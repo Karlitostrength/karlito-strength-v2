@@ -678,10 +678,9 @@ function WorkoutScreen({ user, week, dayKey, onComplete }) {
   const totalSets = Object.values(setLogs).reduce((sum, sets) => sum + sets.length, 0);
   const doneSets = Object.values(setLogs).reduce((sum, sets) => sum + sets.filter(s => s.done).length, 0);
 
-  const saveWorkout = async () => {
+  const saveWorkout = () => {
     const now = new Date();
-    const dateKey = now.toISOString().slice(0, 10);
-    const key = `log:${dateKey}:${dayKey}:${now.getTime()}`;
+    const key = `log:${now.toISOString().slice(0,10)}:${dayKey}:${now.getTime()}`;
     const logData = {
       date: now.toISOString(),
       week, day: dayKey, workout: workout.title,
@@ -692,7 +691,11 @@ function WorkoutScreen({ user, week, dayKey, onComplete }) {
       })),
       comment,
     };
-    try { await window.storage.set(key, JSON.stringify(logData)); } catch(e) {}
+    try {
+      const existing = JSON.parse(localStorage.getItem("ks_logs") || "[]");
+      existing.unshift({ key, ...logData });
+      localStorage.setItem("ks_logs", JSON.stringify(existing));
+    } catch(e) {}
     setSaved(true);
   };
 
@@ -1123,20 +1126,12 @@ function HistoryScreen() {
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const result = await window.storage.list("log:");
-        if (!result || !result.keys || result.keys.length === 0) { setLoading(false); return; }
-        const entries = await Promise.all(
-          result.keys.map(async (k) => {
-            try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; }
-            catch { return null; }
-          })
-        );
-        setLogs(entries.filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } catch { }
-      setLoading(false);
-    })();
+    try {
+      const raw = localStorage.getItem("ks_logs");
+      const entries = raw ? JSON.parse(raw) : [];
+      setLogs(entries.sort((a, b) => new Date(b.date) - new Date(a.date)));
+    } catch { }
+    setLoading(false);
   }, []);
 
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("pl-PL", { weekday: "short", day: "numeric", month: "short" });

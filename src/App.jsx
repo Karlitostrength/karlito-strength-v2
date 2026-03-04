@@ -756,11 +756,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
     loadCoachProgram();
   }, [authUser, week, dayKey]);
 const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
-  if (loadingProgram) return (
-    <div style={{ ...s.screen, textAlign: "center", paddingTop: 60 }}>
-      <div style={{ fontSize: 13, color: "var(--gray)", letterSpacing: "0.1em" }}>LOADING PROGRAM...</div>
-    </div>
-  );
+ 
   
   const workout = coachProgram ? {
     title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,

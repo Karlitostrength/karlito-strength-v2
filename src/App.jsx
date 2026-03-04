@@ -725,7 +725,36 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
 
 // ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 
-function WorkoutScreen({ user, week, dayKey, onComplete }) {
+function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
+  const [coachProgram, setCoachProgram] = useState(null);
+  const [loadingProgram, setLoadingProgram] = useState(true);
+
+  useEffect(() => {
+    const loadCoachProgram = async () => {
+      if (!authUser) { setLoadingProgram(false); return; }
+      try {
+        const { data: days } = await supabase
+          .from("program_days")
+          .select("*")
+          .eq("athlete_id", authUser.id)
+          .eq("week", week)
+          .eq("day", dayKey)
+          .single();
+
+        if (days) {
+          const { data: exs } = await supabase
+            .from("custom_exercises")
+            .select("*")
+            .eq("athlete_id", authUser.id)
+            .eq("week", week)
+            .eq("day", dayKey);
+          setCoachProgram({ ...days, exercises: exs || [] });
+        }
+      } catch(e) {}
+      setLoadingProgram(false);
+    };
+    loadCoachProgram();
+  }, [authUser, week, dayKey]);
   const workout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
   const strengthExercises = workout.sections.find(sec => sec.title === "STRENGTH")?.exercises || [];
 
@@ -1842,7 +1871,7 @@ const [authUser, setAuthUser] = useState(undefined);
       <div className="fade-in" key={tab + activeDay}>
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} />}
-        {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} onComplete={handleWorkoutDone} />}
+      {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
         {tab === "history" && <HistoryScreen />}
         {tab === "progress" && <ProgressScreen user={user} week={week} />}
    {tab === "profile" && <ProfileScreen user={user} />}

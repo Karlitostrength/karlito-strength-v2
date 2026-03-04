@@ -759,31 +759,23 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
  
   
-  const workout = coachProgram
-    ? {
-        title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
-        sections: [
-          {
-            title: "STRENGTH",
-            exercises: coachProgram.exercises.map(ex => ({
-              name: ex.name,
-              sets: ex.sets,
-              reps: ex.reps,
-              weight: ex.weight,
-              isMain: true,
-              pct: null,
-            }))
-          },
-          ...(coachProgram.notes ? [{
-            title: "COACH NOTES",
-            notes: coachProgram.notes,
-          }] : []),
-        ]
-      }
-    : authUser
-      ? null
-      : defaultWorkout;
-
+ const workout = coachProgram ? {
+    title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
+    sections: [
+      {
+        title: "STRENGTH",
+        exercises: coachProgram.exercises.map(ex => ({
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight,
+          isMain: true,
+          pct: null,
+        }))
+      },
+      ...(coachProgram.notes ? [{ title: "COACH NOTES", notes: coachProgram.notes }] : []),
+    ]
+  } : (authUser ? null : defaultWorkout);
   const strengthExercises = workout?.sections?.find(sec => sec.title === "STRENGTH")?.exercises || [];
 
   const [setLogs, setSetLogs] = useState(() => initSetLogs(strengthExercises));

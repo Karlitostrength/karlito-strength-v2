@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://ebpdfalmzkvxfuzaamqh.supabase.co",
+  "sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy"
+);
 
 // ─── FONT INJECTION ──────────────────────────────────────────────────────────
 const style = document.createElement("style");

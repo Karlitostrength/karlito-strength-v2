@@ -1240,9 +1240,14 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
           <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
             Get a custom program tailored to your goals,<br />with direct feedback from Coach Karlos.
           </div>
-          <a href="https://karlito.uk" target="_blank" rel="noopener noreferrer" style={{ ...s.btn, display: "inline-block", textDecoration: "none", padding: "10px 20px" }}>
-            LEARN MORE
-          </a>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <a href="https://www.instagram.com/karlitostrength" target="_blank" rel="noopener noreferrer" style={{ ...s.btn, display: "inline-block", textDecoration: "none", padding: "10px 16px", fontSize: 13 }}>
+              📸 INSTAGRAM
+            </a>
+            <a href="mailto:karolprzybycien91@gmail.com" style={{ ...s.btnGhost, display: "inline-block", textDecoration: "none", padding: "10px 16px", fontSize: 13 }}>
+              ✉️ EMAIL
+            </a>
+          </div>
         </div>
       )}
     </div>

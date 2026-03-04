@@ -789,6 +789,15 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
       </div>
     </div>
   );
+if (!workout) return (
+    <div style={s.screen}>
+      <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
+        <div style={{ fontSize: 24 }}>⏳</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginTop: 8 }}>PROGRAM NOT READY</div>
+        <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>Your coach hasn't assigned this week yet. Check back soon!</div>
+      </div>
+    </div>
+  );
   const strengthExercises = workout.sections.find(sec => sec.title === "STRENGTH")?.exercises || [];
 
 

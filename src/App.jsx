@@ -1637,7 +1637,15 @@ function HistoryScreen() {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
-const NAV = [
+const NAV_ATHLETE = [
+  { id: "dashboard", icon: "⚡", label: "HOME" },
+  { id: "workout", icon: "🏋️", label: "TRAIN" },
+  { id: "history", icon: "📋", label: "LOGI" },
+  { id: "progress", icon: "📈", label: "STATS" },
+  { id: "profile", icon: "👤", label: "JA" },
+];
+
+const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
   { id: "history", icon: "📋", label: "LOGI" },
@@ -1647,8 +1655,9 @@ const NAV = [
 ];
 
 export default function App() {
-  const [authUser, setAuthUser] = useState(undefined);
+const [authUser, setAuthUser] = useState(undefined);
   const [user, setUser] = useState(null);
+  const [isCoach, setIsCoach] = useState(false);
   const [week, setWeek] = useState(1);
   const [tab, setTab] = useState("dashboard");
   const [activeDay, setActiveDay] = useState(null);
@@ -1662,10 +1671,19 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!authUser) return;
     const saved = localStorage.getItem("ks_profile");
     if (saved) setUser(JSON.parse(saved));
+
+    // Sprawdź czy coach
+    supabase.from("profiles")
+      .select("role")
+      .eq("id", authUser.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.role === "coach") setIsCoach(true);
+      });
   }, [authUser]);
 
   if (authUser === undefined) {
@@ -1709,7 +1727,7 @@ export default function App() {
       </div>
 
       <nav style={s.navBar}>
-        {NAV.map(n => (
+        {(isCoach ? NAV_COACH : NAV_ATHLETE).map(n => (
           <div key={n.id} style={s.navItem(tab === n.id)} onClick={() => { setTab(n.id); if (n.id !== "workout") setActiveDay(null); }}>
             <div style={{ fontSize: 20 }}>{n.icon}</div>
             <div style={s.navLabel}>{n.label}</div>

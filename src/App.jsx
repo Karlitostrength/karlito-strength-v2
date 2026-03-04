@@ -261,7 +261,7 @@ function generateWorkout(day, week, level, oneRM, injuries) {
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
 
 const s = {
-  app: { minHeight: "100vh", background: `linear-gradient(rgba(8,8,8,0.88) 0%, rgba(8,8,8,0.82) 40%, rgba(8,8,8,0.92) 100%), url(${COMP_PHOTOS[1].src}) center 30% / cover fixed`, color: "var(--white)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
+  app: { minHeight: "100vh", background: "var(--bg)", color: "var(--white)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
   header: { padding: "24px 20px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg)" },
   logo: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, letterSpacing: "0.08em", color: "var(--white)", lineHeight: 1 },
   logoRed: { color: "var(--red)" },

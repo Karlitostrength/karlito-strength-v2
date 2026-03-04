@@ -1408,65 +1408,7 @@ const saveProgramDay = async () => {
         </div>
       )}
 
-      {/* Add exercise form */}
-      {view === "addExercise" && selectedClient && (
-        <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>
-            NEW EXERCISE FOR {selectedClientData?.name || "ATHLETE"}
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <label style={s.label}>EXERCISE NAME</label>
-            <input value={newEx.name} onChange={e => setNewEx(p => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. Romanian Deadlift" style={s.input} />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-            <div>
-              <label style={s.label}>SETS</label>
-              <input type="number" value={newEx.sets} onChange={e => setNewEx(p => ({ ...p, sets: parseInt(e.target.value) }))} style={s.input} />
-            </div>
-            <div>
-              <label style={s.label}>REPS</label>
-              <input type="number" value={newEx.reps} onChange={e => setNewEx(p => ({ ...p, reps: parseInt(e.target.value) }))} style={s.input} />
-            </div>
-            <div>
-              <label style={s.label}>WEIGHT kg</label>
-              <input type="number" value={newEx.weight} onChange={e => setNewEx(p => ({ ...p, weight: parseFloat(e.target.value) }))} style={s.input} />
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            <div>
-              <label style={s.label}>DAY</label>
-              <div style={{ display: "flex", gap: 6 }}>
-                {["A", "B", "C"].map(d => (
-                  <div key={d} onClick={() => setNewEx(p => ({ ...p, day: d }))}
-                    style={{ ...s.pill(newEx.day === d), flex: 1, textAlign: "center", padding: "10px 0" }}>{d}</div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={s.label}>WEEK</label>
-              <input type="number" min={1} max={12} value={newEx.week}
-                onChange={e => setNewEx(p => ({ ...p, week: parseInt(e.target.value) }))} style={s.input} />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={s.label}>NOTES (optional)</label>
-            <input value={newEx.notes} onChange={e => setNewEx(p => ({ ...p, notes: e.target.value }))}
-              placeholder="e.g. Focus on slow eccentric" style={s.input} />
-          </div>
-
-          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveExercise} disabled={saving}>
-            {saving ? "SAVING..." : "SAVE EXERCISE"}
-          </button>
-          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("profile")}>
-            ← CANCEL
-          </button>
-        </div>
-      )}
+     
 {/* Build program day */}
       {view === "buildProgram" && selectedClient && (
         <div style={{ ...s.card, borderColor: "var(--accent)", marginBottom: 16 }}>

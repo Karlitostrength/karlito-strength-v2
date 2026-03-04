@@ -759,26 +759,40 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
  
   
-  const workout = coachProgram ? {
-    title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
-    sections: [
-      {
-        title: "STRENGTH",
-        exercises: coachProgram.exercises.map(ex => ({
-          name: ex.name,
-          sets: ex.sets,
-          reps: ex.reps,
-          weight: ex.weight,
-          isMain: true,
-          pct: null,
-        }))
-      },
-      ...(coachProgram.notes ? [{
-        title: "COACH NOTES",
-        notes: coachProgram.notes,
-      }] : []),
-    ]
- } : (authUser ? null : defaultWorkout);
+  const workout = coachProgram
+    ? {
+        title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
+        sections: [
+          {
+            title: "STRENGTH",
+            exercises: coachProgram.exercises.map(ex => ({
+              name: ex.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              weight: ex.weight,
+              isMain: true,
+              pct: null,
+            }))
+          },
+          ...(coachProgram.notes ? [{
+            title: "COACH NOTES",
+            notes: coachProgram.notes,
+          }] : []),
+        ]
+      }
+    : authUser
+      ? null
+      : defaultWorkout;
+
+  const strengthExercises = workout?.sections?.find(sec => sec.title === "STRENGTH")?.exercises || [];
+
+  const [setLogs, setSetLogs] = useState(() => initSetLogs(strengthExercises));
+  const [accDone, setAccDone] = useState({});
+  const [condDone, setCondDone] = useState({});
+  const [comment, setComment] = useState("");
+  const [showComment, setShowComment] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   if (!workout) return (
     <div style={s.screen}>
@@ -789,33 +803,6 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
       </div>
     </div>
   );
-if (!workout) return (
-    <div style={s.screen}>
-      <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
-        <div style={{ fontSize: 24 }}>⏳</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginTop: 8 }}>PROGRAM NOT READY</div>
-        <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>Your coach hasn't assigned this week yet. Check back soon!</div>
-      </div>
-    </div>
-  );
-if (!workout) return (
-    <div style={s.screen}>
-      <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
-        <div style={{ fontSize: 24 }}>⏳</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginTop: 8 }}>PROGRAM NOT READY</div>
-        <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>Your coach hasn't assigned this week yet. Check back soon!</div>
-      </div>
-    </div>
-  );
-  const strengthExercises = workout.sections.find(sec => sec.title === "STRENGTH")?.exercises || [];
-
-  const [setLogs, setSetLogs] = useState(() => initSetLogs(strengthExercises));
-  const [accDone, setAccDone] = useState({});
-  const [condDone, setCondDone] = useState({});
-  const [comment, setComment] = useState("");
-  const [showComment, setShowComment] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [showTimer, setShowTimer] = useState(false);
 
   const updateSetLog = (exIdx, setIdx, field, value) => {
     setSetLogs(prev => ({

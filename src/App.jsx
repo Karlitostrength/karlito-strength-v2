@@ -778,7 +778,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
         notes: coachProgram.notes,
       }] : []),
     ]
-    } : (authUser ? null : defaultWorkout);
+ } : (authUser ? null : defaultWorkout);
 
   if (!workout) return (
     <div style={s.screen}>

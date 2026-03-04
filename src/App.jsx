@@ -754,7 +754,7 @@ function WorkoutScreen({ user, week, dayKey, onComplete }) {
   const totalSets = Object.values(setLogs).reduce((sum, sets) => sum + sets.length, 0);
   const doneSets = Object.values(setLogs).reduce((sum, sets) => sum + sets.filter(s => s.done).length, 0);
 
-  const saveWorkout = () => {
+const saveWorkout = async () => {
     const now = new Date();
     const key = `log:${now.toISOString().slice(0,10)}:${dayKey}:${now.getTime()}`;
     const logData = {

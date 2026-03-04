@@ -1299,7 +1299,7 @@ export default function App() {
   const handleWorkoutDone = () => { setActiveDay(null); setTab("history"); };
 
   return (
-    <div style={s.app}>
+<div style={{...s.app, background: `linear-gradient(rgba(8,8,8,0.88) 0%, rgba(8,8,8,0.85) 50%, rgba(8,8,8,0.93) 100%), url(${COMP_PHOTOS[1].src}) center 35% / cover fixed`}}>
       <div style={s.header}>
         <div style={s.logo}>KARLITO <span style={s.logoRed}>STRENGTH</span></div>
         <div style={s.tagline}>Week {week} · {PHASES[getPhase(week)].name}</div>

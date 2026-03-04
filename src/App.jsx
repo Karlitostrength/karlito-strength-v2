@@ -755,8 +755,35 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
     };
     loadCoachProgram();
   }, [authUser, week, dayKey]);
-  const workout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
+ const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
+  
+  const workout = coachProgram ? {
+    title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
+    sections: [
+      {
+        title: "STRENGTH",
+        exercises: coachProgram.exercises.map(ex => ({
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight,
+          isMain: true,
+          pct: null,
+        }))
+      },
+      ...(coachProgram.notes ? [{
+        title: "COACH NOTES",
+        notes: coachProgram.notes,
+      }] : []),
+    ]
+  } : defaultWorkout;
+
   const strengthExercises = workout.sections.find(sec => sec.title === "STRENGTH")?.exercises || [];
+ if (loadingProgram) return (
+    <div style={{ ...s.screen, textAlign: "center", paddingTop: 60 }}>
+      <div style={{ fontSize: 13, color: "var(--gray)", letterSpacing: "0.1em" }}>LOADING PROGRAM...</div>
+    </div>
+  );
 
   const [setLogs, setSetLogs] = useState(() => initSetLogs(strengthExercises));
   const [accDone, setAccDone] = useState({});

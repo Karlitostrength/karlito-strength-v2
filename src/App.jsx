@@ -1049,6 +1049,30 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout }) {
   const pct = getPct(week, user.level);
   const days = ["A", "B", "C"];
 
+  const [coachDays, setCoachDays] = useState([]);
+  const [loadingDays, setLoadingDays] = useState(true);
+
+  useEffect(() => {
+    const loadCoachDays = async () => {
+      setLoadingDays(true);
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data } = await supabase
+            .from("program_days")
+            .select("*")
+            .eq("athlete_id", authUser.id)
+            .eq("week", week);
+          setCoachDays(data || []);
+        }
+      } catch(e) {}
+      setLoadingDays(false);
+    };
+    loadCoachDays();
+  }, [week]);
+
+  const hasCoachProgram = coachDays.length > 0;
+
   return (
     <div style={s.screen}>
       {/* Phase header */}
@@ -1083,31 +1107,55 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout }) {
         ))}
       </div>
 
-      {/* Today's workouts */}
+      {/* This week's sessions */}
       <div style={s.sectionLabel}>THIS WEEK'S SESSIONS</div>
-      {days.map(day => {
-        const dayName = day === "A" ? "SQUAT DOMINANT" : day === "B" ? "DEADLIFT DOMINANT" : "BENCH DOMINANT";
-        const sqVar = day !== "B" ? getSquatVariation(week, user.injuries) : null;
-        const dlVar = day === "B" ? getDeadliftVariation(week, user.injuries) : null;
-        const bpVar = day !== "B" ? getBenchVariation(week, user.injuries) : null;
-        return (
-          <div key={day} style={{ ...s.card, marginBottom: 10, cursor: "pointer", transition: "border-color 0.2s" }}
-            onClick={() => onStartWorkout(day)}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--red)" }}>DAY {day}</div>
-                </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>{dayName}</div>
-                <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>
-                  {day === "A" ? `${sqVar} · ${bpVar}` : day === "B" ? `${dlVar} · OHP · Pull Ups` : `${bpVar} · ${sqVar} · Rows`}
+
+      {loadingDays ? (
+        <div style={{ ...s.card, textAlign: "center", padding: 24 }}>
+          <div style={{ fontSize: 13, color: "var(--gray)" }}>Loading...</div>
+        </div>
+      ) : hasCoachProgram ? (
+        // Coach program days
+        days.map(day => {
+          const coachDay = coachDays.find(d => d.day === day);
+          if (!coachDay) {
+            return (
+              <div key={day} style={{ ...s.card, marginBottom: 10, opacity: 0.5 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--gray2)" }}>DAY {day}</div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, color: "var(--gray)" }}>Not assigned yet</div>
+                  </div>
+                  <div style={{ color: "var(--gray2)", fontSize: 16 }}>⏳</div>
                 </div>
               </div>
-              <div style={{ color: "var(--gray2)", fontSize: 20 }}>›</div>
+            );
+          }
+          return (
+            <div key={day} style={{ ...s.card, marginBottom: 10, cursor: "pointer", transition: "border-color 0.2s", borderColor: "var(--red-dim)" }}
+              onClick={() => onStartWorkout(day)}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--red)" }}>DAY {day}</div>
+                    <div style={{ fontSize: 10, color: "var(--accent)", background: "rgba(232,213,160,0.1)", padding: "2px 6px", borderRadius: 3 }}>COACH</div>
+                  </div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>{coachDay.title}</div>
+                  {coachDay.notes && <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>{coachDay.notes}</div>}
+                </div>
+                <div style={{ color: "var(--gray2)", fontSize: 20 }}>›</div>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      ) : (
+        // No coach program - show message
+        <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
+          <div style={{ fontSize: 24 }}>⏳</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginTop: 8 }}>PROGRAM NOT READY</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>Your coach hasn't assigned Week {week} yet. Check back soon!</div>
+        </div>
+      )}
 
       {/* Week navigation */}
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
@@ -1127,7 +1175,6 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout }) {
     </div>
   );
 }
-
 // ─── PROGRESS ─────────────────────────────────────────────────────────────────
 
 function ProgressScreen({ user, week }) {

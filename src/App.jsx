@@ -292,7 +292,77 @@ const s = {
 };
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
+function AuthScreen({ onAuth }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("login");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
+  const handle = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      let result;
+      if (mode === "login") {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      } else {
+        result = await supabase.auth.signUp({ email, password });
+      }
+      if (result.error) throw result.error;
+      onAuth(result.data.user);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", maxWidth: 480, margin: "0 auto" }}>
+      <div style={s.header}>
+        <div style={s.logo}>KARLITO <span style={s.logoRed}>STRENGTH</span></div>
+        <div style={s.tagline}>Built Through Discipline</div>
+      </div>
+      <div style={s.screen}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={s.redLine} />
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 36, fontWeight: 900, marginBottom: 8 }}>
+            {mode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--gray)" }}>
+            {mode === "login" ? "Your data syncs to the cloud." : "Create your athlete account."}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={s.label}>EMAIL</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="athlete@email.com" style={s.input} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={s.label}>PASSWORD</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+            placeholder="••••••••" style={s.input} />
+        </div>
+
+        {error && (
+          <div style={{ background: "rgba(196,30,30,0.1)", border: "1px solid var(--red-dim)", borderRadius: 6, padding: "10px 14px", fontSize: 13, color: "var(--red)", marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
+
+        <button style={{ ...s.btn, opacity: loading ? 0.6 : 1 }} onClick={handle} disabled={loading}>
+          {loading ? "..." : mode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
+        </button>
+
+        <div onClick={() => setMode(mode === "login" ? "register" : "login")}
+          style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--gray)", cursor: "pointer", textDecoration: "underline" }}>
+          {mode === "login" ? "No account? Register" : "Already have account? Sign in"}
+        </div>
+      </div>
+    </div>
+  );
+}
 function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(0);
   const [data, setData] = useState({

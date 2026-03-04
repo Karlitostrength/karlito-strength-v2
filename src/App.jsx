@@ -1164,8 +1164,17 @@ function CoachScreen() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [view, setView] = useState("sessions"); // sessions | profile | addExercise
   const [newEx, setNewEx] = useState({ name: "", sets: 3, reps: 10, weight: 0, notes: "", day: "A", week: 1 });
-  const [saving, setSaving] = useState(false);
+   const [saving, setSaving] = useState(false);
   const [exercises, setExercises] = useState([]);
+  const [programDays, setProgramDays] = useState([]);
+  const [buildMode, setBuildMode] = useState(false);
+  const [buildWeek, setBuildWeek] = useState(1);
+  const [buildDay, setBuildDay] = useState("A");
+  const [buildTitle, setBuildTitle] = useState("");
+  const [buildNotes, setBuildNotes] = useState("");
+  const [buildExercises, setBuildExercises] = useState([
+    { name: "", sets: 3, reps: 8, weight: 0, notes: "" }
+  ]);
 
   useEffect(() => { loadData(); }, []);
 
@@ -1176,8 +1185,10 @@ function CoachScreen() {
       setClients(profiles || []);
       const { data: logs } = await supabase.from("workouts").select("*").order("created_at", { ascending: false });
       setWorkouts(logs || []);
-      const { data: exs } = await supabase.from("custom_exercises").select("*").order("created_at", { ascending: false });
+   const { data: exs } = await supabase.from("custom_exercises").select("*").order("created_at", { ascending: false });
       setExercises(exs || []);
+      const { data: days } = await supabase.from("program_days").select("*").order("week", { ascending: true });
+      setProgramDays(days || []);
     } catch(e) { console.log("Coach load error:", e); }
     setLoading(false);
   };
@@ -1198,7 +1209,57 @@ function CoachScreen() {
     } catch(e) { console.log("Save exercise error:", e); }
     setSaving(false);
   };
+const saveProgramDay = async () => {
+    if (!selectedClient || !buildTitle) return;
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Zapisz dzień programu
+      const { data: dayData } = await supabase.from("program_days").insert({
+        coach_id: user.id,
+        athlete_id: selectedClient,
+        week: buildWeek,
+        day: buildDay,
+        title: buildTitle,
+        notes: buildNotes,
+      }).select().single();
 
+      // Zapisz ćwiczenia dla tego dnia
+      const validExercises = buildExercises.filter(e => e.name.trim());
+      for (const ex of validExercises) {
+        await supabase.from("custom_exercises").insert({
+          coach_id: user.id,
+          athlete_id: selectedClient,
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight,
+          notes: ex.notes,
+          day: buildDay,
+          week: buildWeek,
+        });
+      }
+
+      setBuildMode(false);
+      setBuildTitle("");
+      setBuildNotes("");
+      setBuildExercises([{ name: "", sets: 3, reps: 8, weight: 0, notes: "" }]);
+      await loadData();
+      setView("profile");
+    } catch(e) { console.log("Save program day error:", e); }
+    setSaving(false);
+  };
+
+  const deleteProgramDay = async (dayId) => {
+    await supabase.from("program_days").delete().eq("id", dayId);
+    await supabase.from("custom_exercises")
+      .delete()
+      .eq("athlete_id", selectedClient)
+      .eq("week", buildWeek)
+      .eq("day", buildDay);
+    await loadData();
+  };
   const deleteExercise = async (id) => {
     await supabase.from("custom_exercises").delete().eq("id", id);
     await loadData();
@@ -1301,9 +1362,49 @@ function CoachScreen() {
             </>
           )}
 
-          <button style={{ ...s.btn, marginTop: 12 }} onClick={() => setView("addExercise")}>
-            + ADD CUSTOM EXERCISE
-          </button>
+         {/* Program days */}
+          {programDays.filter(d => d.athlete_id === selectedClient).length > 0 && (
+            <>
+              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", margin: "12px 0 8px" }}>PROGRAM</div>
+              {programDays.filter(d => d.athlete_id === selectedClient)
+                .map(day => {
+                  const dayExs = exercises.filter(e => 
+                    e.athlete_id === selectedClient && 
+                    e.week === day.week && 
+                    e.day === day.day
+                  );
+                  const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" };
+                  const col = dayCol[day.day] || "var(--red)";
+                  return (
+                    <div key={day.id} style={{ borderLeft: `3px solid ${col}`, paddingLeft: 10, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, color: col }}>
+                            WK {day.week} · DAY {day.day}
+                          </div>
+                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 900 }}>{day.title}</div>
+                          {day.notes && <div style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>{day.notes}</div>}
+                        </div>
+                        <div onClick={() => deleteProgramDay(day.id)}
+                          style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</div>
+                      </div>
+                      {dayExs.map((ex, i) => (
+                        <div key={i} style={{ fontSize: 12, color: "var(--gray)", marginTop: 4 }}>
+                          · {ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}kg
+                          {ex.notes && <span style={{ color: "var(--gray2)", fontStyle: "italic" }}> ({ex.notes})</span>}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+            </>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button style={{ ...s.btn, flex: 1 }} onClick={() => { setBuildMode(true); setView("buildProgram"); }}>
+              + BUILD PROGRAM DAY
+            </button>
+          </div>
         </div>
       )}
 
@@ -1366,7 +1467,87 @@ function CoachScreen() {
           </button>
         </div>
       )}
+{/* Build program day */}
+      {view === "buildProgram" && selectedClient && (
+        <div style={{ ...s.card, borderColor: "var(--accent)", marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)", marginBottom: 14 }}>
+            BUILD PROGRAM DAY — {selectedClientData?.name || "ATHLETE"}
+          </div>
 
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <div>
+              <label style={s.label}>WEEK</label>
+              <input type="number" min={1} max={52} value={buildWeek}
+                onChange={e => setBuildWeek(parseInt(e.target.value))} style={s.input} />
+            </div>
+            <div>
+              <label style={s.label}>DAY</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {["A", "B", "C"].map(d => (
+                  <div key={d} onClick={() => setBuildDay(d)}
+                    style={{ ...s.pill(buildDay === d), flex: 1, textAlign: "center", padding: "10px 0" }}>{d}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={s.label}>SESSION TITLE</label>
+            <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)}
+              placeholder="e.g. Squat Focus — Heavy" style={s.input} />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={s.label}>SESSION NOTES</label>
+            <input value={buildNotes} onChange={e => setBuildNotes(e.target.value)}
+              placeholder="e.g. Focus on depth, no belt today" style={s.input} />
+          </div>
+
+          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 10 }}>EXERCISES</div>
+
+          {buildExercises.map((ex, i) => (
+            <div key={i} style={{ ...s.card, marginBottom: 8, padding: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray2)" }}>EXERCISE {i + 1}</div>
+                {buildExercises.length > 1 && (
+                  <div onClick={() => setBuildExercises(prev => prev.filter((_, idx) => idx !== i))}
+                    style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer" }}>✕</div>
+                )}
+              </div>
+              <input value={ex.name} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, name: e.target.value } : p))}
+                placeholder="Exercise name" style={{ ...s.input, marginBottom: 8 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+                <div>
+                  <label style={s.label}>SETS</label>
+                  <input type="number" value={ex.sets} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, sets: parseInt(e.target.value) } : p))} style={s.input} />
+                </div>
+                <div>
+                  <label style={s.label}>REPS</label>
+                  <input type="number" value={ex.reps} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, reps: parseInt(e.target.value) } : p))} style={s.input} />
+                </div>
+                <div>
+                  <label style={s.label}>KG</label>
+                  <input type="number" value={ex.weight} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, weight: parseFloat(e.target.value) } : p))} style={s.input} />
+                </div>
+              </div>
+              <input value={ex.notes} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, notes: e.target.value } : p))}
+                placeholder="Notes (optional)" style={s.input} />
+            </div>
+          ))}
+
+          <button style={{ ...s.btnGhost, marginBottom: 12 }}
+            onClick={() => setBuildExercises(prev => [...prev, { name: "", sets: 3, reps: 8, weight: 0, notes: "" }])}>
+            + ADD EXERCISE
+          </button>
+
+          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>
+            {saving ? "SAVING..." : "SAVE PROGRAM DAY"}
+          </button>
+          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("profile")}>
+            ← CANCEL
+          </button>
+        </div>
+      )}
       {/* Sessions list */}
       <div style={s.sectionLabel}>
         {selectedClient ? `SESSIONS — ${selectedClientData?.name || "ATHLETE"}` : "ALL SESSIONS"}

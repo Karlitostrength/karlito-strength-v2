@@ -767,11 +767,26 @@ function WorkoutScreen({ user, week, dayKey, onComplete }) {
       })),
       comment,
     };
-    try {
+     try {
       const existing = JSON.parse(localStorage.getItem("ks_logs") || "[]");
       existing.unshift({ key, ...logData });
       localStorage.setItem("ks_logs", JSON.stringify(existing));
     } catch(e) {}
+
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase.from("workouts").insert({
+          user_id: authUser.id,
+          week: logData.week,
+          day: logData.day,
+          workout_title: logData.workout,
+          exercises: logData.exercises,
+          comment: logData.comment,
+        });
+      }
+    } catch(e) { console.log("Supabase sync error:", e); }
+
     setSaved(true);
   };
 
@@ -1188,7 +1203,10 @@ function ProfileScreen({ user }) {
 
       <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)", textAlign: "center" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, letterSpacing: "0.08em", marginBottom: 4 }}>KARLITO STRENGTH</div>
-        <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em" }}>BUILT THROUGH DISCIPLINE</div>
+        <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 16 }}>BUILT THROUGH DISCIPLINE</div>
+        <button style={{ ...s.btnGhost, fontSize: 12 }} onClick={() => supabase.auth.signOut()}>
+          SIGN OUT
+        </button>
       </div>
     </div>
   );
@@ -1362,13 +1380,45 @@ const NAV = [
 ];
 
 export default function App() {
+  const [authUser, setAuthUser] = useState(undefined);
   const [user, setUser] = useState(null);
   const [week, setWeek] = useState(1);
   const [tab, setTab] = useState("dashboard");
   const [activeDay, setActiveDay] = useState(null);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthUser(data.session?.user ?? null);
+    });
+    supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) return;
+    const saved = localStorage.getItem("ks_profile");
+    if (saved) setUser(JSON.parse(saved));
+  }, [authUser]);
+
+  if (authUser === undefined) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "var(--gray)", letterSpacing: "0.2em" }}>LOADING...</div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <AuthScreen onAuth={(u) => setAuthUser(u)} />;
+  }
+
   if (!user) {
-    return <OnboardingScreen onComplete={(u) => { setUser(u); setTab("dashboard"); }} />;
+    return <OnboardingScreen onComplete={(u) => {
+      localStorage.setItem("ks_profile", JSON.stringify(u));
+      setUser(u);
+      setTab("dashboard");
+    }} />;
   }
 
   const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };

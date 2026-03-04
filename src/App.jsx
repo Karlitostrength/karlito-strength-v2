@@ -1982,7 +1982,8 @@ const [hasCoach, setHasCoach] = useState(false);
       .single()
       .then(({ data }) => {
         if (data?.role === "coach") setIsCoach(true);
-        if (data?.coach_id) setHasCoach(true);
+        // Only athletes with coach_id get coached experience
+        if (data?.role === "athlete" && data?.coach_id) setHasCoach(true);
       });
   }, [authUser]);
 

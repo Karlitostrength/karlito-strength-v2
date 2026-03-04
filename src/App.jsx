@@ -755,7 +755,19 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
     };
     loadCoachProgram();
   }, [authUser, week, dayKey]);
-const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
+// visible debug - usunac pozniej
+  if (!coachProgram) return (
+    <div style={{ ...s.screen, paddingTop: 40 }}>
+      <div style={{ ...s.card, borderColor: "var(--red)" }}>
+        <div style={{ fontSize: 12, color: "var(--gray)" }}>
+          No coach program found<br/>
+          user: {authUser?.id?.slice(0,8) || "NO AUTH"}<br/>
+          week: {week} · day: {dayKey}
+        </div>
+      </div>
+    </div>
+  );
+  const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
  
   
   const workout = coachProgram ? {

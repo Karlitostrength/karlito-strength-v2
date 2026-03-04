@@ -1958,6 +1958,21 @@ const NAV_COACH = [
 ];
 
 export default function App() {
+  // Check for invite code in URL
+  const [inviteCode, setInviteCode] = useState(null);
+  
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith("/invite/")) {
+      const code = path.replace("/invite/", "").toUpperCase();
+      setInviteCode(code);
+      localStorage.setItem("ks_invite", code);
+    } else {
+      const saved = localStorage.getItem("ks_invite");
+      if (saved) setInviteCode(saved);
+    }
+  }, []);
+
 const [authUser, setAuthUser] = useState(undefined);
   const [user, setUser] = useState(null);
  const [isCoach, setIsCoach] = useState(false);
@@ -2001,7 +2016,18 @@ const [hasCoach, setHasCoach] = useState(false);
   }
 
   if (!authUser) {
-    return <AuthScreen onAuth={(u) => setAuthUser(u)} />;
+    return <AuthScreen onAuth={async (u) => {
+      setAuthUser(u);
+      // If invite code, assign coach
+      const code = localStorage.getItem("ks_invite");
+      if (code === "KAROL") {
+        await supabase.from("profiles").update({ 
+          coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" 
+        }).eq("id", u.id);
+        localStorage.removeItem("ks_invite");
+        setHasCoach(true);
+      }
+    }} />;
   }
 
   if (!user) {

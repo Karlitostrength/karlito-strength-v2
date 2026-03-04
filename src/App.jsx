@@ -1098,8 +1098,8 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         </div>
       )}
 
-      {/* Phase header */}
-      <div style={{ ...s.card, background: `linear-gradient(135deg, var(--bg2) 0%, rgba(196,30,30,0.08) 100%)`, borderColor: phaseData.color + "44", marginBottom: 20 }}>
+    {/* Phase header - only for free users */}
+      {!hasCoach && <div style={{ ...s.card, background: `linear-gradient(135deg, var(--bg2) 0%, rgba(196,30,30,0.08) 100%)`, borderColor: phaseData.color + "44", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 4 }}>CURRENT PHASE</div>
@@ -1116,19 +1116,30 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
             <div style={{ ...s.progressBar((week / 12) * 100, phaseData.color) }} />
           </div>
           <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>{Math.round((week / 12) * 100)}% complete</div>
-        </div>
-      </div>
+       </div>
+      </div>}
 
-      {/* Intensity today */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
+      {/* Week indicator for coached athletes */}
+      {hasCoach && (
+        <div style={{ ...s.card, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 4 }}>CURRENT WEEK</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900 }}>Week {week}</div>
+          </div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 48, fontWeight: 900, color: "var(--red)" }}>{week}</div>
+        </div>
+      )}
+
+      {/* Intensity today - only for free users */}
+      {!hasCoach && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
         {[["INTENSITY", `${Math.round(pct * 100)}%`, "of 1RM"], ["KB", `${user.kgKB}kg`, "kettlebell"], ["LEVEL", user.level.toUpperCase().slice(0,3), user.level]].map(([label, val, sub]) => (
           <div key={label} style={{ ...s.card, textAlign: "center", padding: 12 }}>
             <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", marginBottom: 4 }}>{label}</div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{val}</div>
             <div style={{ fontSize: 10, color: "var(--gray2)" }}>{sub}</div>
-          </div>
+         </div>
         ))}
-      </div>
+      </div>}
 
       {/* This week's sessions */}
       <div style={s.sectionLabel}>THIS WEEK'S SESSIONS</div>

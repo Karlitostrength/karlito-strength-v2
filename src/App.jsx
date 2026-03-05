@@ -722,7 +722,7 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
     </div>
   );
 }
-
+const [videoLink, setVideoLink] = useState("");
 // ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 
 function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
@@ -1027,6 +1027,34 @@ const saveWorkout = async () => {
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 4 }}>TRENING ZAPISANY</div>
           <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 4 }}>{doneSets} serii · Tydzień {week} · Dzień {dayKey}</div>
+         {/* Video link */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={s.label}>LINK DO VIDEO (opcjonalnie)</label>
+            <input 
+              type="text" 
+              value={videoLink} 
+              onChange={e => setVideoLink(e.target.value)}
+              placeholder="YouTube, Loom, Google Drive..."
+              style={s.input}
+            />
+            <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
+              Coach obejrzy Twoje video i da feedback
+            </div>
+          </div>
+          {/* Video link */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={s.label}>LINK DO VIDEO (opcjonalnie)</label>
+            <input 
+              type="text" 
+              value={videoLink} 
+              onChange={e => setVideoLink(e.target.value)}
+              placeholder="YouTube, Loom, Google Drive..."
+              style={s.input}
+            />
+            <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
+              Coach obejrzy Twoje video i da feedback
+            </div>
+          </div>
           {comment && (
             <div style={{ fontSize: 12, color: "var(--gray2)", fontStyle: "italic", margin: "10px 0", padding: 8, background: "var(--bg3)", borderRadius: 4 }}>
               "{comment}"
@@ -2051,8 +2079,23 @@ function ChatScreen({ authUser, isCoach }) {
 
      {/* Input */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        {!isCoach && (
-          <MealUpload onUpload={(url) => {
+       {!isCoach && (
+          <button 
+            onClick={() => {
+              const url = prompt("Wklej link do zdjęcia (WhatsApp, Instagram, Google Drive):");
+              if (url) {
+                supabase.from("messages").insert({
+                  from_id: authUser.id,
+                  to_id: selectedContact,
+                  content: `[MEAL] ${url}`
+                });
+              }
+            }}
+            style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }}
+          >
+            📸
+          </button>
+        )}
             supabase.from("messages").insert({
               from_id: authUser.id,
               to_id: selectedContact,

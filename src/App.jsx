@@ -1510,19 +1510,6 @@ const saveProgramDay = async () => {
     await loadData();
   };
 
-  const clientWorkouts = selectedClient
-    ? workouts.filter(w => w.user_id === selectedClient)
-    : workouts;
-
-  const clientExercises = selectedClient
-    ? exercises.filter(e => e.athlete_id === selectedClient)
-    : [];
-
-  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", {
-    weekday: "short", day: "numeric", month: "short"
-  });
-
-
   const selectedClientData = clients.find(c => c.id === selectedClient);
   const athletes = clients.filter(c => c.role === "athlete");
   const now = new Date();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -1405,9 +1405,9 @@ function CoachScreen() {
   const [workouts, setWorkouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [view, setView] = useState("sessions"); // sessions | profile | addExercise
+  const [view, setView] = useState("dashboard"); // dashboard | profile | sessions | addExercise
   const [newEx, setNewEx] = useState({ name: "", sets: 3, reps: 10, weight: 0, notes: "", day: "A", week: 1 });
-   const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [exercises, setExercises] = useState([]);
   const [programDays, setProgramDays] = useState([]);
   const [buildMode, setBuildMode] = useState(false);
@@ -1522,272 +1522,296 @@ const saveProgramDay = async () => {
     weekday: "short", day: "numeric", month: "short"
   });
 
-  const selectedClientData = clients.find(c => c.id === selectedClient);
 
-  
+  const selectedClientData = clients.find(c => c.id === selectedClient);
+  const athletes = clients.filter(c => c.role === "athlete");
+  const now = new Date();
+  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1); startOfWeek.setHours(0,0,0,0);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const clientWks = (id) => workouts.filter(w => w.user_id === id);
+  const wksThisWeek = (id) => clientWks(id).filter(w => new Date(w.created_at) >= startOfWeek).length;
+  const wksThisMonth = (id) => clientWks(id).filter(w => new Date(w.created_at) >= startOfMonth).length;
+  const lastWorkout = (id) => clientWks(id)[0];
+  const hasProgram = (id) => programDays.some(d => d.athlete_id === id);
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const clientExercises = selectedClient ? exercises.filter(e => e.athlete_id === selectedClient) : [];
+  const clientWorkouts = selectedClient ? workouts.filter(w => w.user_id === selectedClient) : workouts;
+  const weeklyData = (() => {
+    if (!selectedClient) return [];
+    const weeks = [];
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1 - i * 7); start.setHours(0,0,0,0);
+      const end = new Date(start); end.setDate(start.getDate() + 7);
+      const wks = clientWks(selectedClient).filter(w => { const d = new Date(w.created_at); return d >= start && d < end; });
+      const vol = wks.reduce((s, w) => s + (w.exercises || []).reduce((s2, ex) =>
+        s2 + (ex.sets || []).filter(st => st.done && st.weight && st.reps)
+          .reduce((s3, st) => s3 + parseFloat(st.weight) * parseFloat(st.reps), 0), 0), 0);
+      weeks.push({ label: i === 0 ? "now" : `-${i}w`, sessions: wks.length, vol: Math.round(vol) });
+    }
+    return weeks;
+  })();
 
   return (
     <div style={s.screen}>
-      <div style={s.sectionLabel}>COACH DASHBOARD</div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
-        {[
-          ["CLIENTS", clients.filter(c => c.role === "athlete").length, "total"],
-          ["SESSIONS", workouts.length, "total"],
-          ["THIS WEEK", workouts.filter(w => {
-            const diff = (new Date() - new Date(w.created_at)) / (1000 * 60 * 60 * 24);
-            return diff <= 7;
-          }).length, "last 7 days"],
-        ].map(([label, val, sub]) => (
-          <div key={label} style={{ ...s.card, textAlign: "center", padding: "10px 6px" }}>
-            <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.12em", marginBottom: 3 }}>{label}</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, color: "var(--red)" }}>{val}</div>
-            <div style={{ fontSize: 9, color: "var(--gray2)" }}>{sub}</div>
+      {/* View toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[["dashboard", "📊 OVERVIEW"], ["sessions", "📋 SESSIONS"]].map(([v, label]) => (
+          <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); }}
+            style={{ ...s.pill(view === v && !selectedClient), padding: "8px 14px", flex: 1, textAlign: "center", fontSize: 12 }}>
+            {label}
           </div>
         ))}
       </div>
 
-      {/* Client list */}
-      <div style={s.sectionLabel}>CLIENTS</div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <div onClick={() => { setSelectedClient(null); setView("sessions"); }}
-          style={{ ...s.pill(!selectedClient), padding: "8px 14px" }}>ALL</div>
-        {clients.filter(c => c.role === "athlete").map(c => (
-          <div key={c.id} onClick={() => { setSelectedClient(c.id); setView("profile"); }}
-            style={{ ...s.pill(selectedClient === c.id), padding: "8px 14px" }}>
-            {c.name || c.id.slice(0, 8)}
-          </div>
-        ))}
-      </div>
-
-      {/* Client profile view */}
-      {selectedClient && selectedClientData && view !== "addExercise" && (
-        <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 8 }}>
-            {selectedClientData.name || "Athlete"}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+      {/* OVERVIEW */}
+      {view === "dashboard" && !selectedClient && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
             {[
-              ["Level", selectedClientData.level || "—"],
-              ["Squat", selectedClientData.squat ? `${selectedClientData.squat}kg` : "—"],
-              ["Bench", selectedClientData.bench ? `${selectedClientData.bench}kg` : "—"],
-              ["Deadlift", selectedClientData.deadlift ? `${selectedClientData.deadlift}kg` : "—"],
-              ["KB", selectedClientData.kb_weight ? `${selectedClientData.kb_weight}kg` : "—"],
-              ["Sessions", clientWorkouts.length],
-            ].map(([k, v]) => (
-              <div key={k} style={{ background: "var(--bg3)", borderRadius: 4, padding: "6px 10px" }}>
-                <div style={{ fontSize: 10, color: "var(--gray2)" }}>{k}</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{v}</div>
+              ["ATHLETES", athletes.length, "total"],
+              ["SESSIONS", workouts.length, "all time"],
+              ["THIS WEEK", workouts.filter(w => new Date(w.created_at) >= startOfWeek).length, "all clients"],
+            ].map(([label, val, sub]) => (
+              <div key={label} style={{ ...s.card, textAlign: "center", padding: "10px 6px" }}>
+                <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.12em", marginBottom: 2 }}>{label}</div>
+                <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 26, fontWeight: 900, color: "var(--red)", lineHeight: 1 }}>{val}</div>
+                <div style={{ fontSize: 9, color: "var(--gray2)", marginTop: 2 }}>{sub}</div>
               </div>
             ))}
           </div>
+          <div style={s.sectionLabel}>CLIENTS</div>
+          {athletes.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
+              <div style={{ fontSize: 13, color: "var(--gray)" }}>No athletes yet</div>
+            </div>
+          ) : athletes.map(client => {
+            const last = lastWorkout(client.id);
+            const thisWk = wksThisWeek(client.id);
+            const thisMo = wksThisMonth(client.id);
+            const prog = hasProgram(client.id);
+            const active = thisWk > 0;
+            const bars = [3,2,1,0].map(i => {
+              const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1 - i * 7); start.setHours(0,0,0,0);
+              const end = new Date(start); end.setDate(start.getDate() + 7);
+              return clientWks(client.id).filter(w => { const d = new Date(w.created_at); return d >= start && d < end; }).length;
+            });
+            const maxB = Math.max(...bars, 1);
+            return (
+              <div key={client.id} onClick={() => { setSelectedClient(client.id); setView("profile"); }}
+                style={{ ...s.card, marginBottom: 10, cursor: "pointer", borderLeft: `3px solid ${active ? "var(--red)" : "var(--border)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 18, fontWeight: 900 }}>{client.name || "Athlete"}</div>
+                      {active && <div style={{ ...s.badge("var(--red)"), fontSize: 9 }}>ACTIVE</div>}
+                      {!prog && <div style={{ background: "var(--bg3)", color: "var(--gray)", fontSize: 9, padding: "2px 6px", borderRadius: 4 }}>NO PROGRAM</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
+                      {[["SQ", client.squat], ["BP", client.bench], ["DL", client.deadlift], ["KB", client.kb_weight]].map(([k, v]) => (
+                        <div key={k} style={{ fontSize: 11, color: "var(--gray2)" }}>
+                          <span style={{ color: "var(--gray)", fontWeight: 700 }}>{k}</span> {v ? `${v}kg` : "—"}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <div style={{ fontSize: 11, color: "var(--gray2)" }}><span style={{ color: "var(--accent)", fontWeight: 700 }}>{thisWk}</span> this wk</div>
+                      <div style={{ fontSize: 11, color: "var(--gray2)" }}><span style={{ color: "var(--accent)", fontWeight: 700 }}>{thisMo}</span> this mo</div>
+                      {last && <div style={{ fontSize: 11, color: "var(--gray2)" }}>last: <span style={{ color: "var(--white)" }}>{fmtDate(last.created_at)}</span></div>}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 18, color: "var(--gray2)" }}>›</div>
+                </div>
+                <div style={{ display: "flex", gap: 3, marginTop: 10, alignItems: "flex-end", height: 24 }}>
+                  {bars.map((n, i) => (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                      <div style={{ width: "100%", borderRadius: 2, background: n > 0 ? "var(--red)" : "var(--bg3)", height: Math.max(3, (n / maxB) * 18) }} />
+                      <div style={{ fontSize: 7, color: "var(--gray2)" }}>{i === 3 ? "now" : `-${3-i}w`}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
 
-          {/* Custom exercises for this client */}
+      {/* CLIENT DETAIL */}
+      {selectedClient && selectedClientData && view === "profile" && !buildMode && (
+        <>
+          <button onClick={() => { setSelectedClient(null); setView("dashboard"); }}
+            style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>
+            ← BACK
+          </button>
+          <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
+            <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{selectedClientData.name || "Athlete"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
+              {[["SQUAT", selectedClientData.squat], ["BENCH", selectedClientData.bench], ["DEADLIFT", selectedClientData.deadlift], ["KB", selectedClientData.kb_weight]].map(([k, v]) => (
+                <div key={k} style={{ background: "var(--bg3)", borderRadius: 6, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.08em" }}>{k}</div>
+                  <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 20, fontWeight: 900 }}>{v || "—"}</div>
+                  {v && <div style={{ fontSize: 9, color: "var(--gray2)" }}>kg</div>}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 6 }}>LAST 4 WEEKS — VOLUME</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 52, marginBottom: 12 }}>
+              {weeklyData.map((w, i) => {
+                const maxVol = Math.max(...weeklyData.map(x => x.vol), 1);
+                const h = Math.max(4, (w.vol / maxVol) * 44);
+                return (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                    <div style={{ fontSize: 9, color: "var(--accent)", fontFamily: "\'Barlow Condensed\', sans-serif" }}>{w.sessions > 0 ? w.sessions : ""}</div>
+                    <div style={{ width: "100%", borderRadius: 3, background: i === 3 ? "var(--red)" : "var(--bg3)", border: "1px solid var(--border)", height: h }} />
+                    <div style={{ fontSize: 8, color: "var(--gray2)" }}>{w.label}</div>
+                    {w.vol > 0 && <div style={{ fontSize: 8, color: "var(--gray2)" }}>{w.vol > 999 ? `${(w.vol/1000).toFixed(1)}t` : `${w.vol}kg`}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[["SESSIONS", clientWorkouts.length, "total"], ["THIS WK", wksThisWeek(selectedClient), ""], ["THIS MO", wksThisMonth(selectedClient), ""], ["PROGRAM", hasProgram(selectedClient) ? "YES" : "NO", ""]].map(([k, v, sub]) => (
+                <div key={k} style={{ flex: 1, background: "var(--bg3)", borderRadius: 6, padding: "6px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: 8, color: "var(--gray2)", letterSpacing: "0.06em" }}>{k}</div>
+                  <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 16, fontWeight: 900, color: v === "NO" ? "var(--gray2)" : "var(--accent)" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAM DAY</button>
+            <button onClick={() => setView("addExercise")} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>+ EXERCISE</button>
+          </div>
           {clientExercises.length > 0 && (
-            <>
+            <div style={{ ...s.card, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>CUSTOM EXERCISES</div>
               {clientExercises.map(ex => (
                 <div key={ex.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                   <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>{ex.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--gray)" }}>
-                      {ex.sets}×{ex.reps} · {ex.weight}kg · Day {ex.day} · Wk {ex.week}
-                    </div>
-                    {ex.notes && <div style={{ fontSize: 11, color: "var(--gray2)", fontStyle: "italic" }}>{ex.notes}</div>}
+                    <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 14, fontWeight: 700 }}>{ex.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--gray)" }}>{ex.sets}×{ex.reps} · {ex.weight}kg · Day {ex.day} · Wk {ex.week}</div>
                   </div>
-                  <div onClick={() => deleteExercise(ex.id)}
-                    style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</div>
+                  <div onClick={() => deleteExercise(ex.id)} style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</div>
                 </div>
               ))}
-            </>
+            </div>
           )}
-
-         {/* Program days */}
           {programDays.filter(d => d.athlete_id === selectedClient).length > 0 && (
-            <>
-              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", margin: "12px 0 8px" }}>PROGRAM</div>
-              {programDays.filter(d => d.athlete_id === selectedClient)
-                .map(day => {
-                  const dayExs = exercises.filter(e => 
-                    e.athlete_id === selectedClient && 
-                    e.week === day.week && 
-                    e.day === day.day
-                  );
-                  const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" };
-                  const col = dayCol[day.day] || "var(--red)";
-                  return (
-                    <div key={day.id} style={{ borderLeft: `3px solid ${col}`, paddingLeft: 10, marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, color: col }}>
-                            WK {day.week} · DAY {day.day}
-                          </div>
-                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 900 }}>{day.title}</div>
-                          {day.notes && <div style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>{day.notes}</div>}
-                        </div>
-                        <div onClick={() => deleteProgramDay(day.id)}
-                          style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</div>
-                      </div>
-                      {dayExs.map((ex, i) => (
-                        <div key={i} style={{ fontSize: 12, color: "var(--gray)", marginTop: 4 }}>
-                          · {ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}kg
-                          {ex.notes && <span style={{ color: "var(--gray2)", fontStyle: "italic" }}> ({ex.notes})</span>}
-                        </div>
-                      ))}
+            <div style={{ ...s.card, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>PROGRAM</div>
+              {programDays.filter(d => d.athlete_id === selectedClient).map(day => {
+                const dayExs = exercises.filter(e => e.athlete_id === selectedClient && e.week === day.week && e.day === day.day);
+                const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" }[day.day] || "var(--red)";
+                return (
+                  <div key={day.id} style={{ borderLeft: `3px solid ${col}`, paddingLeft: 10, marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 14, fontWeight: 900 }}>Wk {day.week} · Day {day.day} — {day.title}</div>
+                      <div onClick={() => deleteProgramDay(day.id)} style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer", padding: "4px 8px" }}>✕</div>
                     </div>
-                  );
-                })}
-            </>
+                    {dayExs.map(ex => <div key={ex.id} style={{ fontSize: 11, color: "var(--gray)", marginTop: 3 }}>· {ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}kg</div>)}
+                  </div>
+                );
+              })}
+            </div>
           )}
-
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button style={{ ...s.btn, flex: 1 }} onClick={() => { setBuildMode(true); setView("buildProgram"); }}>
-              + BUILD PROGRAM DAY
-            </button>
-          </div>
-        </div>
+        </>
       )}
 
-     
-{/* Build program day */}
-      {view === "buildProgram" && selectedClient && (
-        <div style={{ ...s.card, borderColor: "var(--accent)", marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)", marginBottom: 14 }}>
-            BUILD PROGRAM DAY — {selectedClientData?.name || "ATHLETE"}
+      {/* BUILD PROGRAM DAY */}
+      {buildMode && selectedClient && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>BUILD PROGRAM DAY</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
+            <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={buildDay} onChange={e => setBuildDay(e.target.value)} style={s.input}>{["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            <div>
-              <label style={s.label}>WEEK</label>
-              <input type="number" min={1} max={52} value={buildWeek}
-                onChange={e => setBuildWeek(parseInt(e.target.value))} style={s.input} />
-            </div>
-            <div>
-              <label style={s.label}>DAY</label>
+          <label style={s.label}>TITLE</label>
+          <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)} placeholder="e.g. Upper Strength" style={{ ...s.input, marginBottom: 12 }} />
+          <label style={s.label}>NOTES (optional)</label>
+          <input value={buildNotes} onChange={e => setBuildNotes(e.target.value)} placeholder="Focus points..." style={{ ...s.input, marginBottom: 12 }} />
+          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>EXERCISES</div>
+          {buildExercises.map((ex, i) => (
+            <div key={i} style={{ background: "var(--bg3)", borderRadius: 6, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <input value={ex.name} onChange={e => { const a=[...buildExercises]; a[i].name=e.target.value; setBuildExercises(a); }} placeholder={`Exercise ${i+1}`} style={{ ...s.input, flex: 2 }} />
+                <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{ color: "var(--red-dim)", cursor: "pointer", padding: "0 6px", alignSelf: "center", fontSize: 16 }}>✕</div>
+              </div>
               <div style={{ display: "flex", gap: 6 }}>
-                {["A", "B", "C"].map(d => (
-                  <div key={d} onClick={() => setBuildDay(d)}
-                    style={{ ...s.pill(buildDay === d), flex: 1, textAlign: "center", padding: "10px 0" }}>{d}</div>
+                {[["Sets","sets",1,8],["Reps","reps",1,30],["kg","weight",0,500]].map(([lbl,key,min,max]) => (
+                  <div key={key} style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", marginBottom: 2 }}>{lbl}</div>
+                    <input type="number" min={min} max={max} value={ex[key]} onChange={e => { const a=[...buildExercises]; a[i][key]=+e.target.value; setBuildExercises(a); }} style={{ ...s.input, padding: "8px 6px" }} />
+                  </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <label style={s.label}>SESSION TITLE</label>
-            <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)}
-              placeholder="e.g. Squat Focus — Heavy" style={s.input} />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={s.label}>SESSION NOTES</label>
-            <input value={buildNotes} onChange={e => setBuildNotes(e.target.value)}
-              placeholder="e.g. Focus on depth, no belt today" style={s.input} />
-          </div>
-
-          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 10 }}>EXERCISES</div>
-
-          {buildExercises.map((ex, i) => (
-            <div key={i} style={{ ...s.card, marginBottom: 8, padding: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray2)" }}>EXERCISE {i + 1}</div>
-                {buildExercises.length > 1 && (
-                  <div onClick={() => setBuildExercises(prev => prev.filter((_, idx) => idx !== i))}
-                    style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer" }}>✕</div>
-                )}
-              </div>
-              <input value={ex.name} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, name: e.target.value } : p))}
-                placeholder="Exercise name" style={{ ...s.input, marginBottom: 8 }} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
-                <div>
-                  <label style={s.label}>SETS</label>
-                  <input type="number" value={ex.sets} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, sets: parseInt(e.target.value) } : p))} style={s.input} />
-                </div>
-                <div>
-                  <label style={s.label}>REPS</label>
-                  <input type="number" value={ex.reps} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, reps: parseInt(e.target.value) } : p))} style={s.input} />
-                </div>
-                <div>
-                  <label style={s.label}>KG</label>
-                  <input type="number" value={ex.weight} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, weight: parseFloat(e.target.value) } : p))} style={s.input} />
-                </div>
-              </div>
-              <input value={ex.notes} onChange={e => setBuildExercises(prev => prev.map((p, idx) => idx === i ? { ...p, notes: e.target.value } : p))}
-                placeholder="Notes (optional)" style={s.input} />
+              <input value={ex.notes} onChange={e => { const a=[...buildExercises]; a[i].notes=e.target.value; setBuildExercises(a); }} placeholder="Notes..." style={{ ...s.input, marginTop: 6, fontSize: 12 }} />
             </div>
           ))}
-
-          <button style={{ ...s.btnGhost, marginBottom: 12 }}
-            onClick={() => setBuildExercises(prev => [...prev, { name: "", sets: 3, reps: 8, weight: 0, notes: "" }])}>
-            + ADD EXERCISE
-          </button>
-
-          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>
-            {saving ? "SAVING..." : "SAVE PROGRAM DAY"}
-          </button>
-          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("profile")}>
-            ← CANCEL
-          </button>
+          <button onClick={() => setBuildExercises([...buildExercises,{name:"",sets:3,reps:8,weight:0,notes:""}])} style={{ ...s.btnGhost, width: "100%", marginBottom: 10, fontSize: 12 }}>+ ADD EXERCISE</button>
+          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>{saving ? "SAVING..." : "SAVE PROGRAM DAY"}</button>
+          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setBuildMode(false)}>← CANCEL</button>
         </div>
       )}
-      {/* Sessions list */}
-      <div style={s.sectionLabel}>
-        {selectedClient ? `SESSIONS — ${selectedClientData?.name || "ATHLETE"}` : "ALL SESSIONS"}
-      </div>
-      {clientWorkouts.length === 0 ? (
-        <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
-          <div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div>
-        </div>
-      ) : (
-        clientWorkouts.map((w, i) => {
-          const client = clients.find(c => c.id === w.user_id);
-          const exs = w.exercises || [];
-          const totalSets = exs.reduce((s, ex) => s + (ex.sets || []).length, 0);
-          const doneSets = exs.reduce((s, ex) => s + (ex.sets || []).filter(st => st.done).length, 0);
-          const vol = exs.reduce((s, ex) =>
-            s + (ex.sets || []).filter(st => st.done && st.weight && st.reps)
-              .reduce((s2, st) => s2 + parseFloat(st.weight) * parseFloat(st.reps), 0), 0);
-          const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" };
-          const col = dayCol[w.day] || "var(--red)";
 
-          return (
-            <div key={i} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
+      {/* ADD EXERCISE */}
+      {view === "addExercise" && selectedClient && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>ADD CUSTOM EXERCISE</div>
+          <label style={s.label}>EXERCISE NAME</label>
+          <input value={newEx.name} onChange={e => setNewEx({...newEx,name:e.target.value})} placeholder="e.g. DB Row" style={{ ...s.input, marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            {[["SETS","sets",1],["REPS","reps",1],["KG","weight",0]].map(([lbl,key,min]) => (
+              <div key={key} style={{ flex: 1 }}><label style={s.label}>{lbl}</label><input type="number" min={min} value={newEx[key]} onChange={e => setNewEx({...newEx,[key]:+e.target.value})} style={s.input} /></div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={newEx.day} onChange={e => setNewEx({...newEx,day:e.target.value})} style={s.input}>{["A","B","C","D"].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={newEx.week} onChange={e => setNewEx({...newEx,week:+e.target.value})} style={s.input} /></div>
+          </div>
+          <label style={s.label}>NOTES</label>
+          <input value={newEx.notes} onChange={e => setNewEx({...newEx,notes:e.target.value})} placeholder="Cues..." style={{ ...s.input, marginBottom: 10 }} />
+          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveExercise} disabled={saving}>{saving ? "SAVING..." : "SAVE EXERCISE"}</button>
+          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("profile")}>← CANCEL</button>
+        </div>
+      )}
+
+      {/* ALL SESSIONS */}
+      {view === "sessions" && !selectedClient && (
+        <>
+          <div style={s.sectionLabel}>ALL SESSIONS</div>
+          {workouts.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div></div>
+          ) : workouts.map((w, i) => {
+            const client = clients.find(c => c.id === w.user_id);
+            const exs = w.exercises || [];
+            const doneSets = exs.reduce((s,ex)=>s+(ex.sets||[]).filter(st=>st.done).length,0);
+            const vol = exs.reduce((s,ex)=>s+(ex.sets||[]).filter(st=>st.done&&st.weight&&st.reps).reduce((s2,st)=>s2+parseFloat(st.weight)*parseFloat(st.reps),0),0);
+            const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+            return (
+              <div key={i} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                      <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
+                      <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
+                    </div>
+                    <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 15, fontWeight: 700 }}>{w.workout_title?.replace(/DAY [ABCD] — /,"")}</div>
+                    <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>{fmtDate(w.created_at)} · {client?.name||"Athlete"}</div>
                   </div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>
-                    {w.workout_title?.replace(/DAY [ABC] — /, "")}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>
-                    {fmtDate(w.created_at)} · {client?.name || "Athlete"}
+                  <div style={{ textAlign: "right" }}>
+                    {vol > 0 && <><div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 20, fontWeight: 900 }}>{Math.round(vol)}</div><div style={{ fontSize: 9, color: "var(--gray2)" }}>KG VOL</div></>}
+                    <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets} sets</div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  {vol > 0 && (
-                    <>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{Math.round(vol)}</div>
-                      <div style={{ fontSize: 9, color: "var(--gray2)" }}>KG VOL</div>
-                    </>
-                  )}
-                  <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets}/{totalSets} sets</div>
-                </div>
+                {w.comment && <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "6px 10px", marginTop: 8, borderLeft: `2px solid ${col}` }}>💬 {w.comment}</div>}
               </div>
-              {w.comment && (
-                <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "6px 10px", marginTop: 8, borderLeft: `2px solid ${col}` }}>
-                  💬 {w.comment}
-                </div>
-              )}
-            </div>
-          );
-        })
+            );
+          })}
+        </>
       )}
     </div>
   );
 }
+
 function ProfileScreen({ user, authUser }) {
   const [notifStatus, setNotifStatus] = React.useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
@@ -2406,6 +2430,109 @@ function LibraryScreen({ authUser, isCoach }) {
   );
 }
 
+// ─── LANDING / ONBOARDING PAGE ───────────────────────────────────────────────
+
+function LandingScreen({ onSignUp }) {
+  const REVOLUT_TAG = "@karolz7hb";
+  const REVOLUT_LINK = "https://revolut.me/karolz7hb";
+  const MONTHLY_PRICE = "£79"; // <-- change to your price
+  const [copied, setCopied] = React.useState(false); // eslint-disable-line
+
+
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--white)", fontFamily: "'Barlow', sans-serif", maxWidth: 480, margin: "0 auto", padding: "0 0 40px" }}>
+
+      {/* Hero */}
+      <div style={{ background: "linear-gradient(180deg, #1a0a0a 0%, var(--bg) 100%)", padding: "48px 24px 32px", textAlign: "center" }}>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.35em", color: "var(--red)", marginBottom: 12 }}>KARLITO STRENGTH</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 42, fontWeight: 900, lineHeight: 1.05, marginBottom: 16 }}>
+          TRAIN SMARTER.<br />
+          <span style={{ color: "var(--red)" }}>LIFT HEAVIER.</span>
+        </div>
+        <div style={{ fontSize: 15, color: "var(--gray)", lineHeight: 1.7, marginBottom: 28, maxWidth: 340, margin: "0 auto 28px" }}>
+          12-week SBD + Kettlebell program. Personal coaching. Direct access to your coach — all in one app.
+        </div>
+        <button onClick={onSignUp}
+          style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 8, padding: "16px 40px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer", width: "100%", maxWidth: 320 }}>
+          START NOW →
+        </button>
+        <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 10 }}>Free 7-day trial · No card required</div>
+      </div>
+
+      {/* What you get */}
+      <div style={{ padding: "0 20px" }}>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.25em", color: "var(--gray2)", textAlign: "center", marginBottom: 16 }}>WHAT YOU GET</div>
+        {[
+          ["🏋️", "12-Week Program", "Periodised SBD + Kettlebell. Accumulation → Intensification → Peak. Auto-adjusts to your 1RM."],
+          ["📊", "RPE Autoregulation", "Log every set with weight, reps and RPE. Track progress week by week."],
+          ["💬", "Direct Coach Access", "Message your coach anytime. Send meal photos, ask questions, get feedback."],
+          ["📚", "Exercise Library", "Video library with technique cues for every movement in the program."],
+          ["🔔", "Push Notifications", "Get notified when your coach assigns a new program or sends a message."],
+        ].map(([icon, title, desc]) => (
+          <div key={title} style={{ display: "flex", gap: 14, marginBottom: 18, padding: "14px 16px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>{icon}</div>
+            <div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 3 }}>{title}</div>
+              <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>{desc}</div>
+            </div>
+          </div>
+        ))}
+
+        {/* Pricing */}
+        <div style={{ background: "linear-gradient(135deg, rgba(196,30,30,0.15), rgba(196,30,30,0.05))", border: "1px solid var(--red-dim)", borderRadius: 12, padding: "24px 20px", marginTop: 8, marginBottom: 20, textAlign: "center" }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.25em", color: "var(--gray2)", marginBottom: 8 }}>MONTHLY COACHING</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 52, fontWeight: 900, lineHeight: 1, color: "var(--white)", marginBottom: 4 }}>{MONTHLY_PRICE}</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 20 }}>/ month · cancel anytime</div>
+          {[
+            "Full 12-week SBD program",
+            "Kettlebell conditioning",
+            "Weekly program updates",
+            "Direct messaging with coach",
+            "Video technique library",
+            "Progress tracking",
+          ].map(item => (
+            <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, textAlign: "left" }}>
+              <div style={{ color: "var(--red)", fontWeight: 900, flexShrink: 0 }}>✓</div>
+              <div style={{ fontSize: 14, color: "var(--gray)" }}>{item}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Payment section */}
+        <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: "20px", marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4 }}>HOW TO PAY</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 16, lineHeight: 1.6 }}>
+            Send payment via Revolut. Use your name as the reference. Access activated within 24h.
+          </div>
+          <div style={{ background: "var(--bg3)", borderRadius: 8, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, border: "1px solid var(--border)" }}>
+            <div>
+              <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>REVOLUT TAG</div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, letterSpacing: "0.05em" }}>{REVOLUT_TAG}</div>
+            </div>
+            <a href={REVOLUT_LINK} target="_blank" rel="noopener noreferrer"
+              style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 6, padding: "10px 16px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, cursor: "pointer", textDecoration: "none", letterSpacing: "0.05em" }}>
+              PAY NOW
+            </a>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--gray2)", lineHeight: 1.6 }}>
+            After payment, message on Revolut or via the app chat. You will receive your login link within 24 hours.
+          </div>
+        </div>
+
+        {/* CTA bottom */}
+        <button onClick={onSignUp}
+          style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 8, padding: "16px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer", width: "100%", marginBottom: 12 }}>
+          CREATE ACCOUNT →
+        </button>
+        <div style={{ fontSize: 12, color: "var(--gray2)", textAlign: "center" }}>
+          Already have an account? <span onClick={onSignUp} style={{ color: "var(--accent)", cursor: "pointer" }}>Sign in</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── HISTORY SCREEN ───────────────────────────────────────────────────────────
 
 function HistoryScreen() {
@@ -2633,12 +2760,18 @@ const [hasCoach, setHasCoach] = useState(false);
       });
   }, [authUser]);
 
+  const [showAuth, setShowAuth] = React.useState(false);
+
   if (authUser === undefined) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "var(--gray)", letterSpacing: "0.2em" }}>LOADING...</div>
       </div>
     );
+  }
+
+  if (!authUser && !showAuth) {
+    return <LandingScreen onSignUp={() => setShowAuth(true)} />;
   }
 
   if (!authUser) {

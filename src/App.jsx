@@ -1780,6 +1780,62 @@ function ProfileScreen({ user }) {
     </div>
   );
 }
+// ─── MEAL UPLOAD ──────────────────────────────────────────────────────────────
+
+function MealUpload({ onUpload }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("meals")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("meals")
+        .getPublicUrl(filePath);
+
+      onUpload(publicUrl);
+    } catch (error) {
+      alert("Error uploading image: " + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleFile}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0,
+          cursor: "pointer"
+        }}
+        disabled={uploading}
+      />
+      <button style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }} disabled={uploading}>
+        {uploading ? "..." : "📸"}
+      </button>
+    </div>
+  );
+}
 // ─── CHAT SCREEN ──────────────────────────────────────────────────────────────
 
 function ChatScreen({ authUser, isCoach }) {
@@ -1964,7 +2020,18 @@ function ChatScreen({ authUser, isCoach }) {
                     background: isMe ? "var(--red)" : "var(--bg3)",
                     border: isMe ? "none" : "1px solid var(--border)"
                   }}>
-                    <div style={{ fontSize: 14, lineHeight: 1.4 }}>{msg.content}</div>
+                    <div style={{ fontSize: 14, lineHeight: 1.4 }}>
+                      {msg.content.startsWith("[MEAL] ") ? (
+                        <img 
+                          src={msg.content.replace("[MEAL] ", "")} 
+                          alt="Meal" 
+                          style={{ maxWidth: "100%", borderRadius: 8, marginTop: 4 }} 
+                          onClick={() => window.open(msg.content.replace("[MEAL] ", ""), "_blank")}
+                        />
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
                     <div style={{ 
                       fontSize: 10, 
                       color: isMe ? "rgba(255,255,255,0.6)" : "var(--gray2)", 
@@ -1982,8 +2049,17 @@ function ChatScreen({ authUser, isCoach }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
+     {/* Input */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        {!isCoach && (
+          <MealUpload onUpload={(url) => {
+            supabase.from("messages").insert({
+              from_id: authUser.id,
+              to_id: selectedContact,
+              content: `[MEAL] ${url}`
+            });
+          }} />
+        )}
         <input
           value={newMsg}
           onChange={(e) => setNewMsg(e.target.value)}

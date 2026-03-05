@@ -772,6 +772,19 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
 function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [coachProgram, setCoachProgram] = useState(null);
   const [loadingProgram, setLoadingProgram] = useState(true);
+  const [prevSets, setPrevSets] = useState({}); // { exName: { weight, reps, rpe } }
+
+  // Smart weight suggestion
+  function suggestWeight(exName) {
+    const prev = prevSets[exName];
+    if (!prev || !prev.weight) return null;
+    const w = parseFloat(prev.weight);
+    const rpe = prev.rpe;
+    if (!rpe) return w;
+    if (rpe < 8) return Math.round((w + 2.5) * 2) / 2;
+    if (rpe > 9) return Math.round((w - 2.5) * 2) / 2;
+    return w;
+  }
 
   useEffect(() => {
     const loadCoachProgram = async () => {
@@ -797,7 +810,40 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
       } catch(e) {}
       setLoadingProgram(false);
     };
+
+    // Load previous workout for same day to get smart suggestions
+    const loadPrevSets = async () => {
+      if (!authUser) return;
+      try {
+        const { data: logs } = await supabase
+          .from("workouts")
+          .select("exercises, created_at")
+          .eq("user_id", authUser.id)
+          .eq("day", dayKey)
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        if (logs && logs.length > 0) {
+          const prev = {};
+          // Find most recent completed set per exercise
+          for (const log of logs) {
+            for (const ex of (log.exercises || [])) {
+              if (!prev[ex.name]) {
+                const doneSets = (ex.sets || []).filter(s => s.done && s.weight);
+                if (doneSets.length > 0) {
+                  const last = doneSets[doneSets.length - 1];
+                  prev[ex.name] = { weight: last.weight, reps: last.reps, rpe: last.rpe };
+                }
+              }
+            }
+          }
+          setPrevSets(prev);
+        }
+      } catch(e) {}
+    };
+
     loadCoachProgram();
+    loadPrevSets();
   }, [authUser, week, dayKey]);
 
   const defaultWorkout = generateWorkout(dayKey, week, user.level, user.oneRM, user.injuries);
@@ -941,6 +987,25 @@ const saveWorkout = async () => {
                     <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>
                       Plan: {ex.sets}×{ex.reps}{ex.pct ? ` @ ${Math.round(ex.pct * 100)}%` : ""}{ex.weight ? ` · ${ex.weight}kg` : ""}
                     </div>
+                    {/* Smart weight suggestion */}
+                    {(() => {
+                      const prev = prevSets[ex.name];
+                      const suggested = suggestWeight(ex.name);
+                      if (!prev) return null;
+                      const rpe = prev.rpe;
+                      const arrow = rpe < 8 ? "↑" : rpe > 9 ? "↓" : "→";
+                      const color = rpe < 8 ? "#4a9eff" : rpe > 9 ? "var(--red)" : "#f0a020";
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
+                          <div style={{ fontSize: 10, color: "var(--gray2)" }}>
+                            Last: {prev.weight}kg×{prev.reps} @RPE{prev.rpe}
+                          </div>
+                          <div style={{ fontSize: 11, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, color, background: `${color}18`, padding: "2px 8px", borderRadius: 4 }}>
+                            {arrow} {suggested}kg suggested
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {exDone && <div style={{ ...s.badge("var(--red)"), fontSize: 9 }}>DONE ✓</div>}
                 </div>
@@ -1110,28 +1175,59 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
 
   const [coachDays, setCoachDays] = useState([]);
   const [loadingDays, setLoadingDays] = useState(true);
+  const [streak, setStreak] = useState(0);
+  const [thisWeekCount, setThisWeekCount] = useState(0);
 
   useEffect(() => {
     const loadCoachDays = async () => {
-      if (!hasCoach) {
-        setLoadingDays(false);
-        return;
-      }
+      if (!hasCoach) { setLoadingDays(false); return; }
       setLoadingDays(true);
       try {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
-          const { data } = await supabase
-            .from("program_days")
-            .select("*")
-            .eq("athlete_id", authUser.id)
-            .eq("week", week);
+          const { data } = await supabase.from("program_days").select("*").eq("athlete_id", authUser.id).eq("week", week);
           setCoachDays(data || []);
         }
       } catch(e) {}
       setLoadingDays(false);
     };
+
+    const calcStreak = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        const { data: logs } = await supabase.from("workouts").select("created_at").eq("user_id", authUser.id).order("created_at", { ascending: false });
+        if (!logs || logs.length === 0) return;
+
+        // Count this week
+        const now = new Date();
+        const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1); startOfWeek.setHours(0,0,0,0);
+        const twc = logs.filter(l => new Date(l.created_at) >= startOfWeek).length;
+        setThisWeekCount(twc);
+
+        // Calculate weekly streak — weeks with at least 1 workout
+        const weekKeys = new Set(logs.map(l => {
+          const d = new Date(l.created_at);
+          const day = d.getDay() || 7;
+          const monday = new Date(d); monday.setDate(d.getDate() - day + 1); monday.setHours(0,0,0,0);
+          return monday.toISOString().slice(0, 10);
+        }));
+
+        const sortedWeeks = [...weekKeys].sort().reverse();
+        let s = 0;
+        const nowMonday = new Date(now); nowMonday.setDate(now.getDate() - (now.getDay() || 7) + 1); nowMonday.setHours(0,0,0,0);
+
+        for (let i = 0; i < sortedWeeks.length; i++) {
+          const expected = new Date(nowMonday); expected.setDate(nowMonday.getDate() - i * 7);
+          const expectedKey = expected.toISOString().slice(0, 10);
+          if (sortedWeeks[i] === expectedKey) { s++; } else { break; }
+        }
+        setStreak(s);
+      } catch(e) {}
+    };
+
     loadCoachDays();
+    calcStreak();
   }, [week, hasCoach]);
 
   const hasCoachProgram = coachDays.length > 0;
@@ -1156,6 +1252,37 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
           </div>
         </div>
       )}
+
+      {/* Streak + This Week */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+        <div style={{ ...s.card, padding: "12px 14px", background: streak >= 3 ? "linear-gradient(135deg, rgba(196,30,30,0.15), rgba(240,100,0,0.08))" : "var(--bg2)", borderColor: streak >= 3 ? "rgba(240,100,0,0.4)" : "var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: streak >= 1 ? 22 : 16 }}>{streak >= 4 ? "🔥" : streak >= 2 ? "⚡" : streak >= 1 ? "💪" : "○"}</span>
+            <div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, lineHeight: 1, color: streak >= 3 ? "#f06400" : "var(--white)" }}>
+                {streak}
+              </div>
+              <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em" }}>WEEK STREAK</div>
+            </div>
+          </div>
+          {streak >= 3 && <div style={{ fontSize: 10, color: "#f06400", marginTop: 4 }}>Don't break the chain!</div>}
+          {streak === 0 && <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4 }}>Start your streak today</div>}
+        </div>
+        <div style={{ ...s.card, padding: "12px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 18 }}>📅</span>
+            <div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, lineHeight: 1, color: thisWeekCount >= 2 ? "var(--red)" : "var(--white)" }}>
+                {thisWeekCount}
+              </div>
+              <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em" }}>THIS WEEK</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4 }}>
+            {thisWeekCount === 0 ? "No sessions yet" : thisWeekCount === 1 ? "1 session done" : `${thisWeekCount} sessions 💪`}
+          </div>
+        </div>
+      </div>
 
     {/* Phase header - only for free users */}
       {!hasCoach && <div style={{ ...s.card, background: `linear-gradient(135deg, var(--bg2) 0%, rgba(196,30,30,0.08) 100%)`, borderColor: phaseData.color + "44", marginBottom: 20 }}>

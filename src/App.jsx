@@ -283,8 +283,8 @@ const s = {
   label: { fontSize: 12, color: "var(--gray)", marginBottom: 6, letterSpacing: "0.08em", display: "block" },
   pill: (active, color = "var(--red)") => ({ display: "inline-block", padding: "6px 14px", borderRadius: 4, border: `1px solid ${active ? color : "var(--border)"}`, background: active ? `rgba(196,30,30,0.1)` : "transparent", color: active ? color : "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.1em", cursor: "pointer", transition: "all 0.2s" }),
   navBar: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "var(--bg2)", borderTop: "1px solid var(--border)", display: "flex", padding: "8px 0 12px" },
-  navItem: (active) => ({ flex: 1, textAlign: "center", padding: "8px 4px", cursor: "pointer", opacity: active ? 1 : 0.45, transition: "opacity 0.2s" }),
-  navLabel: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 4, color: "var(--white)" },
+  navItem: (active) => ({ flex: 1, textAlign: "center", padding: "6px 2px", cursor: "pointer", opacity: active ? 1 : 0.45, transition: "opacity 0.2s" }),
+  navLabel: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 3, color: "var(--white)" },
   exerciseRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid var(--border)" },
   badge: (color) => ({ background: color || "var(--red)", padding: "2px 8px", borderRadius: 3, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "var(--white)" }),
   phaseBar: (color) => ({ height: 3, background: color, borderRadius: 2, marginBottom: 20 }),
@@ -2500,6 +2500,7 @@ const NAV_ATHLETE = [
   { id: "library", icon: "📚", label: "LIBRARY" },
   { id: "chat", icon: "💬", label: "CHAT" },
   { id: "history", icon: "📋", label: "LOGS" },
+  { id: "profile", icon: "👤", label: "ME" },
 ];
 
 const NAV_COACH = [
@@ -2508,6 +2509,7 @@ const NAV_COACH = [
   { id: "library", icon: "📚", label: "LIBRARY" },
   { id: "chat", icon: "💬", label: "CHAT" },
   { id: "coach", icon: "🎯", label: "COACH" },
+  { id: "profile", icon: "👤", label: "ME" },
 ];
 
 export default function App() {

@@ -2096,6 +2096,17 @@ function ChatScreen({ authUser, isCoach }) {
             📸
           </button>
         )}
+                  from_id: authUser.id,
+                  to_id: selectedContact,
+                  content: `[MEAL] ${url}`
+                });
+              }
+            }}
+            style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }}
+          >
+            📸
+          </button>
+        )}
             supabase.from("messages").insert({
               from_id: authUser.id,
               to_id: selectedContact,

@@ -2077,7 +2077,7 @@ function ChatScreen({ authUser, isCoach }) {
         <div ref={messagesEndRef} />
       </div>
 
-     {/* Input */}
+         {/* Input */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
        {!isCoach && (
           <button 
@@ -2096,18 +2096,6 @@ function ChatScreen({ authUser, isCoach }) {
             📸
           </button>
         )}
-                  from_id: authUser.id,
-                  to_id: selectedContact,
-                  content: `[MEAL] ${url}`
-                });
-              }
-            }}
-            style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }}
-          >
-            📸
-          </button>
-        )}
-            
         <input
           value={newMsg}
           onChange={(e) => setNewMsg(e.target.value)}
@@ -2122,9 +2110,6 @@ function ChatScreen({ authUser, isCoach }) {
           ➤
         </button>
       </div>
-    </div>
-  );
-}
 // ─── HISTORY SCREEN ───────────────────────────────────────────────────────────
 
 function HistoryScreen() {

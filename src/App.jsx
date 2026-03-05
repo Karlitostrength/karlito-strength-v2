@@ -2107,13 +2107,7 @@ function ChatScreen({ authUser, isCoach }) {
             📸
           </button>
         )}
-            supabase.from("messages").insert({
-              from_id: authUser.id,
-              to_id: selectedContact,
-              content: `[MEAL] ${url}`
-            });
-          }} />
-        )}
+            
         <input
           value={newMsg}
           onChange={(e) => setNewMsg(e.target.value)}

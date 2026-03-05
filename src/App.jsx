@@ -1808,62 +1808,7 @@ function ProfileScreen({ user }) {
     </div>
   );
 }
-// ─── MEAL UPLOAD ──────────────────────────────────────────────────────────────
 
-function MealUpload({ onUpload }) {
-  const [uploading, setUploading] = useState(false);
-
-  const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("Meals")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("Meals")
-        .getPublicUrl(filePath);
-
-      onUpload(publicUrl);
-    } catch (error) {
-      alert("Error uploading image: " + error.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div style={{ position: "relative", display: "inline-block" }}>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          opacity: 0,
-          cursor: "pointer"
-        }}
-        disabled={uploading}
-      />
-      <button style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }} disabled={uploading}>
-        {uploading ? "..." : "📸"}
-      </button>
-    </div>
-  );
-}
 // ─── CHAT SCREEN ──────────────────────────────────────────────────────────────
 
 function ChatScreen({ authUser, isCoach }) {

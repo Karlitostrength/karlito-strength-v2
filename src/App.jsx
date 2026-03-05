@@ -2219,10 +2219,10 @@ const [hasCoach, setHasCoach] = useState(false);
       .select("role, coach_id")
       .eq("id", authUser.id)
       .single()
-      .then(({ data }) => {
-        if (data?.role === "coach") setIsCoach(true);
-        // Only athletes with coach_id get coached experience
-        if (data?.role === "athlete" && data?.coach_id) setHasCoach(true);
+     .then(({ data }) => {
+        // Reset and set roles
+        setIsCoach(data?.role === "coach");
+        setHasCoach(data?.role === "athlete" && !!data?.coach_id);
       });
   }, [authUser]);
 

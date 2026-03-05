@@ -1796,13 +1796,13 @@ function MealUpload({ onUpload }) {
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("meals")
+        .from("Meals")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from("meals")
+        .from("Meals")
         .getPublicUrl(filePath);
 
       onUpload(publicUrl);

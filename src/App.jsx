@@ -147,7 +147,7 @@ function getSnatchLightProtocol(week) {
     progressDone,
     label: `4 × ${currentReps} reps/arm`,
     note: progressDone
-      ? `✓ 25 pow osiągnięte — cut rest by 5–10s/week (przerwa: ${restLabel})`
+      ? `✓ 25 reps reached — cut rest by 5–10s/week (rest: ${restLabel})`
       : `Rest: ${restLabel} · Goal: 25 reps/arm · +1 rep/week`,
   };
 }
@@ -784,6 +784,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [showComment, setShowComment] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [videoLink, setVideoLink] = useState("");
 
   if (!workout) return (
     <div style={s.screen}>
@@ -947,13 +948,13 @@ const saveWorkout = async () => {
           {/* KB SNATCH LEKKI */}
           {sec.snatchLight && (
             <div style={{ ...s.card, borderColor: condDone.snatchLight ? "rgba(196,30,30,0.6)" : "#4a9eff44", background: "rgba(74,158,255,0.05)" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: "#4a9eff", marginBottom: 6 }}>🏋 KB SNATCH — DZIEŃ LEKKI</div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: "#4a9eff", marginBottom: 6 }}>🏋 KB SNATCH — LIGHT DAY</div>
               <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", color: "var(--white)", marginBottom: 4 }}>{sec.snatchLightData.label}</div>
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>{sec.snatchLightData.note}</div>
-              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>Dobierz ciężar na 15 reps/arm · Chroń skórę dłoni</div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>Pick weight for 15 reps/arm · Protect your hands</div>
               <button onClick={() => setCondDone(p => ({ ...p, snatchLight: !p.snatchLight }))}
                 style={{ ...s.btn, background: condDone.snatchLight ? "var(--red-dim)" : "var(--red)" }}>
-                {condDone.snatchLight ? "✓ ZROBIONE" : "ZAZNACZ JAKO ZROBIONE"}
+                {condDone.snatchLight ? "✓ DONE" : "MARK AS DONE"}
               </button>
             </div>
           )}
@@ -964,13 +965,13 @@ const saveWorkout = async () => {
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: "#f0a020", marginBottom: 6 }}>💥 KB SNATCH — MAX EFFORT</div>
               <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", color: "var(--white)", marginBottom: 4 }}>{sec.snatchMaxData.label}</div>
               {sec.snatchMaxData.isSwing && (
-                <div style={{ fontSize: 11, color: "#f0a020", background: "rgba(240,160,32,0.1)", borderRadius: 4, padding: "4px 8px", marginBottom: 6, display: "inline-block" }}>Początkujący: One Arm Swing zamiast Snatch</div>
+                <div style={{ fontSize: 11, color: "#f0a020", background: "rgba(240,160,32,0.1)", borderRadius: 4, padding: "4px 8px", marginBottom: 6, display: "inline-block" }}>Beginner: One Arm Swing instead of Snatch</div>
               )}
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>{sec.snatchMaxData.note}</div>
               <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>KB +2 sizes · Rest 2 min → heavier KB after 12/12</div>
               <button onClick={() => setCondDone(p => ({ ...p, snatchMax: !p.snatchMax }))}
                 style={{ ...s.btn, background: condDone.snatchMax ? "var(--red-dim)" : "var(--red)" }}>
-                {condDone.snatchMax ? "✓ ZROBIONE" : "ZAZNACZ JAKO ZROBIONE"}
+                {condDone.snatchMax ? "✓ DONE" : "MARK AS DONE"}
               </button>
             </div>
           )}
@@ -982,7 +983,7 @@ const saveWorkout = async () => {
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 12 }}>2-hand swing · {user.kgKB}kg KB</div>
               {!condDone.swing
                 ? <button style={s.btn} onClick={() => setShowTimer(true)}>⏱ LAUNCH EMOM TIMER</button>
-                : <div style={{ color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>✓ ZROBIONE</div>}
+                : <div style={{ color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>✓ DONE</div>}
             </div>
           )}
 
@@ -993,7 +994,7 @@ const saveWorkout = async () => {
               <div style={{ fontSize: 13, color: "var(--white)", marginBottom: 10 }}>{sec.complexData.label}</div>
               <button onClick={() => setCondDone(p => ({ ...p, complex: !p.complex }))}
                 style={{ ...s.btn, background: condDone.complex ? "var(--red-dim)" : "var(--red)" }}>
-                {condDone.complex ? "✓ ZROBIONE" : "ZAZNACZ JAKO ZROBIONE"}
+                {condDone.complex ? "✓ DONE" : "MARK AS DONE"}
               </button>
             </div>
           )}
@@ -1003,7 +1004,7 @@ const saveWorkout = async () => {
       {/* SAVE / FINISH */}
       {!saved ? (
         <div style={s.card}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 10 }}>ZAKOŃCZ TRENING</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 10 }}>FINISH WORKOUT</div>
           <div style={{ fontSize: 13, color: doneSets === totalSets && totalSets > 0 ? "#4a9eff" : "var(--gray)", marginBottom: 14 }}>
             {doneSets === totalSets && totalSets > 0 ? "✅ All sets logged" : `⏳ ${doneSets}/${totalSets} sets done — you can save at any time`}
           </div>
@@ -1011,7 +1012,7 @@ const saveWorkout = async () => {
             <div style={{ marginBottom: 12 }}>
               <label style={s.label}>KOMENTARZ (opcjonalny)</label>
               <textarea value={comment} onChange={e => setComment(e.target.value)}
-                placeholder="Np. Świetny trening, poprawiłem technikę snatcha, lekko bolało kolano..."
+                placeholder="E.g. Great session, improved snatch technique, slight knee pain..."
                 style={{ ...s.input, minHeight: 72, resize: "none", lineHeight: 1.5 }} />
             </div>
           ) : (
@@ -1024,11 +1025,11 @@ const saveWorkout = async () => {
       ) : (
         <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)", textAlign: "center", animation: "fadeIn 0.4s ease" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 4 }}>TRENING ZAPISANY</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 4 }}>WORKOUT SAVED</div>
           <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 4 }}>{doneSets} sets · Week {week} · Day {dayKey}</div>
          {/* Video link */}
           <div style={{ marginBottom: 12 }}>
-            <label style={s.label}>LINK DO VIDEO (opcjonalnie)</label>
+            <label style={s.label}>VIDEO LINK (optional)</label>
             <input 
               type="text" 
               value={videoLink} 
@@ -1037,21 +1038,7 @@ const saveWorkout = async () => {
               style={s.input}
             />
             <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
-              Coach obejrzy Twoje video i da feedback
-            </div>
-          </div>
-          {/* Video link */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={s.label}>LINK DO VIDEO (opcjonalnie)</label>
-            <input 
-              type="text" 
-              value={videoLink} 
-              onChange={e => setVideoLink(e.target.value)}
-              placeholder="YouTube, Loom, Google Drive..."
-              style={s.input}
-            />
-            <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
-              Coach obejrzy Twoje video i da feedback
+              Your coach will review your video and give feedback
             </div>
           </div>
           {comment && (
@@ -1059,7 +1046,7 @@ const saveWorkout = async () => {
               "{comment}"
             </div>
           )}
-          <button style={{ ...s.btn, marginTop: 12 }} onClick={onComplete}>KONIEC →</button>
+          <button style={{ ...s.btn, marginTop: 12 }} onClick={onComplete}>DONE →</button>
         </div>
       )}
     </div>
@@ -1426,7 +1413,7 @@ const saveProgramDay = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Zapisz dzień programu
+      // Save program day
       const { data: dayData } = await supabase.from("program_days").insert({
         coach_id: user.id,
         athlete_id: selectedClient,
@@ -1436,7 +1423,7 @@ const saveProgramDay = async () => {
         notes: buildNotes,
       }).select().single();
 
-      // Zapisz ćwiczenia dla tego dnia
+      // Save exercises for this day
       const validExercises = buildExercises.filter(e => e.name.trim());
       for (const ex of validExercises) {
         await supabase.from("custom_exercises").insert({
@@ -1816,6 +1803,8 @@ function ChatScreen({ authUser, isCoach }) {
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
+  const [photoMode, setPhotoMode] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState("");
   const messagesEndRef = useRef(null);
 
   // Load contacts (for coach: athletes, for athlete: coach)
@@ -2021,39 +2010,70 @@ function ChatScreen({ authUser, isCoach }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        {!isCoach && (
-          <button 
-            onClick={() => {
-              const url = prompt("Wklej link do zdjęcia (WhatsApp, Instagram, Google Drive):");
-              if (url) {
-                supabase.from("messages").insert({
-                  from_id: authUser.id,
-                  to_id: selectedContact,
-                  content: `[MEAL] ${url}`
-                });
-              }
+      {/* Photo URL panel */}
+      {photoMode && (
+        <div style={{ ...s.card, marginTop: 8, padding: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--accent)", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.1em" }}>
+            📸 SEND PHOTO — paste a link
+          </div>
+          <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 8, lineHeight: 1.6 }}>
+            How to get a photo link:<br />
+            • <strong style={{ color: "var(--gray)" }}>WhatsApp:</strong> Open photo → Share → Copy link<br />
+            • <strong style={{ color: "var(--gray)" }}>Google Drive:</strong> Share → Copy link<br />
+            • <strong style={{ color: "var(--gray)" }}>Instagram:</strong> Copy the post URL
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={photoUrl}
+              onChange={e => setPhotoUrl(e.target.value)}
+              placeholder="https://..."
+              autoFocus
+              style={{
+                background: "var(--bg3)", border: "1px solid var(--border)",
+                borderRadius: 6, padding: "12px 14px", color: "var(--white)",
+                fontSize: 14, flex: 1, minWidth: 0,
+                fontFamily: "'Barlow', sans-serif", outline: "none",
+              }}
+            />
+            <button onClick={async () => {
+              if (!photoUrl.trim() || !selectedContact) return;
+              const url = photoUrl.trim();
+              setPhotoUrl(""); setPhotoMode(false);
+              await supabase.from("messages").insert({ from_id: authUser.id, to_id: selectedContact, content: `[MEAL] ${url}` });
+            }} style={{ ...s.btn, width: "auto", padding: "10px 16px", flexShrink: 0 }}>➤</button>
+            <button onClick={() => { setPhotoMode(false); setPhotoUrl(""); }}
+              style={{ ...s.btnGhost, width: "auto", padding: "10px 14px", flexShrink: 0 }}>✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Text input */}
+      {!photoMode && (
+        <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+          {!isCoach && (
+            <button onClick={() => setPhotoMode(true)}
+              style={{ ...s.btnGhost, padding: "12px 14px", flexShrink: 0, width: "auto" }}>
+              📸
+            </button>
+          )}
+          <input
+            value={newMsg}
+            onChange={e => setNewMsg(e.target.value)}
+            onKeyPress={e => e.key === "Enter" && sendMessage()}
+            placeholder="Type a message..."
+            style={{
+              background: "var(--bg3)", border: "1px solid var(--border)",
+              borderRadius: 6, padding: "12px 14px", color: "var(--white)",
+              fontSize: 15, flex: 1, minWidth: 0,
+              fontFamily: "'Barlow', sans-serif", outline: "none",
             }}
-            style={{ ...s.btnGhost, padding: "12px 16px", minWidth: 50 }}
-          >
-            📸
+          />
+          <button onClick={sendMessage}
+            style={{ ...s.btn, width: "auto", padding: "12px 18px", flexShrink: 0 }}>
+            ➤
           </button>
-        )}
-        <input
-          value={newMsg}
-          onChange={(e) => setNewMsg(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-          placeholder="Type a message..."
-          style={{ ...s.input, flex: 1 }}
-        />
-        <button 
-          onClick={sendMessage}
-          style={{ ...s.btn, width: "auto", padding: "12px 20px" }}
-        >
-          ➤
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2087,18 +2107,18 @@ function HistoryScreen() {
 
   if (loading) return (
     <div style={{ ...s.screen, textAlign: "center", paddingTop: 60 }}>
-      <div style={{ fontSize: 13, color: "var(--gray)", letterSpacing: "0.1em" }}>ŁADOWANIE...</div>
+      <div style={{ fontSize: 13, color: "var(--gray)", letterSpacing: "0.1em" }}>LOADING...</div>
     </div>
   );
 
   if (logs.length === 0) return (
     <div style={s.screen}>
-      <div style={s.sectionLabel}>HISTORIA TRENINGÓW</div>
+      <div style={s.sectionLabel}>WORKOUT HISTORY</div>
       <div style={{ ...s.card, textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No logs yet</div>
         <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7 }}>
-          Po treningu naciśnij<br /><strong style={{ color: "var(--white)" }}>💾 ZAPISZ TRENING</strong><br />i log pojawi się tutaj.
+          After a workout press<br /><strong style={{ color: "var(--white)" }}>💾 SAVE WORKOUT</strong><br />and it will appear here.
         </div>
       </div>
     </div>
@@ -2109,13 +2129,13 @@ function HistoryScreen() {
 
   return (
     <div style={s.screen}>
-      <div style={s.sectionLabel}>HISTORIA TRENINGÓW</div>
+      <div style={s.sectionLabel}>WORKOUT HISTORY</div>
 
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
         {[
-          ["SESJE", totalSessions, "łącznie"],
-          ["WOLUMIN", totalVol > 0 ? `${Math.round(totalVol / 1000)}t` : "—", "łączny"],
+          ["SESSIONS", totalSessions, "total"],
+          ["VOLUME", totalVol > 0 ? `${Math.round(totalVol / 1000)}t` : "—", "total"],
           ["OSTATNI", logs[0] ? fmtDate(logs[0].date) : "—", "trening"],
         ].map(([label, val, sub]) => (
           <div key={label} style={{ ...s.card, textAlign: "center", padding: "10px 6px" }}>
@@ -2142,7 +2162,7 @@ function HistoryScreen() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  <div style={{ ...s.badge(col), fontSize: 10 }}>DZIEŃ {log.day}</div>
+                  <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {log.day}</div>
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {log.week}</div>
                 </div>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 2 }}>
@@ -2220,7 +2240,7 @@ const NAV_ATHLETE = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
   { id: "chat", icon: "💬", label: "CHAT" },
-  { id: "history", icon: "📋", label: "LOGI" },
+  { id: "history", icon: "📋", label: "LOGS" },
   { id: "profile", icon: "👤", label: "JA" },
 ];
 
@@ -2270,7 +2290,7 @@ const [hasCoach, setHasCoach] = useState(false);
     const saved = localStorage.getItem("ks_profile");
     if (saved) setUser(JSON.parse(saved));
 
-    // Sprawdź rolę i coach_id
+    // Check role and coach_id
     supabase.from("profiles")
       .select("role, coach_id")
       .eq("id", authUser.id)

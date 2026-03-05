@@ -2172,8 +2172,8 @@ const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
   { id: "chat", icon: "💬", label: "CHAT" },
-  { id: "history", icon: "📋", label: "LOGI" },
   { id: "coach", icon: "🎯", label: "COACH" },
+  { id: "profile", icon: "👤", label: "JA" },
 ];
 
 export default function App() {

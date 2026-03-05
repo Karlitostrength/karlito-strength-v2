@@ -722,7 +722,6 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
     </div>
   );
 }
-const [videoLink, setVideoLink] = useState("");
 // ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 
 function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {

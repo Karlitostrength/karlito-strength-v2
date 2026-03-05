@@ -2077,9 +2077,9 @@ function ChatScreen({ authUser, isCoach }) {
         <div ref={messagesEndRef} />
       </div>
 
-         {/* Input */}
+      {/* Input */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-       {!isCoach && (
+        {!isCoach && (
           <button 
             onClick={() => {
               const url = prompt("Wklej link do zdjęcia (WhatsApp, Instagram, Google Drive):");
@@ -2110,6 +2110,9 @@ function ChatScreen({ authUser, isCoach }) {
           ➤
         </button>
       </div>
+    </div>
+  );
+}
 // ─── HISTORY SCREEN ───────────────────────────────────────────────────────────
 
 function HistoryScreen() {

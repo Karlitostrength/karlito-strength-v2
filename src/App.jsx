@@ -1800,7 +1800,7 @@ const saveProgramDay = async () => {
 }
 
 function ProfileScreen({ user, authUser }) {
-  const [notifStatus, setNotifStatus] = React.useState(
+  const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
   );
 
@@ -2423,7 +2423,7 @@ function LandingScreen({ onSignUp }) {
   const REVOLUT_TAG = "@karolz7hb";
   const REVOLUT_LINK = "https://revolut.me/karolz7hb";
   const MONTHLY_PRICE = "£79"; // <-- change to your price
-  const [copied, setCopied] = React.useState(false); // eslint-disable-line
+  const [copied, setCopied] = useState(false); // eslint-disable-line
 
 
 
@@ -2747,7 +2747,7 @@ const [hasCoach, setHasCoach] = useState(false);
       });
   }, [authUser]);
 
-  const [showAuth, setShowAuth] = React.useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   if (authUser === undefined) {
     return (

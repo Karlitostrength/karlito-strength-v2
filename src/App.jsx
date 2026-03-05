@@ -6,6 +6,51 @@ const supabase = createClient(
   "sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy"
 );
 
+const VAPID_PUBLIC_KEY = "BOYjSxB8XPMWutCtu_-aHx5PkZBXCSQVmwsOlYz8Q6n-QGo2_6UxEgGBzJp3PuSr6aJgvcSQbavVV8Muss0Hgmc";
+const SUPABASE_FUNCTIONS_URL = "https://ebpdfalmzkvxfuzaamqh.supabase.co/functions/v1";
+
+async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
+  try {
+    await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, title, message, tag, url }),
+    });
+  } catch (e) {
+    console.log("Push failed (non-critical):", e);
+  }
+}
+
+async function registerPushSubscription(userId) {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return false;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    await supabase.from("push_subscriptions").upsert({
+      user_id: userId,
+      subscription: JSON.stringify(sub),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,subscription" });
+    return true;
+  } catch (e) {
+    console.log("Push registration failed:", e);
+    return false;
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
 // ─── FONT INJECTION ──────────────────────────────────────────────────────────
 const style = document.createElement("style");
 style.textContent = `
@@ -1445,6 +1490,8 @@ const saveProgramDay = async () => {
       setBuildExercises([{ name: "", sets: 3, reps: 8, weight: 0, notes: "" }]);
       await loadData();
       setView("profile");
+      // Push notification to athlete
+      sendPushToUser(selectedClient, "💪 New program from Coach Karol", `Week ${buildWeek} · Day ${buildDay} — ${buildTitle}`, "program", "/");
     } catch(e) { console.log("Save program day error:", e); }
     setSaving(false);
   };
@@ -1741,7 +1788,15 @@ const saveProgramDay = async () => {
     </div>
   );
 }
-function ProfileScreen({ user }) {
+function ProfileScreen({ user, authUser }) {
+  const [notifStatus, setNotifStatus] = React.useState(
+    typeof Notification !== "undefined" ? Notification.permission : "unsupported"
+  );
+
+  const enableNotifications = async () => {
+    const ok = await registerPushSubscription(authUser.id);
+    setNotifStatus(ok ? "granted" : "denied");
+  };
   return (
     <div style={s.screen}>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -1787,6 +1842,19 @@ function ProfileScreen({ user }) {
       <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)", textAlign: "center" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, letterSpacing: "0.08em", marginBottom: 4 }}>KARLITO STRENGTH</div>
         <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 16 }}>BUILT THROUGH DISCIPLINE</div>
+
+        {notifStatus !== "granted" && notifStatus !== "unsupported" && (
+          <button style={{ ...s.btn, marginBottom: 10, fontSize: 13 }} onClick={enableNotifications}>
+            🔔 ENABLE NOTIFICATIONS
+          </button>
+        )}
+        {notifStatus === "granted" && (
+          <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 12 }}>🔔 Notifications enabled ✓</div>
+        )}
+        {notifStatus === "denied" && (
+          <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 12 }}>🔕 Notifications blocked — enable in browser settings</div>
+        )}
+
         <button style={{ ...s.btnGhost, fontSize: 12 }} onClick={() => supabase.auth.signOut()}>
           SIGN OUT
         </button>
@@ -1874,14 +1942,16 @@ function ChatScreen({ authUser, isCoach }) {
 
   const sendMessage = async () => {
     if (!newMsg.trim() || !selectedContact) return;
-    
+    const content = newMsg.trim();
     await supabase.from("messages").insert({
       from_id: authUser.id,
       to_id: selectedContact,
-      content: newMsg.trim()
+      content,
     });
-    
     setNewMsg("");
+    // Push notification to recipient
+    const senderName = isCoach ? "Coach Karol" : "Jurek";
+    sendPushToUser(selectedContact, `💬 New message from ${senderName}`, content, "chat", "/");
   };
 
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-GB", { 
@@ -2040,6 +2110,7 @@ function ChatScreen({ authUser, isCoach }) {
               const url = photoUrl.trim();
               setPhotoUrl(""); setPhotoMode(false);
               await supabase.from("messages").insert({ from_id: authUser.id, to_id: selectedContact, content: `[MEAL] ${url}` });
+              sendPushToUser(selectedContact, "📸 New photo from Jurek", "Tap to view the photo", "chat", "/");
             }} style={{ ...s.btn, width: "auto", padding: "10px 16px", flexShrink: 0 }}>➤</button>
             <button onClick={() => { setPhotoMode(false); setPhotoUrl(""); }}
               style={{ ...s.btnGhost, width: "auto", padding: "10px 14px", flexShrink: 0 }}>✕</button>
@@ -2611,7 +2682,7 @@ const [hasCoach, setHasCoach] = useState(false);
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "history" && <HistoryScreen />}
         {tab === "progress" && <ProgressScreen user={user} week={week} />}
-   {tab === "profile" && <ProfileScreen user={user} />}
+   {tab === "profile" && <ProfileScreen user={user} authUser={authUser} />}
         {tab === "coach" && <CoachScreen />}
       </div>
 

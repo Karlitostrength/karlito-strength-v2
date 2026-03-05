@@ -1780,7 +1780,227 @@ function ProfileScreen({ user }) {
     </div>
   );
 }
+// ─── CHAT SCREEN ──────────────────────────────────────────────────────────────
 
+function ChatScreen({ authUser, isCoach }) {
+  const [messages, setMessages] = useState([]);
+  const [newMsg, setNewMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [contacts, setContacts] = useState([]);
+  const [selectedContact, setSelectedContact] = useState(null);
+  const messagesEndRef = useRef(null);
+
+  // Load contacts (for coach: athletes, for athlete: coach)
+  useEffect(() => {
+    const loadContacts = async () => {
+      if (isCoach) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .eq("coach_id", authUser.id);
+        setContacts(data || []);
+        if (data?.length > 0) setSelectedContact(data[0].id);
+      } else {
+        const { data } = await supabase
+          .from("profiles")
+          .select("coach_id")
+          .eq("id", authUser.id)
+          .single();
+        if (data?.coach_id) {
+          setSelectedContact(data.coach_id);
+          setContacts([{ id: data.coach_id, name: "Coach" }]);
+        }
+      }
+      setLoading(false);
+    };
+    loadContacts();
+  }, [authUser, isCoach]);
+
+  // Load messages
+  useEffect(() => {
+    if (!selectedContact) return;
+    
+    const loadMessages = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`and(from_id.eq.${authUser.id},to_id.eq.${selectedContact}),and(from_id.eq.${selectedContact},to_id.eq.${authUser.id})`)
+        .order("created_at", { ascending: true });
+      setMessages(data || []);
+    };
+    
+    loadMessages();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel("messages")
+      .on("postgres_changes", { 
+        event: "INSERT", 
+        schema: "public", 
+        table: "messages" 
+      }, (payload) => {
+        const msg = payload.new;
+        if ((msg.from_id === authUser.id && msg.to_id === selectedContact) ||
+            (msg.from_id === selectedContact && msg.to_id === authUser.id)) {
+          setMessages(prev => [...prev, msg]);
+        }
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [selectedContact, authUser]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!newMsg.trim() || !selectedContact) return;
+    
+    await supabase.from("messages").insert({
+      from_id: authUser.id,
+      to_id: selectedContact,
+      content: newMsg.trim()
+    });
+    
+    setNewMsg("");
+  };
+
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-GB", { 
+    hour: "2-digit", 
+    minute: "2-digit" 
+  });
+
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { 
+    day: "numeric", 
+    month: "short" 
+  });
+
+  if (loading) {
+    return (
+      <div style={s.screen}>
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 13, color: "var(--gray)" }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (contacts.length === 0) {
+    return (
+      <div style={s.screen}>
+        <div style={s.sectionLabel}>MESSAGES</div>
+        <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>
+            {isCoach ? "NO ATHLETES YET" : "NO COACH ASSIGNED"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>
+            {isCoach ? "Invite athletes to start chatting" : "Contact us to get a personal coach"}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={s.screen}>
+      <div style={s.sectionLabel}>MESSAGES</div>
+
+      {/* Contact selector for coach */}
+      {isCoach && contacts.length > 1 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
+          {contacts.map(c => (
+            <div 
+              key={c.id} 
+              onClick={() => setSelectedContact(c.id)}
+              style={{ 
+                ...s.pill(selectedContact === c.id), 
+                padding: "8px 14px",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {c.name || c.id.slice(0, 8)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Messages */}
+      <div style={{ 
+        ...s.card, 
+        height: "50vh", 
+        overflowY: "auto", 
+        display: "flex", 
+        flexDirection: "column",
+        padding: 12
+      }}>
+        {messages.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: "var(--gray)" }}>
+            No messages yet. Say hi! 👋
+          </div>
+        ) : (
+          messages.map((msg, i) => {
+            const isMe = msg.from_id === authUser.id;
+            const showDate = i === 0 || fmtDate(messages[i-1].created_at) !== fmtDate(msg.created_at);
+            
+            return (
+              <div key={msg.id}>
+                {showDate && (
+                  <div style={{ textAlign: "center", fontSize: 11, color: "var(--gray2)", margin: "12px 0" }}>
+                    {fmtDate(msg.created_at)}
+                  </div>
+                )}
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: isMe ? "flex-end" : "flex-start",
+                  marginBottom: 8
+                }}>
+                  <div style={{
+                    maxWidth: "75%",
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    background: isMe ? "var(--red)" : "var(--bg3)",
+                    border: isMe ? "none" : "1px solid var(--border)"
+                  }}>
+                    <div style={{ fontSize: 14, lineHeight: 1.4 }}>{msg.content}</div>
+                    <div style={{ 
+                      fontSize: 10, 
+                      color: isMe ? "rgba(255,255,255,0.6)" : "var(--gray2)", 
+                      marginTop: 4,
+                      textAlign: "right"
+                    }}>
+                      {fmtTime(msg.created_at)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input
+          value={newMsg}
+          onChange={(e) => setNewMsg(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Type a message..."
+          style={{ ...s.input, flex: 1 }}
+        />
+        <button 
+          onClick={sendMessage}
+          style={{ ...s.btn, width: "auto", padding: "12px 20px" }}
+        >
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+}
 // ─── HISTORY SCREEN ───────────────────────────────────────────────────────────
 
 function HistoryScreen() {
@@ -1943,17 +2163,16 @@ function HistoryScreen() {
 const NAV_ATHLETE = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
+  { id: "chat", icon: "💬", label: "CHAT" },
   { id: "history", icon: "📋", label: "LOGI" },
-  { id: "progress", icon: "📈", label: "STATS" },
   { id: "profile", icon: "👤", label: "JA" },
 ];
 
 const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
+  { id: "chat", icon: "💬", label: "CHAT" },
   { id: "history", icon: "📋", label: "LOGI" },
-  { id: "progress", icon: "📈", label: "STATS" },
-  { id: "profile", icon: "👤", label: "JA" },
   { id: "coach", icon: "🎯", label: "COACH" },
 ];
 
@@ -2052,6 +2271,7 @@ const [hasCoach, setHasCoach] = useState(false);
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
       {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
+        {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "history" && <HistoryScreen />}
         {tab === "progress" && <ProgressScreen user={user} week={week} />}
    {tab === "profile" && <ProfileScreen user={user} />}

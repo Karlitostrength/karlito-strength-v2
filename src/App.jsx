@@ -145,10 +145,10 @@ function getSnatchLightProtocol(week) {
     reps: currentReps,
     rest: restLabel,
     progressDone,
-    label: `4 × ${currentReps} pow/rękę`,
+    label: `4 × ${currentReps} reps/arm`,
     note: progressDone
-      ? `✓ 25 pow osiągnięte — skracaj przerwę o 5–10 sek/tydzień (przerwa: ${restLabel})`
-      : `Przerwa: ${restLabel} · Cel: 25 pow/rękę · +1 pow/tydzień`,
+      ? `✓ 25 pow osiągnięte — cut rest by 5–10s/week (przerwa: ${restLabel})`
+      : `Rest: ${restLabel} · Goal: 25 reps/arm · +1 rep/week`,
   };
 }
 
@@ -169,8 +169,8 @@ function getSnatchMaxProtocol(week, level) {
     isSwing,
     label: `4 × ${currentReps}/${currentReps} · ${exercise}`,
     note: reachedTarget
-      ? `🔥 12 pow osiągnięte — skocz na cięższą kulę!`
-      : `Ciężar +2 numery · Przerwa 2 min · Cel: 12 pow → cięższa kula`,
+      ? `🔥 12 reps reached — go up to a heavier KB!`
+      : `Weight +2 sizes · Rest 2 min · Goal: 12 reps → heavier KB`,
     reachedTarget,
   };
 }
@@ -722,6 +722,7 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
     </div>
   );
 }
+const [videoLink, setVideoLink] = useState("");
 // ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 
 function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
@@ -863,14 +864,14 @@ const saveWorkout = async () => {
       {/* Header + progress */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={s.sectionLabel}>Tydzień {week} · {phaseData.name}</div>
+          <div style={s.sectionLabel}>Week {week} · {phaseData.name}</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, fontWeight: 900 }}>{workout.title}</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, color: doneSets === totalSets && totalSets > 0 ? "var(--red)" : "var(--white)" }}>
             {doneSets}<span style={{ fontSize: 13, color: "var(--gray2)" }}>/{totalSets}</span>
           </div>
-          <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.12em" }}>SERIE</div>
+          <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.12em" }}>SETS</div>
         </div>
       </div>
       <div style={{ height: 3, background: "var(--border)", borderRadius: 2, marginBottom: 20 }}>
@@ -950,7 +951,7 @@ const saveWorkout = async () => {
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: "#4a9eff", marginBottom: 6 }}>🏋 KB SNATCH — DZIEŃ LEKKI</div>
               <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", color: "var(--white)", marginBottom: 4 }}>{sec.snatchLightData.label}</div>
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>{sec.snatchLightData.note}</div>
-              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>Dobierz ciężar na 15 pow/rękę · Chroń skórę dłoni</div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>Dobierz ciężar na 15 reps/arm · Chroń skórę dłoni</div>
               <button onClick={() => setCondDone(p => ({ ...p, snatchLight: !p.snatchLight }))}
                 style={{ ...s.btn, background: condDone.snatchLight ? "var(--red-dim)" : "var(--red)" }}>
                 {condDone.snatchLight ? "✓ ZROBIONE" : "ZAZNACZ JAKO ZROBIONE"}
@@ -967,7 +968,7 @@ const saveWorkout = async () => {
                 <div style={{ fontSize: 11, color: "#f0a020", background: "rgba(240,160,32,0.1)", borderRadius: 4, padding: "4px 8px", marginBottom: 6, display: "inline-block" }}>Początkujący: One Arm Swing zamiast Snatch</div>
               )}
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>{sec.snatchMaxData.note}</div>
-              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>Odważnik +2 numery · Przerwa 2 min → cięższa kula po 12/12</div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", borderTop: "1px solid var(--border)", paddingTop: 8, marginBottom: 12 }}>KB +2 sizes · Rest 2 min → heavier KB after 12/12</div>
               <button onClick={() => setCondDone(p => ({ ...p, snatchMax: !p.snatchMax }))}
                 style={{ ...s.btn, background: condDone.snatchMax ? "var(--red-dim)" : "var(--red)" }}>
                 {condDone.snatchMax ? "✓ ZROBIONE" : "ZAZNACZ JAKO ZROBIONE"}
@@ -1005,7 +1006,7 @@ const saveWorkout = async () => {
         <div style={s.card}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 10 }}>ZAKOŃCZ TRENING</div>
           <div style={{ fontSize: 13, color: doneSets === totalSets && totalSets > 0 ? "#4a9eff" : "var(--gray)", marginBottom: 14 }}>
-            {doneSets === totalSets && totalSets > 0 ? "✅ Wszystkie serie zalogowane" : `⏳ ${doneSets}/${totalSets} serii ukończonych — możesz zapisać w każdej chwili`}
+            {doneSets === totalSets && totalSets > 0 ? "✅ All sets logged" : `⏳ ${doneSets}/${totalSets} sets done — you can save at any time`}
           </div>
           {showComment ? (
             <div style={{ marginBottom: 12 }}>
@@ -1025,7 +1026,7 @@ const saveWorkout = async () => {
         <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)", textAlign: "center", animation: "fadeIn 0.4s ease" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 4 }}>TRENING ZAPISANY</div>
-          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 4 }}>{doneSets} serii · Tydzień {week} · Dzień {dayKey}</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 4 }}>{doneSets} sets · Week {week} · Day {dayKey}</div>
          {/* Video link */}
           <div style={{ marginBottom: 12 }}>
             <label style={s.label}>LINK DO VIDEO (opcjonalnie)</label>
@@ -2073,7 +2074,7 @@ function HistoryScreen() {
     setLoading(false);
   }, []);
 
-  const fmtDate = (iso) => new Date(iso).toLocaleDateString("pl-PL", { weekday: "short", day: "numeric", month: "short" });
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" };
 
   const volKg = (exercises) => exercises?.reduce((s, ex) =>
@@ -2096,7 +2097,7 @@ function HistoryScreen() {
       <div style={s.sectionLabel}>HISTORIA TRENINGÓW</div>
       <div style={{ ...s.card, textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Brak logów</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No logs yet</div>
         <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7 }}>
           Po treningu naciśnij<br /><strong style={{ color: "var(--white)" }}>💾 ZAPISZ TRENING</strong><br />i log pojawi się tutaj.
         </div>
@@ -2157,7 +2158,7 @@ function HistoryScreen() {
                     <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em" }}>KG VOL</div>
                   </>
                 )}
-                <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets}/{allSets} serii</div>
+                <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets}/{allSets} sets</div>
                 {rpe != null && (
                   <div style={{ ...s.badge(rpe >= 9 ? "var(--red)" : "var(--gray2)"), fontSize: 9, marginTop: 4, display: "inline-block" }}>RPE {rpe}</div>
                 )}
@@ -2203,7 +2204,7 @@ function HistoryScreen() {
                 )}
 
                 <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 10, textAlign: "right", letterSpacing: "0.08em" }}>
-                  KLIKNIJ ABY ZWINĄĆ ↑
+                  CLICK TO COLLAPSE ↑
                 </div>
               </div>
             )}

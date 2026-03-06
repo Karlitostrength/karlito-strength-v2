@@ -2005,7 +2005,12 @@ function ProfileScreen({ user, authUser }) {
           </button>
         )}
         {notifStatus === "granted" && (
-          <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 12 }}>🔔 Notifications enabled ✓</div>
+          <>
+            <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>🔔 Notifications enabled ✓</div>
+            <button style={{ ...s.btnGhost, fontSize: 11, marginBottom: 10 }} onClick={enableNotifications}>
+              ↺ Re-register subscription
+            </button>
+          </>
         )}
         {notifStatus === "denied" && (
           <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 6 }}>🔕 Notifications blocked — enable in browser settings</div>

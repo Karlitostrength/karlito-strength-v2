@@ -3288,6 +3288,16 @@ const [hasCoach, setHasCoach] = useState(false);
   }, [authUser]);
 
   const [showAuth, setShowAuth] = useState(false);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem("ks_pwa_dismissed");
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    if (!dismissed && !isStandalone) {
+      const timer = setTimeout(() => setShowPwaBanner(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   if (authUser === undefined) {
     return (
@@ -3327,8 +3337,25 @@ const [hasCoach, setHasCoach] = useState(false);
   const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };
   const handleWorkoutDone = () => { setActiveDay(null); setTab("history"); };
 
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
   return (
 <div style={{...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url('https://drive.google.com/uc?export=view&id=1U8QROGZWsy5_BxVcrUFs98HIYt1yud7-') center 20% / cover fixed`}}>
+
+      {showPwaBanner && (
+        <div style={{ position: "fixed", bottom: 70, left: 12, right: 12, zIndex: 9999, background: "#1a1a1a", border: "1px solid var(--accent)", borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.7)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, letterSpacing: "0.1em", color: "var(--text)" }}>📲 ADD TO HOME SCREEN</div>
+            <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "none", border: "none", color: "var(--gray)", fontSize: 18, cursor: "pointer", padding: "0 4px" }}>✕</button>
+          </div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray)", letterSpacing: "0.05em", lineHeight: 1.5 }}>
+            {isIOS
+              ? "Tap the Share button below → \"Add to Home Screen\" for the full app experience."
+              : "Tap the menu (⋮) in your browser → \"Add to Home Screen\" for the full app experience."}
+          </div>
+          <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "var(--accent)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.15em", padding: "8px 0", cursor: "pointer" }}>GOT IT</button>
+        </div>
+      )}
       <div style={s.header}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>

@@ -928,6 +928,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [accDone, setAccDone] = useState({});
   const [condDone, setCondDone] = useState({});
   const [comment, setComment] = useState("");
+  const [videoLink, setVideoLink] = useState("");
   const [showComment, setShowComment] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -972,6 +973,7 @@ const saveWorkout = async () => {
         sets: setLogs[ei] || [],
       })),
       comment,
+      video_link: videoLink,
     };
      try {
       const existing = JSON.parse(localStorage.getItem("ks_logs") || "[]");
@@ -989,6 +991,7 @@ const saveWorkout = async () => {
           workout_title: logData.workout,
           exercises: logData.exercises,
           comment: logData.comment,
+          video_link: logData.video_link,
         });
       }
     } catch(e) { console.log("Supabase sync error:", e); }
@@ -1186,6 +1189,16 @@ const saveWorkout = async () => {
               + Dodaj komentarz do treningu
             </div>
           )}
+                    <div style={{ marginBottom: 12 }}>
+            <label style={s.label}>VIDEO LINK (optional)</label>
+            <input
+              type="text"
+              value={videoLink}
+              onChange={e => setVideoLink(e.target.value)}
+              placeholder="Paste YouTube, Loom or Google Drive link..."
+              style={s.input}
+            />
+          </div>
           <button style={s.btn} onClick={saveWorkout}>💾 ZAPISZ TRENING</button>
         </div>
       ) : (

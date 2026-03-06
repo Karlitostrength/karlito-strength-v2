@@ -3021,4 +3021,3 @@ const [hasCoach, setHasCoach] = useState(false);
     </div>
   );
 }
-export default function App() {

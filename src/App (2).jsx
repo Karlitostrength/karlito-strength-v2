@@ -9,6 +9,13 @@ const supabase = createClient(
 const VAPID_PUBLIC_KEY = "BOYjSxB8XPMWutCtu_-aHx5PkZBXCSQVmwsOlYz8Q6n-QGo2_6UxEgGBzJp3PuSr6aJgvcSQbavVV8Muss0Hgmc";
 const SUPABASE_FUNCTIONS_URL = "https://ebpdfalmzkvxfuzaamqh.supabase.co/functions/v1";
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
 async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
   try {
     await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
@@ -68,12 +75,6 @@ async function unregisterPushSubscription(userId) {
   }
 }
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-}
 
 // ─── FONT INJECTION ──────────────────────────────────────────────────────────
 const style = document.createElement("style");

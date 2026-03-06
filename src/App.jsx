@@ -2222,14 +2222,15 @@ function ProfileScreen({ user, authUser }) {
         {!Object.values(user.injuries).some(Boolean) && <Row label="Injuries" val="None — full program" />}
       </div>
 
-      <div style={s.sectionLabel}>COMPETITION GALLERY</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-        {COMP_PHOTOS.map((p, i) => (
-          <div key={i} style={{ borderRadius: 6, overflow: "hidden", position: "relative", border: "1px solid #222" }}>
-            <img src={p.src} alt={p.caption} style={{ width: "100%", display: "block", objectFit: "cover", height: 300, objectPosition: i === 0 ? "center 20%" : "center 35%" }} />
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.85))", padding: "24px 12px 10px", fontSize: 12, color: "var(--cream)", letterSpacing: "0.05em", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, textTransform: "uppercase" }}>{p.caption}</div>
-          </div>
-        ))}
+     <div style={s.sectionLabel}>YOUR JOURNEY</div>
+      <div style={{ ...s.card, textAlign: "center", padding: "30px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>⚔️</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: "var(--white)", letterSpacing: "0.05em", fontWeight: 900 }}>
+          THE IRON NEVER LIES
+        </div>
+        <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 8 }}>
+          Forged through discipline. Keep showing up.
+        </div>
       </div>
 
       <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)", textAlign: "center" }}>

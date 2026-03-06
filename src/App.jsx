@@ -55,7 +55,18 @@ async function registerPushSubscription(userId) {
   }
 }
 
-function urlBase64ToUint8Array(base64String) {
+async function unregisterPushSubscription(userId) {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    await supabase.from("push_subscriptions").delete().eq("user_id", userId);
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
@@ -1941,17 +1952,30 @@ function ProfileScreen({ user, authUser }) {
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
   );
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [pushError, setPushError] = useState("");
+
+  useEffect(() => {
+    // Check if actually subscribed in DB
+    const check = async () => {
+      const { data } = await supabase.from("push_subscriptions").select("id").eq("user_id", authUser.id).single();
+      setPushEnabled(!!data);
+    };
+    check();
+  }, [authUser]);
 
   const enableNotifications = async () => {
     setPushError("");
     const result = await registerPushSubscription(authUser.id);
-    if (result.ok) {
-      setNotifStatus("granted");
-    } else {
-      setNotifStatus("denied");
-      setPushError(result.error || "Unknown error");
-    }
+    if (result.ok) { setNotifStatus("granted"); setPushEnabled(true); }
+    else { setNotifStatus("denied"); setPushError(result.error || "Unknown error"); }
+  };
+
+  const disableNotifications = async () => {
+    setPushError("");
+    const result = await unregisterPushSubscription(authUser.id);
+    if (result.ok) setPushEnabled(false);
+    else setPushError(result.error || "Unknown error");
   };
   return (
     <div style={s.screen}>
@@ -1999,25 +2023,25 @@ function ProfileScreen({ user, authUser }) {
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, letterSpacing: "0.08em", marginBottom: 4 }}>KARLITO STRENGTH</div>
         <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 16 }}>BUILT THROUGH DISCIPLINE</div>
 
-        {notifStatus !== "granted" && notifStatus !== "unsupported" && (
+        {notifStatus === "unsupported" ? (
+          <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 12 }}>🔕 Push not supported in this browser</div>
+        ) : pushEnabled ? (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>🔔 Notifications enabled ✓</div>
+            <button style={{ ...s.btnGhost, fontSize: 11, marginBottom: 6 }} onClick={enableNotifications}>↺ Re-register</button>
+            <button style={{ ...s.btnGhost, fontSize: 11, color: "var(--red-dim)", borderColor: "var(--red-dim)" }} onClick={disableNotifications}>🔕 Disable notifications</button>
+          </div>
+        ) : (
           <button style={{ ...s.btn, marginBottom: 10, fontSize: 13 }} onClick={enableNotifications}>
             🔔 ENABLE NOTIFICATIONS
           </button>
         )}
-        {notifStatus === "granted" && (
-          <>
-            <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>🔔 Notifications enabled ✓</div>
-            <button style={{ ...s.btnGhost, fontSize: 11, marginBottom: 10 }} onClick={enableNotifications}>
-              ↺ Re-register subscription
-            </button>
-          </>
-        )}
-        {notifStatus === "denied" && (
-          <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 6 }}>🔕 Notifications blocked — enable in browser settings</div>
+        {notifStatus === "denied" && !pushEnabled && (
+          <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 8 }}>Blocked in browser — reset in site settings</div>
         )}
         {pushError ? (
-          <div style={{ fontSize: 11, color: "var(--red-dim)", marginBottom: 12, background: "rgba(196,30,30,0.1)", padding: "6px 10px", borderRadius: 4 }}>
-            Error: {pushError}
+          <div style={{ fontSize: 11, color: "var(--red-dim)", marginBottom: 10, background: "rgba(196,30,30,0.1)", padding: "6px 10px", borderRadius: 4 }}>
+            ⚠ {pushError}
           </div>
         ) : null}
 

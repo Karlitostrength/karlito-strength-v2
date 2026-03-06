@@ -1594,7 +1594,10 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
                     <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>{coachDay.title}</div>
                     {coachDay.notes && <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>{coachDay.notes}</div>}
                   </div>
-                  <div style={{ color: "var(--gray2)", fontSize: 20 }}>›</div>
+                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  <span style={{ fontSize: 11, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif" }}>VIEW</span>
+  <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
+</div>
                 </div>
               </div>
             );

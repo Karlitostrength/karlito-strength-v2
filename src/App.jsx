@@ -3200,7 +3200,7 @@ const [hasCoach, setHasCoach] = useState(false);
   const handleWorkoutDone = () => { setActiveDay(null); setTab("history"); };
 
   return (
-<div style={{...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url(${COMP_PHOTOS[1].src}) center 35% / cover fixed`}}>
+<div style={{...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url('https://drive.google.com/uc?export=view&id=1U8QROGZWsy5_BxVcrUFs98HIYt1yud7-') center 20% / cover fixed`}}>
       <div style={s.header}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>

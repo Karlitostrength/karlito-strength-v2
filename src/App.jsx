@@ -1913,8 +1913,9 @@ const saveProgramDay = async () => {
   return (
     <div style={s.screen}>
       {/* View toggle */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[["dashboard", "📊 OVERVIEW"], ["sessions", "📋 SESSIONS"]].map(([v, label]) => (
+          {/* View toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, overflowX: "auto" }}>
+        {[["dashboard", "📊 OVERVIEW"], ["sessions", "📋 SESSIONS"], ["library", "📚 BAZA"]].map(([v, label]) => (
           <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); }}
             style={{ ...s.pill(view === v && !selectedClient), padding: "8px 14px", flex: 1, textAlign: "center", fontSize: 12 }}>
             {label}
@@ -3093,6 +3094,50 @@ function HistoryScreen() {
                 {log.comment && (
                   <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: `2px solid ${col}` }}>
                     💬 {log.comment}
+                          {/* EXERCISE LIBRARY (COACH VIEW) */}
+      {view === "library" && !selectedClient && (
+        <>
+          <div style={s.sectionLabel}>DODAJ DO BIBLIOTEKI</div>
+          <div style={{ ...s.card, marginBottom: 20 }}>
+             <input placeholder="Nazwa ćwiczenia (np. KB Swing)" style={{...s.input, marginBottom: 8}} id="libName" />
+             <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
+                 <select style={{...s.input, flex: 1}} id="libCat">
+                     <option value="Squat">Squat</option>
+                     <option value="Hinge">Hinge</option>
+                     <option value="Press">Press</option>
+                     <option value="Pull">Pull</option>
+                     <option value="KB">Kettlebell</option>
+                     <option value="Accessories">Accessories</option>
+                 </select>
+                 <input placeholder="Kto prezentuje? (np. Kacper MS)" style={{...s.input, flex: 1}} id="libDemo" />
+             </div>
+             <input placeholder="Link do YouTube (np. https://youtu.be/...)" style={{...s.input, marginBottom: 8}} id="libUrl" />
+             <input placeholder="Wskazówki (np. Chest up. Drive through heel.)" style={{...s.input, marginBottom: 12}} id="libCues" />
+             
+             <button style={s.btn} onClick={async () => {
+                 const name = document.getElementById("libName").value;
+                 const cat = document.getElementById("libCat").value;
+                 const url = document.getElementById("libUrl").value;
+                 const cues = document.getElementById("libCues").value;
+                 const demo = document.getElementById("libDemo").value;
+                 
+                 if(!name || !url) return alert("Podaj nazwę i link!");
+                 
+                 const { data: { user } } = await supabase.auth.getUser();
+                 await supabase.from("exercise_library").insert({ name, category: cat, youtube_url: url, cues, demonstrator: demo });
+                 
+                 alert("Dodano pomyślnie! (Odśwież aby zobaczyć na dole)");
+                 document.getElementById("libName").value = '';
+                 document.getElementById("libUrl").value = '';
+                 document.getElementById("libCues").value = '';
+             }}>
+                 💾 ZAPISZ W BAZIE
+             </button>
+          </div>
+          
+          {/* Tu później wyrenderujemy listę ćwiczeń z bazy */}
+        </>
+      )}
                   </div>
                 )}
 

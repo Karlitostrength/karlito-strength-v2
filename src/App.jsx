@@ -932,8 +932,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [showComment, setShowComment] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
-  const [videoLink, setVideoLink] = useState("");
-
+ 
   if (!workout) return (
     <div style={s.screen}>
       <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>

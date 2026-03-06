@@ -1458,7 +1458,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
     <div style={s.screen}>
       {/* Nordic header rune */}
       <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.5em", color: "var(--gray2)", marginBottom: 16, fontFamily: "'Barlow Condensed', sans-serif" }}>
-        ᛟ — KARLOS STRENGTH — ᛟ
+        ᛟ — KARLITO STRENGTH — ᛟ
       </div>
 
       {/* Readiness check-in */}
@@ -1654,7 +1654,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         <div style={{ ...s.card, borderColor: "var(--accent)", background: "rgba(232,213,160,0.05)", marginTop: 16, textAlign: "center" }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)", marginBottom: 6 }}>🎯 WANT PERSONALIZED COACHING?</div>
           <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
-            Get a custom program tailored to your goals,<br />with direct feedback from Coach Karlos.
+            Get a custom program tailored to your goals,<br />with direct feedback from Coach Karol.
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
             <a href="https://www.instagram.com/karlitostrength" target="_blank" rel="noopener noreferrer" style={{ ...s.btn, display: "inline-block", textDecoration: "none", padding: "10px 16px", fontSize: 13 }}>
@@ -3201,7 +3201,7 @@ const [hasCoach, setHasCoach] = useState(false);
       <div style={s.header}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={s.logo}>KARLOS <span style={s.logoRed}>STRENGTH</span></div>
+            <div style={s.logo}>KARLITO <span style={s.logoRed}>STRENGTH</span></div>
             <div style={s.tagline}>ᚠᚢᚦᚨᚱᚲ · Forged Through Iron</div>
           </div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)", textAlign: "right", letterSpacing: "0.1em" }}>

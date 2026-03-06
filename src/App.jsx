@@ -1475,7 +1475,13 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
 
       {/* Readiness check-in */}
       <ReadinessWidget authUser={null} />
-
+      {/* Gladiator / Personal Touch */}
+      <div style={{ textAlign: "center", padding: "10px 0 20px 0" }}>
+        <div style={{ fontSize: 24, marginBottom: 4 }}>⚔️</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: "var(--white)", letterSpacing: "0.15em", fontWeight: 900, textTransform: "uppercase" }}>
+          STRENGTH AND HONOR
+        </div>
+      </div>
       {/* Program type badge */}
       {hasCoach ? (
         <div style={{ background: "rgba(201,168,76,0.08)", border: "1px solid var(--gold-dim)", borderRadius: 8, padding: "8px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>

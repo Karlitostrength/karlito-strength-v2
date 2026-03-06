@@ -1968,7 +1968,9 @@ const saveProgramDay = async () => {
                   </div>
                   <div style={{ fontSize: 18, color: "var(--gray2)" }}>›</div>
                 </div>
-                <div style={{ display: "flex", gap: 3, marginTop: 10, alignItems: "flex-end", height: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 }}>
+<div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", paddingBottom: 2 }}>ACTIVITY (4 WKS)</div>
+<div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 24, width: 100 }}>
                   {bars.map((n, i) => (
                     <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                       <div style={{ width: "100%", borderRadius: 2, background: n > 0 ? "var(--red)" : "var(--bg3)", height: Math.max(3, (n / maxB) * 18) }} />

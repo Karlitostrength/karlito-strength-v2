@@ -1931,7 +1931,7 @@ const saveProgramDay = async () => {
             <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
               <div style={{ fontSize: 13, color: "var(--gray)" }}>No athletes yet</div>
             </div>
-          ) : athletes.map(client => {
+                 ) : athletes.map(client => {
             const last = lastWorkout(client.id);
             const thisWk = wksThisWeek(client.id);
             const thisMo = wksThisMonth(client.id);
@@ -1966,19 +1966,23 @@ const saveProgramDay = async () => {
                       {last && <div style={{ fontSize: 11, color: "var(--gray2)" }}>last: <span style={{ color: "var(--white)" }}>{fmtDate(last.created_at)}</span></div>}
                     </div>
                   </div>
-                  <div style={{ fontSize: 18, color: "var(--gray2)" }}>›</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif" }}>VIEW</span>
+                    <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
+                  </div>
                 </div>
-             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 }}>
-  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", paddingBottom: 2 }}>ACTIVITY (4 WKS)</div>
-  <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 24, width: 100 }}>
-    {bars.map((n, i) => (
-      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-        <div style={{ width: "100%", borderRadius: 2, background: n > 0 ? "var(--red)" : "var(--bg3)", height: Math.max(3, (n / maxB) * 18) }} />
-        <div style={{ fontSize: 7, color: "var(--gray2)" }}>{i === 3 ? "now" : `-${3-i}w`}</div>
-      </div>
-    ))}
-  </div>
-</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", paddingBottom: 2 }}>ACTIVITY (4 WKS)</div>
+                  <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 24, width: 100 }}>
+                    {bars.map((n, i) => (
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                        <div style={{ width: "100%", borderRadius: 2, background: n > 0 ? "var(--red)" : "var(--bg3)", height: Math.max(3, (n / maxB) * 18) }} />
+                        <div style={{ fontSize: 7, color: "var(--gray2)" }}>{i === 3 ? "now" : `-${3-i}w`}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </>

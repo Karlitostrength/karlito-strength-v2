@@ -6,14 +6,22 @@ const supabase = createClient(
   "sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy"
 );
 
-const VAPID_PUBLIC_KEY = "BOYjSxB8XPMWutCtu_-aHx5PkZBXCSQVmwsOlYz8Q6n-QGo2_6UxEgGBzJp3PuSr6aJgvcSQbavVV8Muss0Hgmc";
-const SUPABASE_FUNCTIONS_URL = "https://ebpdfalmzkvxfuzaamqh.supabase.co/functions/v1";
+const VAPID_PUBLIC_KEY =
+  "BOYjSxB8XPMWutCtu_-aHx5PkZBXCSQVmwsOlYz8Q6n-QGo2_6UxEgGBzJp3PuSr6aJgvcSQbavVV8Muss0Hgmc";
+
+const SUPABASE_FUNCTIONS_URL =
+  "https://ebpdfalmzkvxfuzaamqh.supabase.co/functions/v1";
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
   const raw = window.atob(base64);
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
 async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
@@ -21,7 +29,13 @@ async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
     await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, title, message, tag, url }),
+      body: JSON.stringify({
+        user_id: userId,
+        title,
+        message,
+        tag,
+        url,
+      }),
     });
   } catch (e) {
     console.log("Push failed (non-critical):", e);
@@ -30,17 +44,23 @@ async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
 
 async function registerPushSubscription(userId) {
   try {
-    if (!("serviceWorker" in navigator)) throw new Error("Service Workers not supported");
-    if (!("PushManager" in window)) throw new Error("Push not supported in this browser");
-    
+    if (!("serviceWorker" in navigator))
+      throw new Error("Service Workers not supported");
+
+    if (!("PushManager" in window))
+      throw new Error("Push not supported in this browser");
+
     const reg = await navigator.serviceWorker.register("/sw.js");
+
     await navigator.serviceWorker.ready;
-    
+
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") throw new Error("Permission denied");
-    
-    // Check if already subscribed
+
+    if (permission !== "granted")
+      throw new Error("Permission denied");
+
     let sub = await reg.pushManager.getSubscription();
+
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -48,13 +68,19 @@ async function registerPushSubscription(userId) {
       });
     }
 
-    const { error } = await supabase.from("push_subscriptions").upsert({
-      user_id: userId,
-      subscription: JSON.stringify(sub),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    const { error } = await supabase
+      .from("push_subscriptions")
+      .upsert(
+        {
+          user_id: userId,
+          subscription: JSON.stringify(sub),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
 
     if (error) throw new Error("DB error: " + error.message);
+
     return { ok: true };
   } catch (e) {
     console.error("Push registration failed:", e);
@@ -65,74 +91,67 @@ async function registerPushSubscription(userId) {
 async function unregisterPushSubscription(userId) {
   try {
     if (!("serviceWorker" in navigator)) return;
+
     const reg = await navigator.serviceWorker.ready;
+
     const sub = await reg.pushManager.getSubscription();
+
     if (sub) await sub.unsubscribe();
-    await supabase.from("push_subscriptions").delete().eq("user_id", userId);
+
+    await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId);
+
     return { ok: true };
-  } catch(e) {
+  } catch (e) {
     return { ok: false, error: e.message };
   }
 }
 
+// ─── FONT INJECTION ─────────────────────────────────────────
 
-// ─── FONT INJECTION ──────────────────────────────────────────────────────────
 const style = document.createElement("style");
+
 style.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --bg: #080808;
-    --bg2: #111111;
-    --bg3: #1a1a1a;
-    --bg4: #222222;
-    --border: #2a2a2a;
-    --red: #c41e1e;
-    --red-dim: #7a1212;
-    --red-glow: rgba(196,30,30,0.15);
-    --white: #f0ece4;
-    --gray: #888880;
-    --gray2: #555550;
-    --accent: #e8d5a0;
-  }
+:root {
+  --bg: #080808;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --bg4: #222222;
+  --border: #2a2a2a;
+  --red: #c41e1e;
+  --red-dim: #7a1212;
+  --red-glow: rgba(196,30,30,0.15);
+  --white: #f0ece4;
+  --gray: #888880;
+  --gray2: #555550;
+  --accent: #e8d5a0;
+}
 
-  body { background: var(--bg); color: var(--white); font-family: 'Barlow', sans-serif; }
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Barlow', sans-serif;
+}
 
-  .condensed { font-family: 'Barlow Condensed', sans-serif; }
+.condensed {
+  font-family: 'Barlow Condensed', sans-serif;
+}
 
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    background: var(--border);
-    outline: none;
-    border-radius: 2px;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--red);
-    cursor: pointer;
-  }
+.fade-in { animation: fadeIn 0.35s ease forwards; }
 
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-  @keyframes timerPulse { 0% { box-shadow: 0 0 0 0 rgba(196,30,30,0.4); } 70% { box-shadow: 0 0 0 16px rgba(196,30,30,0); } 100% { box-shadow: 0 0 0 0 rgba(196,30,30,0); } }
-
-  .fade-in { animation: fadeIn 0.35s ease forwards; }
-  .pulse { animation: pulse 1.5s infinite; }
-  .timer-pulse { animation: timerPulse 1s infinite; }
-
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to { opacity:1; transform:translateY(0); }
+}
 `;
-document.head.appendChild(style);
 
+document.head.appendChild(style);
 // ─── ENGINE ───────────────────────────────────────────────────────────────────
 
 const PHASES = {

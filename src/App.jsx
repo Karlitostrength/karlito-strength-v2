@@ -1583,43 +1583,29 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
           <div style={{ fontSize: 13, color: "var(--gray)" }}>Loading...</div>
         </div>
       ) : hasCoach ? (
-        // COACHED ATHLETE - show coach program or "not ready"
+        // COACHED ATHLETE - show only assigned days, or "AWAITING" if none
         hasCoachProgram ? (
-          days.map(day => {
-            const coachDay = coachDays.find(d => d.day === day);
-            if (!coachDay) {
-              return (
-                <div key={day} style={{ ...s.card, marginBottom: 10, opacity: 0.5 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--gray2)" }}>DAY {day}</div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, color: "var(--gray)" }}>Not assigned yet</div>
-                    </div>
-                    <div style={{ color: "var(--gray2)", fontSize: 16 }}>⏳</div>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div key={day} style={{ ...s.card, marginBottom: 10, cursor: "pointer", transition: "border-color 0.2s", borderColor: "var(--red-dim)" }}
-                onClick={() => onStartWorkout(day)}>
+          <>
+            {coachDays.map(coachDay => (
+              <div key={coachDay.id} style={{ ...s.card, marginBottom: 10, cursor: "pointer", transition: "border-color 0.2s", borderColor: "var(--red-dim)" }}
+                onClick={() => onStartWorkout(coachDay.day)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--red)" }}>DAY {day}</div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, letterSpacing: "0.2em", color: "var(--red)" }}>DAY {coachDay.day}</div>
                       <div style={{ fontSize: 10, color: "var(--accent)", background: "rgba(232,213,160,0.1)", padding: "2px 6px", borderRadius: 3 }}>COACH</div>
                     </div>
                     <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>{coachDay.title}</div>
                     {coachDay.notes && <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>{coachDay.notes}</div>}
                   </div>
-                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-  <span style={{ fontSize: 11, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif" }}>VIEW</span>
-  <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
-</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif" }}>START</span>
+                    <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
+                  </div>
                 </div>
               </div>
-            );
-          })
+            ))}
+          </>
         ) : (
           <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
             <div style={{ fontSize: 24 }}>⏳</div>
@@ -2086,6 +2072,31 @@ const saveProgramDay = async () => {
               })}
             </div>
           )}
+          {/* RECENT WORKOUTS WITH VIDEO FEEDBACK */}
+          {clientWorkouts.filter(w => w.video_link).length > 0 && (
+            <div style={{ ...s.card, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 8 }}>🎥 VIDEO FEEDBACK</div>
+              {clientWorkouts.filter(w => w.video_link).slice(0, 5).map((w, i) => {
+                const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" }[w.day] || "var(--red)";
+                return (
+                  <div key={i} style={{ borderBottom: i < 4 ? "1px solid var(--border)" : "none", padding: "10px 0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <div>
+                        <span style={{ ...s.badge(col), fontSize: 9 }}>DAY {w.day}</span>
+                        <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray)", marginLeft: 8 }}>WK {w.week} · {fmtDate(w.created_at)}</span>
+                      </div>
+                    </div>
+                    {w.comment && <div style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic", marginBottom: 6 }}>"{w.comment}"</div>}
+                    <a href={w.video_link} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(201,168,76,0.1)", border: "1px solid var(--gold-dim)", borderRadius: 6, textDecoration: "none", cursor: "pointer" }}>
+                      <span style={{ fontSize: 14 }}>▶</span>
+                      <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em" }}>OBEJRZYJ WIDEO</span>
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
@@ -2176,6 +2187,16 @@ const saveProgramDay = async () => {
                   </div>
                 </div>
                 {w.comment && <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "6px 10px", marginTop: 8, borderLeft: `2px solid ${col}` }}>💬 {w.comment}</div>}
+                {w.video_link && (
+                  <a href={w.video_link} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, padding: "8px 12px", background: "rgba(201,168,76,0.1)", border: "1px solid var(--gold-dim)", borderRadius: 6, textDecoration: "none", cursor: "pointer" }}>
+                    <span style={{ fontSize: 16 }}>▶</span>
+                    <div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em" }}>WATCH VIDEO FEEDBACK</div>
+                      <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 1, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.video_link}</div>
+                    </div>
+                  </a>
+                )}
               </div>
             );
           })}
@@ -2301,7 +2322,39 @@ function ChatScreen({ authUser, isCoach }) {
   const [selectedContact, setSelectedContact] = useState(null);
   const [photoMode, setPhotoMode] = useState(false);
   const [photoUrl, setPhotoUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const uploadPhotoToStorage = async (file) => {
+    setUploading(true);
+    setUploadError("");
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `chat/${authUser.id}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('chat-photos')
+        .upload(fileName, file, { contentType: file.type, upsert: false });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage
+        .from('chat-photos')
+        .getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
+      if (!publicUrl || !selectedContact) throw new Error("Upload failed");
+      await supabase.from("messages").insert({
+        from_id: authUser.id,
+        to_id: selectedContact,
+        content: `[MEAL] ${publicUrl}`,
+      });
+      const senderName = isCoach ? "Coach Karol" : "Jurek";
+      sendPushToUser(selectedContact, `📸 New photo from ${senderName}`, "Tap to view the photo", "chat", "/");
+      setPhotoMode(false);
+    } catch (e) {
+      setUploadError(e.message || "Upload failed. Check Supabase Storage bucket 'chat-photos' is public.");
+    }
+    setUploading(false);
+  };
 
   // Load contacts (for coach: athletes, for athlete: coach)
   useEffect(() => {
@@ -2530,40 +2583,41 @@ function ChatScreen({ authUser, isCoach }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Photo URL panel */}
+      {/* Native Photo Upload panel */}
       {photoMode && (
         <div style={{ ...s.card, marginTop: 8, padding: 12 }}>
           <div style={{ fontSize: 12, color: "var(--accent)", marginBottom: 8, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.1em" }}>
-            📸 SEND PHOTO — paste a link
+            📸 SEND MEAL PHOTO
           </div>
-          <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 8, lineHeight: 1.6 }}>
-            How to get a photo link:<br />
-            • <strong style={{ color: "var(--gray)" }}>WhatsApp:</strong> Open photo → Share → Copy link<br />
-            • <strong style={{ color: "var(--gray)" }}>Google Drive:</strong> Share → Copy link<br />
-            • <strong style={{ color: "var(--gray)" }}>Instagram:</strong> Copy the post URL
-          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) await uploadPhotoToStorage(file);
+              e.target.value = "";
+            }}
+          />
+          {uploadError && (
+            <div style={{ fontSize: 11, color: "var(--red)", marginBottom: 8, background: "rgba(192,57,43,0.1)", padding: "6px 10px", borderRadius: 4 }}>
+              ⚠ {uploadError}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
-            <input
-              value={photoUrl}
-              onChange={e => setPhotoUrl(e.target.value)}
-              placeholder="https://..."
-              autoFocus
-              style={{
-                background: "var(--bg3)", border: "1px solid var(--border)",
-                borderRadius: 6, padding: "12px 14px", color: "var(--white)",
-                fontSize: 14, flex: 1, minWidth: 0,
-                fontFamily: "'Barlow', sans-serif", outline: "none",
-              }}
-            />
-            <button onClick={async () => {
-              if (!photoUrl.trim() || !selectedContact) return;
-              const url = photoUrl.trim();
-              setPhotoUrl(""); setPhotoMode(false);
-              await supabase.from("messages").insert({ from_id: authUser.id, to_id: selectedContact, content: `[MEAL] ${url}` });
-              sendPushToUser(selectedContact, "📸 New photo from Jurek", "Tap to view the photo", "chat", "/");
-            }} style={{ ...s.btn, width: "auto", padding: "10px 16px", flexShrink: 0 }}>➤</button>
-            <button onClick={() => { setPhotoMode(false); setPhotoUrl(""); }}
-              style={{ ...s.btnGhost, width: "auto", padding: "10px 14px", flexShrink: 0 }}>✕</button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{ ...s.btn, flex: 2, padding: "12px", opacity: uploading ? 0.6 : 1 }}>
+              {uploading ? "⏳ UPLOADING..." : "📷 CHOOSE PHOTO"}
+            </button>
+            <button onClick={() => { setPhotoMode(false); setUploadError(""); }}
+              style={{ ...s.btnGhost, flex: 1, padding: "12px" }}>✕ CANCEL</button>
+          </div>
+          <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 8, textAlign: "center" }}>
+            Wybierz zdjęcie z galerii lub zrób nowe
           </div>
         </div>
       )}

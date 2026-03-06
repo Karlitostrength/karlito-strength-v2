@@ -23,24 +23,35 @@ async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
 
 async function registerPushSubscription(userId) {
   try {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+    if (!("serviceWorker" in navigator)) throw new Error("Service Workers not supported");
+    if (!("PushManager" in window)) throw new Error("Push not supported in this browser");
+    
     const reg = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
+    
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") return false;
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
-    await supabase.from("push_subscriptions").upsert({
+    if (permission !== "granted") throw new Error("Permission denied");
+    
+    // Check if already subscribed
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const { error } = await supabase.from("push_subscriptions").upsert({
       user_id: userId,
       subscription: JSON.stringify(sub),
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id,subscription" });
-    return true;
+    }, { onConflict: "user_id" });
+
+    if (error) throw new Error("DB error: " + error.message);
+    return { ok: true };
   } catch (e) {
-    console.log("Push registration failed:", e);
-    return false;
+    console.error("Push registration failed:", e);
+    return { ok: false, error: e.message };
   }
 }
 
@@ -1930,10 +1941,17 @@ function ProfileScreen({ user, authUser }) {
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
   );
+  const [pushError, setPushError] = useState("");
 
   const enableNotifications = async () => {
-    const ok = await registerPushSubscription(authUser.id);
-    setNotifStatus(ok ? "granted" : "denied");
+    setPushError("");
+    const result = await registerPushSubscription(authUser.id);
+    if (result.ok) {
+      setNotifStatus("granted");
+    } else {
+      setNotifStatus("denied");
+      setPushError(result.error || "Unknown error");
+    }
   };
   return (
     <div style={s.screen}>
@@ -1990,8 +2008,13 @@ function ProfileScreen({ user, authUser }) {
           <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 12 }}>🔔 Notifications enabled ✓</div>
         )}
         {notifStatus === "denied" && (
-          <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 12 }}>🔕 Notifications blocked — enable in browser settings</div>
+          <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 6 }}>🔕 Notifications blocked — enable in browser settings</div>
         )}
+        {pushError ? (
+          <div style={{ fontSize: 11, color: "var(--red-dim)", marginBottom: 12, background: "rgba(196,30,30,0.1)", padding: "6px 10px", borderRadius: 4 }}>
+            Error: {pushError}
+          </div>
+        ) : null}
 
         <button style={{ ...s.btnGhost, fontSize: 12 }} onClick={() => supabase.auth.signOut()}>
           SIGN OUT
@@ -2054,9 +2077,10 @@ function ChatScreen({ authUser, isCoach }) {
     
     loadMessages();
 
-    // Real-time subscription
+    // Real-time subscription — unique channel per conversation
+    const channelName = `messages:${[authUser.id, selectedContact].sort().join(":")}`;
     const channel = supabase
-      .channel("messages")
+      .channel(channelName)
       .on("postgres_changes", { 
         event: "INSERT", 
         schema: "public", 
@@ -2065,7 +2089,16 @@ function ChatScreen({ authUser, isCoach }) {
         const msg = payload.new;
         if ((msg.from_id === authUser.id && msg.to_id === selectedContact) ||
             (msg.from_id === selectedContact && msg.to_id === authUser.id)) {
-          setMessages(prev => [...prev, msg]);
+          // Replace temp message or add new one
+          setMessages(prev => {
+            const hasDup = prev.some(m => m.id === msg.id);
+            if (hasDup) return prev;
+            // Remove optimistic temp if it matches content
+            const filtered = prev.filter(m => 
+              !(String(m.id).startsWith("temp-") && m.content === msg.content && m.from_id === msg.from_id)
+            );
+            return [...filtered, msg];
+          });
         }
       })
       .subscribe();
@@ -2081,12 +2114,24 @@ function ChatScreen({ authUser, isCoach }) {
   const sendMessage = async () => {
     if (!newMsg.trim() || !selectedContact) return;
     const content = newMsg.trim();
+    setNewMsg("");
+
+    // Optimistic update — show immediately without waiting for realtime
+    const tempMsg = {
+      id: `temp-${Date.now()}`,
+      from_id: authUser.id,
+      to_id: selectedContact,
+      content,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempMsg]);
+
     await supabase.from("messages").insert({
       from_id: authUser.id,
       to_id: selectedContact,
       content,
     });
-    setNewMsg("");
+
     // Push notification to recipient
     const senderName = isCoach ? "Coach Karol" : "Jurek";
     sendPushToUser(selectedContact, `💬 New message from ${senderName}`, content, "chat", "/");

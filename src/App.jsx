@@ -3152,25 +3152,121 @@ function HistoryScreen() {
     </div>
   );
 }
+// ─── EXERCISE LIBRARY SCREEN ──────────────────────────────────────────────────
+function LibraryScreen() {
+  const [exercises, setExercises] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState("All");
 
+  useEffect(() => {
+    const fetchLibrary = async () => {
+      const { data } = await supabase.from("exercise_library").select("*").order("name");
+      setExercises(data || []);
+      setLoading(false);
+    };
+    fetchLibrary();
+  }, []);
+
+  const categories = ["All", "Squat", "Hinge", "Press", "Pull", "KB", "Accessories"];
+  const filteredEx = activeCategory === "All" ? exercises : exercises.filter(e => e.category === activeCategory);
+
+  // Funkcja wyciągająca ID z linku YouTube (aby wyrenderować player)
+  const getYouTubeEmbedUrl = (url) => {
+    let videoId = "";
+    if (url.includes("youtu.be/")) videoId = url.split("youtu.be/")[1]?.split("?")[0];
+    else if (url.includes("v=")) videoId = url.split("v=")[1]?.split("&")[0];
+    else if (url.includes("shorts/")) videoId = url.split("shorts/")[1]?.split("?")[0];
+    
+    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
+  };
+
+  if (loading) return <div style={{...s.screen, textAlign: "center", paddingTop: 40}}>Loading Library...</div>;
+
+  return (
+    <div style={s.screen}>
+      <div style={s.sectionLabel}>EXERCISE LIBRARY</div>
+      
+      {/* Category Filter */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 5 }}>
+        {categories.map(cat => (
+          <div key={cat} onClick={() => setActiveCategory(cat)}
+            style={{ 
+              ...s.pill(activeCategory === cat), 
+              padding: "6px 12px", 
+              whiteSpace: "nowrap" 
+            }}>
+            {cat}
+          </div>
+        ))}
+      </div>
+
+      {/* Videos List */}
+      {filteredEx.length === 0 ? (
+        <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
+          <div style={{ fontSize: 13, color: "var(--gray)" }}>No exercises found in this category.</div>
+        </div>
+      ) : (
+        filteredEx.map(ex => {
+          const embedUrl = getYouTubeEmbedUrl(ex.youtube_url);
+          return (
+            <div key={ex.id} style={{ ...s.card, marginBottom: 16, padding: "16px 12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{ ...s.badge("var(--red)"), fontSize: 9 }}>{ex.category.toUpperCase()}</div>
+                    {ex.demonstrator && <div style={{ fontSize: 10, color: "var(--accent)" }}>Demo: {ex.demonstrator}</div>}
+                  </div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900 }}>
+                    {ex.name}
+                  </div>
+                </div>
+              </div>
+
+              {/* YouTube Player */}
+              {embedUrl ? (
+                <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", borderRadius: 8, marginBottom: 12 }}>
+                  <iframe 
+                    src={embedUrl}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }}
+                    allowFullScreen
+                    title={ex.name}
+                  />
+                </div>
+              ) : (
+                <a href={ex.youtube_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "#4a9eff", fontSize: 13, marginBottom: 12 }}>
+                  Watch Video ↗
+                </a>
+              )}
+
+              {/* Cues / Description */}
+              {ex.cues && (
+                <div style={{ fontSize: 13, color: "var(--gray)", background: "var(--bg3)", padding: 10, borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
+                  💡 {ex.cues}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 const NAV_ATHLETE = [
-  { id: "dashboard", icon: "ᚠ", label: "HOME" },
-  { id: "workout", icon: "ᚢ", label: "TRAIN" },
-  { id: "library", icon: "ᚱ", label: "LIBRARY" },
-  { id: "chat", icon: "ᚨ", label: "CHAT" },
-  { id: "history", icon: "ᛚ", label: "LOGS" },
-  { id: "profile", icon: "ᛟ", label: "ME" },
+  { id: "dashboard", icon: "⚡", label: "HOME" },
+  { id: "workout", icon: "🏋️", label: "TRAIN" },
+  { id: "library", icon: "📚", label: "BAZA" },
+  { id: "chat", icon: "💬", label: "CHAT" },
+  { id: "profile", icon: "👤", label: "JA" },
 ];
 
 const NAV_COACH = [
-  { id: "dashboard", icon: "ᚠ", label: "HOME" },
-  { id: "workout", icon: "ᚢ", label: "TRAIN" },
-  { id: "library", icon: "ᚱ", label: "LIBRARY" },
-  { id: "chat", icon: "ᚨ", label: "CHAT" },
-  { id: "coach", icon: "ᛜ", label: "COACH" },
-  { id: "profile", icon: "ᛟ", label: "ME" },
+  { id: "dashboard", icon: "⚡", label: "HOME" },
+  { id: "library", icon: "📚", label: "BAZA" },
+  { id: "chat", icon: "💬", label: "CHAT" },
+  { id: "coach", icon: "🎯", label: "COACH" },
+  { id: "profile", icon: "👤", label: "JA" },
 ];
 
 export default function App() {
@@ -3281,6 +3377,7 @@ const [hasCoach, setHasCoach] = useState(false);
       <div className="fade-in" key={tab + activeDay}>
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
+                {tab === "library" && <LibraryScreen />}
       {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
         {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}

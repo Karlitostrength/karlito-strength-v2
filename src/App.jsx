@@ -3372,7 +3372,6 @@ const [hasCoach, setHasCoach] = useState(false);
       <div className="fade-in" key={tab + activeDay}>
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
-                {tab === "library" && <LibraryScreen />}
       {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
         {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}

@@ -829,6 +829,44 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [coachProgram, setCoachProgram] = useState(null);
   const [loadingProgram, setLoadingProgram] = useState(true);
   const [prevSets, setPrevSets] = useState({}); // { exName: { weight, reps, rpe } }
+  const [historyModal, setHistoryModal] = useState(null);
+  const [exHistory, setExHistory] = useState({});
+
+  const loadExHistory = async (exName) => {
+    if (exHistory[exName] || !authUser) return;
+    try {
+      const { data: logs } = await supabase
+        .from("workouts")
+        .select("exercises, created_at, week, day")
+        .eq("user_id", authUser.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      const history = [];
+      for (const log of (logs || [])) {
+        for (const ex of (log.exercises || [])) {
+          if (ex.name === exName) {
+            const doneSets = (ex.sets || []).filter(s => s.done && s.weight);
+            if (doneSets.length > 0) {
+              history.push({
+                date: log.created_at,
+                week: log.week,
+                day: log.day,
+                sets: doneSets,
+                totalReps: doneSets.reduce((s, st) => s + parseFloat(st.reps || 0), 0),
+                maxWeight: Math.max(...doneSets.map(st => parseFloat(st.weight || 0))),
+              });
+            }
+          }
+        }
+      }
+      setExHistory(p => ({ ...p, [exName]: history.slice(0, 8) }));
+    } catch(e) {}
+  };
+
+  const openHistory = (exName) => {
+    setHistoryModal(exName);
+    loadExHistory(exName);
+  };
 
   // Smart weight suggestion
   function suggestWeight(exName) {
@@ -1039,8 +1077,11 @@ const saveWorkout = async () => {
               <div key={ei} style={{ ...s.card, borderColor: exDone ? "rgba(196,30,30,0.6)" : "var(--border)", marginBottom: 10, transition: "border-color 0.3s" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                   <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: "0.04em" }}>
-                      {ex.isMain && <span style={{ color: "var(--red)", marginRight: 6 }}>●</span>}{ex.name}
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span onClick={() => openHistory(ex.name)} style={{ cursor: "pointer" }}>
+                        {ex.isMain && <span style={{ color: "var(--red)", marginRight: 6 }}>●</span>}{ex.name}
+                      </span>
+                      <span onClick={() => openHistory(ex.name)} style={{ fontSize: 10, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 6px", cursor: "pointer", letterSpacing: "0.05em" }}>HISTORY</span>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>
                       Plan: {ex.sets}×{ex.reps}{ex.pct ? ` @ ${Math.round(ex.pct * 100)}%` : ""}{ex.weight ? ` · ${ex.weight}kg` : ""}
@@ -1225,6 +1266,50 @@ const saveWorkout = async () => {
             </div>
           )}
           <button style={{ ...s.btn, marginTop: 12 }} onClick={onComplete}>DONE →</button>
+        </div>
+      )}
+
+      {/* EXERCISE HISTORY MODAL */}
+      {historyModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end" }}
+          onClick={() => setHistoryModal(null)}>
+          <div style={{ width: "100%", background: "var(--bg2)", borderRadius: "16px 16px 0 0", padding: 20, maxHeight: "70vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, letterSpacing: "0.1em", color: "var(--accent)" }}>
+                {historyModal.toUpperCase()} — HISTORY
+              </div>
+              <button onClick={() => setHistoryModal(null)} style={{ background: "none", border: "none", color: "var(--gray)", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            {!exHistory[historyModal] ? (
+              <div style={{ color: "var(--gray)", fontSize: 13, textAlign: "center", padding: 24 }}>Loading...</div>
+            ) : exHistory[historyModal].length === 0 ? (
+              <div style={{ color: "var(--gray)", fontSize: 13, textAlign: "center", padding: 24 }}>No history yet for this exercise.</div>
+            ) : exHistory[historyModal].map((entry, i) => (
+              <div key={i} style={{ borderBottom: "1px solid var(--border)", paddingBottom: 12, marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ background: "var(--accent)", color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 10, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.08em" }}>WK {entry.week} · DAY {entry.day}</div>
+                    <div style={{ fontSize: 11, color: "var(--gray2)" }}>{new Date(entry.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, color: "var(--text)" }}>{entry.maxWeight}kg</div>
+                    <div style={{ fontSize: 10, color: "var(--gray2)" }}>MAX</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {entry.sets.map((st, si) => (
+                    <div key={si} style={{ background: "var(--bg3)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      {st.weight}kg × {st.reps}{st.rpe ? <span style={{ color: "var(--gray2)" }}> @{st.rpe}</span> : ""}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
+                  {entry.sets.length} sets · {entry.totalReps} total reps
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -1782,6 +1867,50 @@ function CoachScreen() {
   const [buildExercises, setBuildExercises] = useState([
     { name: "", sets: 3, reps: 8, weight: 0, notes: "" }
   ]);
+  const [libraryPicker, setLibraryPicker] = useState(null); // index of exercise being picked
+  const [libraryList, setLibraryList] = useState([]);
+  const [libPickerCat, setLibPickerCat] = useState("All");
+  const [libPickerSearch, setLibPickerSearch] = useState("");
+  const [copyWeekFrom, setCopyWeekFrom] = useState(1);
+  const [copyWeekTo, setCopyWeekTo] = useState(2);
+  const [copyingWeek, setCopyingWeek] = useState(false);
+  const [showCopyWeek, setShowCopyWeek] = useState(false);
+
+  const loadLibraryList = async () => {
+    if (libraryList.length > 0) return;
+    const { data } = await supabase.from("exercise_library").select("name, category").order("category").order("name");
+    setLibraryList(data || []);
+  };
+
+  const copyWeek = async () => {
+    if (!selectedClient) return;
+    setCopyingWeek(true);
+    try {
+      const { data: days } = await supabase.from("program_days").select("*")
+        .eq("athlete_id", selectedClient).eq("week", copyWeekFrom);
+      for (const day of (days || [])) {
+        const { data: newDay } = await supabase.from("program_days").insert({
+          coach_id: day.coach_id, athlete_id: day.athlete_id,
+          week: copyWeekTo, day: day.day, title: day.title, notes: day.notes
+        }).select().single();
+        if (newDay) {
+          const { data: exs } = await supabase.from("custom_exercises").select("*")
+            .eq("athlete_id", selectedClient).eq("week", copyWeekFrom).eq("day", day.day);
+          for (const ex of (exs || [])) {
+            await supabase.from("custom_exercises").insert({
+              athlete_id: ex.athlete_id, coach_id: ex.coach_id,
+              week: copyWeekTo, day: ex.day, name: ex.name,
+              sets: ex.sets, reps: ex.reps, weight: ex.weight, notes: ex.notes
+            });
+          }
+        }
+      }
+      await loadData();
+      setShowCopyWeek(false);
+      alert(`Week ${copyWeekFrom} copied to Week ${copyWeekTo}!`);
+    } catch(e) { alert("Error copying week"); }
+    setCopyingWeek(false);
+  };
 
   useEffect(() => { loadData(); }, []);
 
@@ -2038,8 +2167,30 @@ const saveProgramDay = async () => {
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAM DAY</button>
+            <button onClick={() => setShowCopyWeek(v => !v)} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>⧉ COPY WEEK</button>
             <button onClick={() => setView("addExercise")} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>+ EXERCISE</button>
           </div>
+
+          {showCopyWeek && (
+            <div style={{ ...s.card, marginBottom: 12, borderColor: "rgba(200,160,40,0.3)" }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: "var(--gold)", marginBottom: 10, letterSpacing: "0.1em" }}>⧇ COPY WEEK</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>FROM WEEK</div>
+                  <input type="number" min={1} max={12} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
+                </div>
+                <div style={{ fontSize: 18, color: "var(--gray2)", paddingTop: 16 }}>→</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>TO WEEK</div>
+                  <input type="number" min={1} max={12} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
+                </div>
+              </div>
+              <button onClick={copyWeek} disabled={copyingWeek || copyWeekFrom === copyWeekTo} style={{ ...s.btn, fontSize: 13, opacity: (copyingWeek || copyWeekFrom === copyWeekTo) ? 0.5 : 1 }}>
+                {copyingWeek ? "COPYING..." : "COPY WEEK " + copyWeekFrom + " → WEEK " + copyWeekTo}
+              </button>
+            </div>
+          )}
+
           {clientExercises.length > 0 && (
             <div style={{ ...s.card, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>CUSTOM EXERCISES</div>
@@ -2116,7 +2267,10 @@ const saveProgramDay = async () => {
           {buildExercises.map((ex, i) => (
             <div key={i} style={{ background: "var(--bg3)", borderRadius: 6, padding: 10, marginBottom: 8 }}>
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <input value={ex.name} onChange={e => { const a=[...buildExercises]; a[i].name=e.target.value; setBuildExercises(a); }} placeholder={`Exercise ${i+1}`} style={{ ...s.input, flex: 2 }} />
+                <div onClick={() => { setLibraryPicker(i); loadLibraryList(); }} style={{ ...s.input, flex: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: ex.name ? "var(--text)" : "var(--gray2)" }}>
+                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14 }}>{ex.name || `Pick exercise ${i+1}...`}</span>
+                  <span style={{ fontSize: 11, color: "var(--accent)" }}>📚</span>
+                </div>
                 <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{ color: "var(--red-dim)", cursor: "pointer", padding: "0 6px", alignSelf: "center", fontSize: 16 }}>✕</div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -2133,6 +2287,47 @@ const saveProgramDay = async () => {
           <button onClick={() => setBuildExercises([...buildExercises,{name:"",sets:3,reps:8,weight:0,notes:""}])} style={{ ...s.btnGhost, width: "100%", marginBottom: 10, fontSize: 12 }}>+ ADD EXERCISE</button>
           <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>{saving ? "SAVING..." : "SAVE PROGRAM DAY"}</button>
           <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setBuildMode(false)}>← CANCEL</button>
+        </div>
+      )}
+
+      {/* LIBRARY PICKER MODAL */}
+      {libraryPicker !== null && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end" }}
+          onClick={() => setLibraryPicker(null)}>
+          <div style={{ width: "100%", background: "var(--bg2)", borderRadius: "16px 16px 0 0", padding: 16, maxHeight: "75vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)" }}>PICK EXERCISE</div>
+              <button onClick={() => setLibraryPicker(null)} style={{ background: "none", border: "none", color: "var(--gray)", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <input value={libPickerSearch} onChange={e => setLibPickerSearch(e.target.value)}
+              placeholder="Search..." style={{ ...s.input, marginBottom: 10 }} />
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {["All", "Squat", "Hinge", "Press", "Pull", "KB", "Accessories"].map(cat => (
+                <div key={cat} onClick={() => setLibPickerCat(cat)}
+                  style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer",
+                    fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
+                    background: libPickerCat === cat ? "var(--accent)" : "var(--bg3)",
+                    color: libPickerCat === cat ? "#fff" : "var(--gray)" }}>
+                  {cat}
+                </div>
+              ))}
+            </div>
+            {libraryList
+              .filter(e => (libPickerCat === "All" || e.category === libPickerCat) && e.name.toLowerCase().includes(libPickerSearch.toLowerCase()))
+              .map((ex, i) => (
+                <div key={i} onClick={() => {
+                  const a = [...buildExercises];
+                  a[libraryPicker].name = ex.name;
+                  setBuildExercises(a);
+                  setLibraryPicker(null);
+                  setLibPickerSearch("");
+                }} style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{ex.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 8px" }}>{ex.category}</div>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 
@@ -2898,50 +3093,6 @@ function HistoryScreen() {
                 {log.comment && (
                   <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: `2px solid ${col}` }}>
                     💬 {log.comment}
-                          {/* EXERCISE LIBRARY (COACH VIEW) */}
-      {view === "library" && !selectedClient && (
-        <>
-          <div style={s.sectionLabel}>DODAJ DO BIBLIOTEKI</div>
-          <div style={{ ...s.card, marginBottom: 20 }}>
-             <input placeholder="Nazwa ćwiczenia (np. KB Swing)" style={{...s.input, marginBottom: 8}} id="libName" />
-             <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
-                 <select style={{...s.input, flex: 1}} id="libCat">
-                     <option value="Squat">Squat</option>
-                     <option value="Hinge">Hinge</option>
-                     <option value="Press">Press</option>
-                     <option value="Pull">Pull</option>
-                     <option value="KB">Kettlebell</option>
-                     <option value="Accessories">Accessories</option>
-                 </select>
-                 <input placeholder="Kto prezentuje? (np. Kacper MS)" style={{...s.input, flex: 1}} id="libDemo" />
-             </div>
-             <input placeholder="Link do YouTube (np. https://youtu.be/...)" style={{...s.input, marginBottom: 8}} id="libUrl" />
-             <input placeholder="Wskazówki (np. Chest up. Drive through heel.)" style={{...s.input, marginBottom: 12}} id="libCues" />
-             
-             <button style={s.btn} onClick={async () => {
-                 const name = document.getElementById("libName").value;
-                 const cat = document.getElementById("libCat").value;
-                 const url = document.getElementById("libUrl").value;
-                 const cues = document.getElementById("libCues").value;
-                 const demo = document.getElementById("libDemo").value;
-                 
-                 if(!name || !url) return alert("Podaj nazwę i link!");
-                 
-                 const { data: { user } } = await supabase.auth.getUser();
-                 await supabase.from("exercise_library").insert({ name, category: cat, youtube_url: url, cues, demonstrator: demo });
-                 
-                 alert("Dodano pomyślnie! (Odśwież aby zobaczyć na dole)");
-                 document.getElementById("libName").value = '';
-                 document.getElementById("libUrl").value = '';
-                 document.getElementById("libCues").value = '';
-             }}>
-                 💾 ZAPISZ W BAZIE
-             </button>
-          </div>
-          
-          {/* Tu później wyrenderujemy listę ćwiczeń z bazy */}
-        </>
-      )}
                   </div>
                 )}
 
@@ -2977,7 +3128,7 @@ function LibraryScreen({ authUser, isCoach }) {
   const [editMode, setEditMode] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", category: "KB", youtube_url: "", cues: "", demonstrator: "" });
+  const [form, setForm] = useState({ name: "", category: "KB", youtube_url: "", description: "" });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => { loadExercises(); }, []);
@@ -3001,7 +3152,7 @@ function LibraryScreen({ authUser, isCoach }) {
       } else {
         await supabase.from("exercise_library").insert(form);
       }
-      setForm({ name: "", category: "KB", youtube_url: "", cues: "", demonstrator: "" });
+      setForm({ name: "", category: "KB", youtube_url: "", description: "" });
       setEditMode(false);
       setEditingId(null);
       await loadExercises();
@@ -3017,7 +3168,7 @@ function LibraryScreen({ authUser, isCoach }) {
   };
 
   const startEdit = (ex) => {
-    setForm({ name: ex.name, category: ex.category, youtube_url: ex.youtube_url || "", cues: ex.cues || "", demonstrator: ex.demonstrator || "" });
+    setForm({ name: ex.name, category: ex.category, youtube_url: ex.youtube_url || "", description: ex.description || "" });
     setEditingId(ex.id);
     setEditMode(true);
     setExpanded(null);
@@ -3038,7 +3189,7 @@ function LibraryScreen({ authUser, isCoach }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={s.sectionLabel}>EXERCISE LIBRARY</div>
         {isCoach && !editMode && (
-          <button onClick={() => { setEditMode(true); setEditingId(null); setForm({ name: "", category: "KB", youtube_url: "", cues: "", demonstrator: "" }); }}
+          <button onClick={() => { setEditMode(true); setEditingId(null); setForm({ name: "", category: "KB", youtube_url: "", description: "" }); }}
             style={{ ...s.btn, width: "auto", padding: "8px 16px", fontSize: 13 }}>
             + ADD
           </button>
@@ -3075,12 +3226,8 @@ function LibraryScreen({ authUser, isCoach }) {
           <input value={form.youtube_url} onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
             placeholder="https://youtube.com/watch?v=..." style={{ ...s.input, marginBottom: 12 }} />
 
-          <label style={s.label}>DEMONSTRATOR (optional)</label>
-          <input value={form.demonstrator} onChange={e => setForm(f => ({ ...f, demonstrator: e.target.value }))}
-            placeholder="e.g. Kacper MS" style={{ ...s.input, marginBottom: 12 }} />
-
-          <label style={s.label}>COACHING CUES (optional)</label>
-          <textarea value={form.cues} onChange={e => setForm(f => ({ ...f, cues: e.target.value }))}
+          <label style={s.label}>DESCRIPTION / COACHING CUES (optional)</label>
+          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             placeholder="Key coaching points..."
             rows={4}
             style={{ ...s.input, resize: "vertical", lineHeight: 1.6, minHeight: 90 }} />
@@ -3143,14 +3290,14 @@ function LibraryScreen({ authUser, isCoach }) {
                       fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900,
                       padding: "2px 8px", borderRadius: 4, letterSpacing: "0.08em"
                     }}>{ex.category.toUpperCase()}</div>
-                    {ex.demonstrator && <span style={{ fontSize: 10, color: "var(--accent)" }}>👤 {ex.demonstrator}</span>}
+
                   </div>
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, fontWeight: 700 }}>
                     {ex.name}
                   </div>
-                  {!isOpen && ex.cues && (
+                  {!isOpen && ex.description && (
                     <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%" }}>
-                      {ex.cues.substring(0, 60)}...
+                      {ex.description.substring(0, 60)}...
                     </div>
                   )}
                 </div>
@@ -3176,10 +3323,10 @@ function LibraryScreen({ authUser, isCoach }) {
                   )}
 
                   {/* Description / Cues */}
-                  {ex.cues && (
+                  {ex.description && (
                     <div style={{ fontSize: 13, color: "var(--white)", lineHeight: 1.7, background: "var(--bg3)", borderRadius: 6, padding: "12px 14px", marginBottom: 12 }}>
-                      {ex.cues.split('\n').map((line, i) => (
-                        <span key={i}>{line}{i < ex.cues.split('\n').length - 1 && <br />}</span>
+                      {ex.description.split('\n').map((line, i) => (
+                        <span key={i}>{line}{i < ex.description.split('\n').length - 1 && <br />}</span>
                       ))}
                     </div>
                   )}

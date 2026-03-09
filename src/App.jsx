@@ -988,9 +988,23 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
           .filter(Boolean)
           .slice(0, 4);
 
+        const embedUrl = getYouTubeEmbedUrl(videoUrl);
         return (
-          <div key={ei} style={{ ...s.card, borderColor: res.done ? "rgba(196,30,30,0.7)" : "var(--border)", marginBottom: 12, transition: "border-color 0.3s" }}>
+          <div key={ei} style={{ ...s.card, borderColor: res.done ? "rgba(196,30,30,0.7)" : "var(--border)", marginBottom: 12, transition: "border-color 0.3s", padding: 0, overflow: "hidden" }}>
 
+            {/* Video embed above exercise */}
+            {embedUrl && (
+              <div style={{ position: "relative", width: "100%", paddingBottom: "56.25%", background: "#000" }}>
+                <iframe
+                  src={embedUrl}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
+
+            <div style={{ padding: "12px 14px" }}>
             {/* Exercise header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div style={{ flex: 1 }}>
@@ -1001,17 +1015,11 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
                   {ex.sets} × {ex.reps} @ {ex.weight ? `${ex.weight}kg` : "—"}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {videoUrl && (
-                  <a href={videoUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 18, textDecoration: "none" }} title="Watch exercise video">▶</a>
-                )}
-                <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
-                  style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
-                    border: `1px solid ${res.done ? "var(--red)" : "var(--border)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s" }}>
-                  {res.done ? "✓" : "○"}
-                </div>
+              <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
+                style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
+                  border: `1px solid ${res.done ? "var(--red)" : "var(--border)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s" }}>
+                {res.done ? "✓" : "○"}
               </div>
             </div>
 
@@ -1057,6 +1065,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
                 )}
               </div>
             )}
+            </div>{/* end padding div */}
           </div>
         );
       })}
@@ -1669,6 +1678,7 @@ function CoachScreen() {
   const [exercises, setExercises] = useState([]);
   const [programDays, setProgramDays] = useState([]);
   const [buildMode, setBuildMode] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null); // workout object for detail view
   const [editingDay, setEditingDay] = useState(null); // { dayId, exIds[] } for edit mode
   const [buildWeek, setBuildWeek] = useState(1);
   const [buildDay, setBuildDay] = useState("A");
@@ -1852,7 +1862,7 @@ const saveProgramDay = async () => {
       {/* View toggle */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
         {[["dashboard", "📊 OVERVIEW"], ["sessions", "📋 SESSIONS"]].map(([v, label]) => (
-          <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); }}
+          <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); setEditingDay(null); }}
             style={{ ...s.pill(view === v && !selectedClient), padding: "8px 14px", flex: 1, textAlign: "center", fontSize: 12 }}>
             {label}
           </div>
@@ -2176,8 +2186,8 @@ const saveProgramDay = async () => {
         </div>
       )}
 
-      {/* ALL SESSIONS */}
-      {view === "sessions" && !selectedClient && (
+      {/* ALL SESSIONS — list */}
+      {view === "sessions" && !selectedClient && !selectedSession && (
         <>
           <div style={s.sectionLabel}>ALL SESSIONS</div>
           {workouts.length === 0 ? (
@@ -2185,12 +2195,12 @@ const saveProgramDay = async () => {
           ) : workouts.map((w, i) => {
             const client = clients.find(c => c.id === w.user_id);
             const exs = w.exercises || [];
-            const doneSets = exs.reduce((s,ex)=> s + ((ex.sets||[]).filter(st=>st.done).length || (ex.done ? 1 : 0)), 0);
-            const vol = exs.reduce((s,ex)=>s+(ex.sets||[]).filter(st=>st.done&&st.weight&&st.reps).reduce((s2,st)=>s2+parseFloat(st.weight)*parseFloat(st.reps),0),0);
+            const doneExs = exs.filter(ex => ex.done || (ex.sets||[]).some(s=>s.done)).length;
             const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
             return (
-              <div key={i} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div key={i} onClick={() => setSelectedSession(w)}
+                style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}`, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
                       <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
@@ -2200,26 +2210,75 @@ const saveProgramDay = async () => {
                     <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>{fmtDate(w.created_at)} · {client?.name||"Athlete"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {vol > 0 && <><div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 20, fontWeight: 900 }}>{Math.round(vol)}</div><div style={{ fontSize: 9, color: "var(--gray2)" }}>KG VOL</div></>}
-                    <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets} sets</div>
+                    <div style={{ fontSize: 11, color: "var(--gray2)" }}>{doneExs}/{exs.length} done</div>
+                    {w.comment && <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4 }}>💬 comment</div>}
+                    {w.video_link && <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 2 }}>▶ video</div>}
+                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
                   </div>
                 </div>
-                {w.comment && <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "6px 10px", marginTop: 8, borderLeft: `2px solid ${col}` }}>💬 {w.comment}</div>}
-                {w.video_link && (
-                  <a href={w.video_link} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, padding: "8px 12px", background: "rgba(201,168,76,0.1)", border: "1px solid var(--gold-dim)", borderRadius: 6, textDecoration: "none", cursor: "pointer" }}>
-                    <span style={{ fontSize: 16 }}>▶</span>
-                    <div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em" }}>WATCH VIDEO FEEDBACK</div>
-                      <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 1, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.video_link}</div>
-                    </div>
-                  </a>
-                )}
               </div>
             );
           })}
         </>
       )}
+
+      {/* SESSION DETAIL VIEW */}
+      {view === "sessions" && !selectedClient && selectedSession && (() => {
+        const w = selectedSession;
+        const client = clients.find(c => c.id === w.user_id);
+        const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+        return (
+          <div>
+            <button onClick={() => setSelectedSession(null)} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
+            <div style={{ ...s.card, borderLeft: `3px solid ${col}`, marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
+                <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week} · {fmtDate(w.created_at)}</div>
+              </div>
+              <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 18, fontWeight: 900 }}>{w.workout_title?.replace(/DAY [ABCD] — /,"")}</div>
+              <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 2 }}>{client?.name || "Athlete"}</div>
+            </div>
+
+            {/* Exercises with results */}
+            {(w.exercises || []).map((ex, ei) => (
+              <div key={ei} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${ex.done ? "var(--red)" : "var(--border)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ex.result ? 8 : 0 }}>
+                  <div>
+                    <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 14, fontWeight: 900 }}>{ex.name}</div>
+                    {ex.planned && <div style={{ fontSize: 11, color: "var(--gray2)" }}>Plan: {ex.planned.sets}×{ex.planned.reps} @ {ex.planned.weight}kg</div>}
+                  </div>
+                  <div style={{ fontSize: 12, color: ex.done ? "var(--red)" : "var(--gray2)", fontWeight: 700 }}>{ex.done ? "✓ DONE" : "—"}</div>
+                </div>
+                {ex.result && (
+                  <div style={{ fontSize: 13, color: "var(--text)", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>
+                    {ex.result}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Athlete comment */}
+            {w.comment && (
+              <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>💬 ATHLETE COMMENT</div>
+                <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, fontStyle: "italic" }}>{w.comment}</div>
+              </div>
+            )}
+
+            {/* Video feedback */}
+            {w.video_link && (
+              <a href={w.video_link} target="_blank" rel="noopener noreferrer"
+                style={{ ...s.card, display: "flex", alignItems: "center", gap: 10, marginBottom: 12, borderColor: "var(--gold-dim)", textDecoration: "none", cursor: "pointer" }}>
+                <span style={{ fontSize: 24 }}>▶</span>
+                <div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>WATCH VIDEO FEEDBACK</div>
+                  <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{w.video_link}</div>
+                </div>
+              </a>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2374,16 +2433,43 @@ function ChatScreen({ authUser, isCoach }) {
     setUploading(false);
   };
 
-  // Load contacts (for coach: athletes, for athlete: coach)
+  // Load contacts (for coach: all athletes, for athlete: coach)
   useEffect(() => {
     const loadContacts = async () => {
       if (isCoach) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("id, name")
-          .eq("coach_id", authUser.id);
-        setContacts(data || []);
-        if (data?.length > 0) setSelectedContact(data[0].id);
+        // Get athletes by coach_id
+        const { data: byCoachId } = await supabase
+          .from("profiles").select("id, name").eq("coach_id", authUser.id);
+        // Get athletes from program_days (in case coach_id not set)
+        const { data: byProgram } = await supabase
+          .from("program_days").select("athlete_id").eq("coach_id", authUser.id);
+        // Get athletes from messages
+        const { data: byMessages } = await supabase
+          .from("messages").select("from_id, to_id")
+          .or(`from_id.eq.${authUser.id},to_id.eq.${authUser.id}`);
+
+        // Collect unique athlete IDs
+        const ids = new Set((byCoachId || []).map(p => p.id));
+        (byProgram || []).forEach(d => ids.add(d.athlete_id));
+        (byMessages || []).forEach(m => {
+          if (m.from_id !== authUser.id) ids.add(m.from_id);
+          if (m.to_id !== authUser.id) ids.add(m.to_id);
+        });
+        ids.delete(authUser.id);
+
+        // Load profiles for all IDs
+        let contacts = byCoachId || [];
+        const existingIds = new Set(contacts.map(c => c.id));
+        const missing = [...ids].filter(id => !existingIds.has(id));
+        if (missing.length > 0) {
+          const { data: extra } = await supabase
+            .from("profiles").select("id, name").in("id", missing);
+          contacts = [...contacts, ...(extra || [])];
+        }
+        // Sort by name
+        contacts.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        setContacts(contacts);
+        if (contacts.length > 0) setSelectedContact(contacts[0].id);
       } else {
         const { data } = await supabase
           .from("profiles")

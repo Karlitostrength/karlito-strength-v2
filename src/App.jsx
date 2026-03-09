@@ -983,7 +983,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
         const prevResults = prevWorkouts
           .map(w => {
             const found = (w.exercises || []).find(e => e.name === ex.name);
-            return found ? { date: w.created_at, week: w.week, result: found.result, planned: found.planned } : null;
+            return found ? { date: w.created_at, week: w.week, result: found.result, planned: found.planned, coach_comment: w.coach_comment } : null;
           })
           .filter(Boolean)
           .slice(0, 4);
@@ -1058,6 +1058,11 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
                           <div style={{ fontSize: 12, color: "var(--text)", marginTop: 3, lineHeight: 1.4 }}>{pr.result}</div>
                         ) : (
                           <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 3, fontStyle: "italic" }}>No result logged</div>
+                        )}
+                        {pr.coach_comment && (
+                          <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontStyle: "italic" }}>
+                            🎯 {pr.coach_comment}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -1302,6 +1307,157 @@ function ReadinessWidget({ authUser }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
+// ─── SCHEDULE ────────────────────────────────────────────────────────────────
+
+function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
+  const [allDays, setAllDays] = useState([]);
+  const [completedDays, setCompletedDays] = useState({}); // { "wk-day": true }
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!authUser) { setLoading(false); return; }
+      try {
+        // Load all program days
+        const { data: days } = await supabase
+          .from("program_days").select("*")
+          .eq("athlete_id", authUser.id)
+          .order("week", { ascending: true });
+
+        // Load completed workouts
+        const { data: logs } = await supabase
+          .from("workouts").select("week, day")
+          .eq("user_id", authUser.id);
+
+        const done = {};
+        (logs || []).forEach(l => { done[`${l.week}-${l.day}`] = true; });
+
+        setAllDays(days || []);
+        setCompletedDays(done);
+      } catch(e) {}
+      setLoading(false);
+    };
+    load();
+  }, [authUser]);
+
+  if (loading) return (
+    <div style={s.screen}>
+      <div style={{ textAlign: "center", padding: 60, color: "var(--gray)", fontSize: 13, letterSpacing: "0.1em" }}>LOADING...</div>
+    </div>
+  );
+
+  // Group days by week
+  const byWeek = {};
+  allDays.forEach(d => {
+    if (!byWeek[d.week]) byWeek[d.week] = [];
+    byWeek[d.week].push(d);
+  });
+  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+
+  const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)", D: "#a78bfa" };
+
+  // Find current week (first incomplete week that has days)
+  const currentWeek = weeks.find(w => byWeek[w].some(d => !completedDays[`${w}-${d.day}`])) || weeks[0] || week;
+
+  return (
+    <div style={s.screen}>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, marginBottom: 4 }}>TRAINING PLAN</div>
+      <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 20 }}>
+        {allDays.length > 0
+          ? `${Object.keys(completedDays).length} sessions completed · ${allDays.length - Object.keys(completedDays).length} remaining`
+          : hasCoach ? "No program assigned yet" : "Free 12-week program"}
+      </div>
+
+      {allDays.length === 0 && !hasCoach && (
+        <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 16 }}>
+          <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>⚡ FREE PROGRAM</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 8 }}>12-WEEK AUTO PROGRAM</div>
+          <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
+            Your program is auto-generated week by week. Go to HOME to start each session.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {["A","B","C"].map(d => (
+              <div key={d} style={{ flex: 1, minWidth: 80, background: "var(--bg3)", borderRadius: 8, padding: "10px 8px", textAlign: "center", borderLeft: `3px solid ${dayCol[d]}` }}>
+                <div style={{ fontSize: 10, color: dayCol[d], fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em" }}>DAY {d}</div>
+                <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4 }}>Wk {week}</div>
+                <button onClick={() => onStartWorkout(d)}
+                  style={{ marginTop: 8, fontSize: 10, padding: "4px 10px", background: "var(--red)", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                  START
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {weeks.map(wk => {
+        const wkDays = byWeek[wk];
+        const wkDone = wkDays.filter(d => completedDays[`${wk}-${d.day}`]).length;
+        const isCurrentWk = wk === currentWeek;
+        const isPast = wkDone === wkDays.length;
+        const phase = PHASES[getPhase(wk)];
+
+        return (
+          <div key={wk} style={{ marginBottom: 16 }}>
+            {/* Week header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900, color: isCurrentWk ? "var(--red)" : "var(--gray2)", letterSpacing: "0.08em" }}>
+                WEEK {wk}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 8px" }}>{phase?.name || ""}</div>
+              <div style={{ marginLeft: "auto", fontSize: 11, color: isPast ? "var(--red)" : isCurrentWk ? "var(--gold)" : "var(--gray2)" }}>
+                {isPast ? "✓ DONE" : `${wkDone}/${wkDays.length}`}
+              </div>
+            </div>
+
+            {/* Day cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {wkDays.sort((a,b) => a.day < b.day ? -1 : 1).map(d => {
+                const isDone = completedDays[`${wk}-${d.day}`];
+                const col = dayCol[d.day] || "var(--red)";
+                return (
+                  <div key={d.id} style={{ ...s.card, borderLeft: `3px solid ${isDone ? "rgba(196,30,30,0.5)" : col}`, opacity: isDone ? 0.6 : 1, padding: "12px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
+                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: col, letterSpacing: "0.1em" }}>DAY {d.day}</div>
+                          {isDone && <div style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>✓ COMPLETED</div>}
+                        </div>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{d.title || `Day ${d.day}`}</div>
+                      </div>
+                      {!isDone && isCurrentWk && (
+                        <button onClick={() => { setWeek(wk); onStartWorkout(d.day); }}
+                          style={{ padding: "8px 16px", background: "var(--red)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 12, cursor: "pointer", letterSpacing: "0.08em" }}>
+                          START →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {allDays.length > 0 && (
+        <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.03)", marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>OVERALL PROGRESS</div>
+          <div style={{ height: 6, background: "var(--border)", borderRadius: 3, marginBottom: 8 }}>
+            <div style={{ height: "100%", borderRadius: 3, background: "var(--red)",
+              width: `${allDays.length > 0 ? (Object.keys(completedDays).length / allDays.length) * 100 : 0}%`,
+              transition: "width 0.5s ease" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--gray2)" }}>
+            <span>{Object.keys(completedDays).length} completed</span>
+            <span>{allDays.length} total sessions</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
   const phase = getPhase(week);
   const phaseData = PHASES[phase];
@@ -1564,7 +1720,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         <div style={{ ...s.card, borderColor: "var(--accent)", background: "rgba(232,213,160,0.05)", marginTop: 16, textAlign: "center" }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)", marginBottom: 6 }}>🎯 WANT PERSONALIZED COACHING?</div>
           <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
-            Get a custom program tailored to your goals,<br />with direct feedback from Coach Karol.
+            Get a custom program tailored to your goals,<br />with direct feedback from Coach Karlito.
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
             <a href="https://www.instagram.com/karlitostrength" target="_blank" rel="noopener noreferrer" style={{ ...s.btn, display: "inline-block", textDecoration: "none", padding: "10px 16px", fontSize: 13 }}>
@@ -1679,6 +1835,9 @@ function CoachScreen() {
   const [programDays, setProgramDays] = useState([]);
   const [buildMode, setBuildMode] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null); // workout object for detail view
+  const [coachComment, setCoachComment] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
+  const [commentSaved, setCommentSaved] = useState(false);
   const [editingDay, setEditingDay] = useState(null); // { dayId, exIds[] } for edit mode
   const [buildWeek, setBuildWeek] = useState(1);
   const [buildDay, setBuildDay] = useState("A");
@@ -1765,7 +1924,24 @@ function CoachScreen() {
     } catch(e) { console.log("Save exercise error:", e); }
     setSaving(false);
   };
-const saveProgramDay = async () => {
+const saveCoachComment = async () => {
+    if (!selectedSession?.id) return;
+    setSavingComment(true);
+    setCommentSaved(false);
+    try {
+      await supabase.from("workouts")
+        .update({ coach_comment: coachComment })
+        .eq("id", selectedSession.id);
+      setCommentSaved(true);
+      setSelectedSession(prev => ({ ...prev, coach_comment: coachComment }));
+      // Send push to athlete
+      sendPushToUser(selectedSession.user_id, "💬 Coach feedback on your workout", "Tap to read your coach's feedback", "feedback", "/");
+      setTimeout(() => setCommentSaved(false), 3000);
+    } catch(e) { console.log("Comment save error:", e); }
+    setSavingComment(false);
+  };
+
+  const saveProgramDay = async () => {
     if (!selectedClient || !buildTitle) return;
     setSaving(true);
     try {
@@ -1800,7 +1976,7 @@ const saveProgramDay = async () => {
             notes: ex.notes, day: buildDay, week: buildWeek,
           });
         }
-        sendPushToUser(selectedClient, "💪 New program from Coach Karol", `Week ${buildWeek} · Day ${buildDay} — ${buildTitle}`, "program", "/");
+        sendPushToUser(selectedClient, "💪 New program from Coach Karlito", `Week ${buildWeek} · Day ${buildDay} — ${buildTitle}`, "program", "/");
       }
 
       setBuildMode(false);
@@ -1989,6 +2165,35 @@ const saveProgramDay = async () => {
               ))}
             </div>
           </div>
+          {/* Athlete Goals */}
+          {(selectedClientData.main_goal || selectedClientData.competition_date || selectedClientData.athlete_notes) && (
+            <div style={{ ...s.card, borderColor: "rgba(200,160,40,0.3)", background: "rgba(200,160,40,0.03)", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 8 }}>🎯 ATHLETE GOALS</div>
+              {selectedClientData.main_goal && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>GOAL</div>
+                  <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>{selectedClientData.main_goal}</div>
+                </div>
+              )}
+              {selectedClientData.competition_date && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>COMPETITION</div>
+                  <div style={{ fontSize: 13, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                    {new Date(selectedClientData.competition_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                    {" · "}
+                    {Math.ceil((new Date(selectedClientData.competition_date) - new Date()) / (1000*60*60*24))} days out
+                  </div>
+                </div>
+              )}
+              {selectedClientData.athlete_notes && (
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>NOTES</div>
+                  <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.5 }}>{selectedClientData.athlete_notes}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAM DAY</button>
             <button onClick={() => setShowCopyWeek(v => !v)} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>⧉ COPY WEEK</button>
@@ -2198,7 +2403,7 @@ const saveProgramDay = async () => {
             const doneExs = exs.filter(ex => ex.done || (ex.sets||[]).some(s=>s.done)).length;
             const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
             return (
-              <div key={i} onClick={() => setSelectedSession(w)}
+              <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setCommentSaved(false); }}
                 style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}`, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
@@ -2276,6 +2481,29 @@ const saveProgramDay = async () => {
                 </div>
               </a>
             )}
+
+            {/* Coach comment */}
+            <div style={{ ...s.card, borderColor: "rgba(196,30,30,0.4)", background: "rgba(196,30,30,0.03)", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: "var(--red)", letterSpacing: "0.15em", marginBottom: 8 }}>🎯 COACH FEEDBACK</div>
+              {w.coach_comment && !coachComment && (
+                <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, fontStyle: "italic", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", marginBottom: 10 }}>
+                  {w.coach_comment}
+                </div>
+              )}
+              <textarea
+                value={coachComment}
+                onChange={e => setCoachComment(e.target.value)}
+                placeholder="Add feedback for this session... technique notes, adjustments, encouragement"
+                rows={3}
+                style={{ ...s.input, resize: "none", lineHeight: 1.5, fontSize: 13, marginBottom: 10 }}
+              />
+              <button
+                onClick={saveCoachComment}
+                disabled={savingComment || !coachComment.trim()}
+                style={{ ...s.btn, opacity: (savingComment || !coachComment.trim()) ? 0.5 : 1 }}>
+                {commentSaved ? "✓ FEEDBACK SENT" : savingComment ? "SAVING..." : "SEND FEEDBACK →"}
+              </button>
+            </div>
           </div>
         );
       })()}
@@ -2284,6 +2512,41 @@ const saveProgramDay = async () => {
 }
 
 function ProfileScreen({ user, authUser }) {
+  const [goals, setGoals] = useState({ main_goal: "", competition_date: "", notes: "" });
+  const [savingGoals, setSavingGoals] = useState(false);
+  const [goalsSaved, setGoalsSaved] = useState(false);
+
+  useEffect(() => {
+    const loadGoals = async () => {
+      try {
+        const { data } = await supabase.from("profiles")
+          .select("main_goal, competition_date, athlete_notes")
+          .eq("id", authUser.id).single();
+        if (data) setGoals({
+          main_goal: data.main_goal || "",
+          competition_date: data.competition_date || "",
+          notes: data.athlete_notes || "",
+        });
+      } catch(e) {}
+    };
+    loadGoals();
+  }, [authUser]);
+
+  const saveGoals = async () => {
+    setSavingGoals(true);
+    setGoalsSaved(false);
+    try {
+      await supabase.from("profiles").update({
+        main_goal: goals.main_goal,
+        competition_date: goals.competition_date || null,
+        athlete_notes: goals.notes,
+      }).eq("id", authUser.id);
+      setGoalsSaved(true);
+      setTimeout(() => setGoalsSaved(false), 2000);
+    } catch(e) {}
+    setSavingGoals(false);
+  };
+
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
   );
@@ -2381,6 +2644,41 @@ function ProfileScreen({ user, authUser }) {
           </div>
         ) : null}
 
+        {/* GOALS SECTION */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={s.sectionLabel}>🎯 GOALS</div>
+          <div style={s.card}>
+            <label style={s.label}>MAIN GOAL</label>
+            <input
+              value={goals.main_goal}
+              onChange={e => setGoals(g => ({ ...g, main_goal: e.target.value }))}
+              placeholder="e.g. Total 500kg at nationals, lose 5kg, first powerlifting meet..."
+              style={{ ...s.input, marginBottom: 12 }}
+            />
+            <label style={s.label}>COMPETITION DATE (optional)</label>
+            <input
+              type="date"
+              value={goals.competition_date}
+              onChange={e => setGoals(g => ({ ...g, competition_date: e.target.value }))}
+              style={{ ...s.input, marginBottom: 12, colorScheme: "dark" }}
+            />
+            <label style={s.label}>NOTES FOR COACH</label>
+            <textarea
+              value={goals.notes}
+              onChange={e => setGoals(g => ({ ...g, notes: e.target.value }))}
+              placeholder="Injuries, schedule constraints, preferences..."
+              rows={3}
+              style={{ ...s.input, resize: "none", lineHeight: 1.5, marginBottom: 12 }}
+            />
+            <button
+              onClick={saveGoals}
+              disabled={savingGoals}
+              style={{ ...s.btn, opacity: savingGoals ? 0.6 : 1 }}>
+              {goalsSaved ? "✓ SAVED" : savingGoals ? "SAVING..." : "SAVE GOALS"}
+            </button>
+          </div>
+        </div>
+
         <button style={{ ...s.btnGhost, fontSize: 12 }} onClick={() => supabase.auth.signOut()}>
           SIGN OUT
         </button>
@@ -2424,7 +2722,7 @@ function ChatScreen({ authUser, isCoach }) {
         to_id: selectedContact,
         content: `[MEAL] ${publicUrl}`,
       });
-      const senderName = isCoach ? "Coach Karol" : "Jurek";
+      const senderName = isCoach ? "Coach Karlito" : "Athlete";
       sendPushToUser(selectedContact, `📸 New photo from ${senderName}`, "Tap to view the photo", "chat", "/");
       setPhotoMode(false);
     } catch (e) {
@@ -2557,7 +2855,7 @@ function ChatScreen({ authUser, isCoach }) {
     });
 
     // Push notification to recipient
-    const senderName = isCoach ? "Coach Karol" : "Jurek";
+    const senderName = isCoach ? "Coach Karlito" : "Athlete";
     sendPushToUser(selectedContact, `💬 New message from ${senderName}`, content, "chat", "/");
   };
 
@@ -3012,6 +3310,12 @@ function HistoryScreen() {
                     💬 {log.comment}
                   </div>
                 )}
+                {log.coach_comment && (
+                  <div style={{ fontSize: 12, color: "var(--text)", background: "rgba(196,30,30,0.07)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: "2px solid var(--red)" }}>
+                    <span style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em", display: "block", marginBottom: 3 }}>🎯 COACH FEEDBACK</span>
+                    {log.coach_comment}
+                  </div>
+                )}
 
                 <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 10, textAlign: "right", letterSpacing: "0.08em" }}>
                   CLICK TO COLLAPSE ↑
@@ -3288,7 +3592,7 @@ function LibraryScreen({ authUser, isCoach }) {
 const NAV_ATHLETE = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "workout", icon: "🏋️", label: "TRAIN" },
-  { id: "library", icon: "📚", label: "BAZA" },
+  { id: "schedule", icon: "📅", label: "PLAN" },
   { id: "chat", icon: "💬", label: "CHAT" },
   { id: "profile", icon: "👤", label: "JA" },
 ];
@@ -3307,10 +3611,22 @@ export default function App() {
   
   useEffect(() => {
     const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const refParam = params.get("ref");
+
     if (path.startsWith("/invite/")) {
       const code = path.replace("/invite/", "").toUpperCase();
       setInviteCode(code);
       localStorage.setItem("ks_invite", code);
+    } else if (refParam) {
+      // ?ref=KARLITO or any code in query param
+      const code = refParam.toUpperCase();
+      setInviteCode(code);
+      localStorage.setItem("ks_invite", code);
+    } else if (path === "/free" || path === "/start" || path === "/join") {
+      // Free program path - no invite code, clear any saved
+      localStorage.removeItem("ks_invite");
+      setInviteCode(null);
     } else {
       const saved = localStorage.getItem("ks_invite");
       if (saved) setInviteCode(saved);
@@ -3380,7 +3696,7 @@ const [hasCoach, setHasCoach] = useState(false);
       setAuthUser(u);
       // If invite code, assign coach
       const code = localStorage.getItem("ks_invite");
-      if (code === "KAROL") {
+      if (code === "KARLITO") {
         await supabase.from("profiles").update({ 
           coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" 
         }).eq("id", u.id);
@@ -3436,7 +3752,8 @@ const [hasCoach, setHasCoach] = useState(false);
       <div className="fade-in" key={tab + activeDay}>
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
-      {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
+        {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
+        {tab === "schedule" && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("workout"); }} />}
         {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "history" && <HistoryScreen />}

@@ -944,12 +944,12 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
 
   return (
     <div style={s.screen}>
-      <div style={{ ...s.phaseBar(phaseData.color) }} />
+      {!coachProgram && <div style={{ ...s.phaseBar(phaseData.color) }} />}
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={s.sectionLabel}>Week {week} · {phaseData.name}</div>
+          <div style={s.sectionLabel}>{coachProgram ? `Week ${week}` : `Week ${week} · ${phaseData.name}`}</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900 }}>{workout.title}</div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -2769,14 +2769,42 @@ function ChatScreen({ authUser, isCoach }) {
         setContacts(contacts);
         if (contacts.length > 0) setSelectedContact(contacts[0].id);
       } else {
-        const { data } = await supabase
-          .from("profiles")
-          .select("coach_id")
-          .eq("id", authUser.id)
-          .single();
-        if (data?.coach_id) {
-          setSelectedContact(data.coach_id);
-          setContacts([{ id: data.coach_id, name: "Coach" }]);
+        // Try profiles.coach_id first
+        let coachId = null;
+        try {
+          const { data } = await supabase.from("profiles")
+            .select("coach_id").eq("id", authUser.id).single();
+          coachId = data?.coach_id;
+        } catch(e) {}
+
+        // Fallback: find coach from program_days assigned to this athlete
+        if (!coachId) {
+          try {
+            const { data } = await supabase.from("program_days")
+              .select("coach_id").eq("athlete_id", authUser.id).limit(1).single();
+            coachId = data?.coach_id;
+          } catch(e) {}
+        }
+
+        // Fallback: find coach from messages sent to this athlete
+        if (!coachId) {
+          try {
+            const { data } = await supabase.from("messages")
+              .select("from_id").eq("to_id", authUser.id).limit(1).single();
+            if (data?.from_id && data.from_id !== authUser.id) coachId = data.from_id;
+          } catch(e) {}
+        }
+
+        if (coachId) {
+          // Try to get coach name
+          let coachName = "Coach Karlito";
+          try {
+            const { data: cp } = await supabase.from("profiles")
+              .select("name").eq("id", coachId).single();
+            if (cp?.name) coachName = cp.name;
+          } catch(e) {}
+          setSelectedContact(coachId);
+          setContacts([{ id: coachId, name: coachName }]);
         }
       }
       setLoading(false);
@@ -3744,7 +3772,7 @@ const [hasCoach, setHasCoach] = useState(false);
           </div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)", textAlign: "right", letterSpacing: "0.1em" }}>
             <div style={{ color: "var(--gold)", fontSize: 10 }}>WK {week}</div>
-            <div>{PHASES[getPhase(week)].name}</div>
+            {!hasCoach && <div>{PHASES[getPhase(week)].name}</div>}
           </div>
         </div>
       </div>

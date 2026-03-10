@@ -79,35 +79,36 @@ async function unregisterPushSubscription(userId) {
 // ─── FONT INJECTION ──────────────────────────────────────────────────────────
 const style = document.createElement("style");
 style.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;900&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #06080a;
-    --bg2: #0d1117;
-    --bg3: #151c24;
-    --bg4: #1e2730;
-    --border: #243040;
-    --red: #c0392b;
+    --bg: #0f0e0d;
+    --bg2: #1a1816;
+    --bg3: #242220;
+    --bg4: #2e2b28;
+    --border: #3a3632;
+    --red: #e03428;
     --red-dim: #7a1a14;
-    --red-glow: rgba(192,57,43,0.15);
-    --gold: #c9a84c;
-    --gold-dim: rgba(201,168,76,0.15);
-    --gold-glow: rgba(201,168,76,0.25);
+    --red-glow: rgba(224,52,40,0.15);
+    --gold: #d4a843;
+    --gold-dim: rgba(212,168,67,0.18);
+    --gold-glow: rgba(212,168,67,0.30);
     --steel: #4a7fa5;
     --steel-dim: rgba(74,127,165,0.15);
-    --white: #e8dfd0;
-    --gray: #7a8a94;
-    --gray2: #445060;
+    --white: #ffffff;
+    --text: #ffffff;
+    --gray: #b8bfc8;
+    --gray2: #737d8a;
     --accent: #c9a84c;
     --rune: #4a7fa5;
   }
 
-  body { background: var(--bg); color: var(--white); font-family: 'Barlow', sans-serif; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
 
   .condensed { font-family: 'Barlow Condensed', sans-serif; }
-  .cinzel { font-family: 'Cinzel', serif; }
+  .cinzel { font-family: 'DM Sans', sans-serif; font-weight: 700; }
 
   input[type=range] {
     -webkit-appearance: none;
@@ -359,29 +360,29 @@ function generateWorkout(day, week, level, oneRM, injuries) {
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
 
 const s = {
-  app: { minHeight: "100vh", background: "var(--bg)", color: "var(--white)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
-  header: { padding: "20px 20px 14px", borderBottom: "1px solid var(--border)", background: "linear-gradient(180deg, #0a0f15 0%, var(--bg) 100%)" },
-  logo: { fontFamily: "'Cinzel', serif", fontSize: 22, fontWeight: 700, letterSpacing: "0.12em", color: "var(--white)", lineHeight: 1 },
+  app: { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
+  header: { padding: "20px 20px 14px", borderBottom: "1px solid var(--border)", background: "var(--bg)" },
+  logo: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, letterSpacing: "0.1em", color: "var(--white)", lineHeight: 1 },
   logoRed: { color: "var(--gold)" },
-  tagline: { fontSize: 10, letterSpacing: "0.28em", color: "var(--gray2)", marginTop: 4, textTransform: "uppercase", fontFamily: "'Barlow Condensed', sans-serif" },
+  tagline: { fontSize: 10, letterSpacing: "0.28em", color: "var(--gold)", marginTop: 5, textTransform: "uppercase", fontFamily: "'Barlow Condensed', sans-serif", opacity: 0.65 },
   screen: { padding: "20px 20px", animation: "fadeIn 0.3s ease" },
-  sectionLabel: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: "0.3em", color: "var(--gray2)", textTransform: "uppercase", marginBottom: 12 },
-  card: { background: "linear-gradient(145deg, var(--bg2) 0%, var(--bg3) 100%)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 12, backdropFilter: "blur(4px)", position: "relative", overflow: "hidden" },
+  sectionLabel: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.25em", color: "var(--gray)", textTransform: "uppercase", marginBottom: 12 },
+  card: { background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 12, position: "relative", overflow: "hidden" },
   bigNum: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 56, fontWeight: 900, lineHeight: 1, color: "var(--white)" },
   redLine: { width: 32, height: 2, background: "linear-gradient(90deg, var(--gold), transparent)", marginBottom: 8 },
-  btn: { background: "linear-gradient(135deg, var(--red) 0%, #8b1a14 100%)", color: "var(--white)", border: "1px solid rgba(192,57,43,0.6)", borderRadius: 6, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
-  btnGold: { background: "linear-gradient(135deg, var(--gold) 0%, #8a6820 100%)", color: "#0a0f15", border: "none", borderRadius: 6, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
-  btnGhost: { background: "transparent", color: "var(--gray)", border: "1px solid var(--border)", borderRadius: 6, padding: "12px 20px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "border-color 0.2s" },
-  input: { background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 6, padding: "12px 14px", color: "var(--white)", fontSize: 15, width: "100%", fontFamily: "'Barlow', sans-serif", outline: "none" },
-  label: { fontSize: 11, color: "var(--gray)", marginBottom: 6, letterSpacing: "0.12em", display: "block", textTransform: "uppercase" },
-  pill: (active, color = "var(--gold)") => ({ display: "inline-block", padding: "6px 14px", borderRadius: 4, border: `1px solid ${active ? color : "var(--border)"}`, background: active ? `rgba(201,168,76,0.12)` : "transparent", color: active ? color : "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.1em", cursor: "pointer", transition: "all 0.2s" }),
-  navBar: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "linear-gradient(180deg, var(--bg2) 0%, #080c10 100%)", borderTop: "1px solid var(--border)", display: "flex", padding: "8px 0 12px" },
-  navItem: (active) => ({ flex: 1, textAlign: "center", padding: "6px 2px", cursor: "pointer", opacity: active ? 1 : 0.4, transition: "opacity 0.2s" }),
-  navLabel: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3, color: "var(--white)" },
-  exerciseRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid var(--border)" },
-  badge: (color) => ({ background: color || "var(--red)", padding: "2px 8px", borderRadius: 3, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "var(--white)" }),
+  btn: { background: "var(--red)", color: "#fff", border: "none", borderRadius: 8, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
+  btnGold: { background: "var(--gold)", color: "#111", border: "none", borderRadius: 8, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
+  btnGhost: { background: "transparent", color: "var(--gray)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 20px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "border-color 0.2s" },
+  input: { background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 14px", color: "var(--white)", fontSize: 15, width: "100%", fontFamily: "'DM Sans', sans-serif", outline: "none", lineHeight: 1.4 },
+  label: { fontSize: 11, color: "var(--gray)", marginBottom: 6, letterSpacing: "0.1em", display: "block", textTransform: "uppercase", fontWeight: 600 },
+  pill: (active, color = "var(--gold)") => ({ display: "inline-block", padding: "7px 14px", borderRadius: 6, border: `1px solid ${active ? color : "var(--border)"}`, background: active ? `rgba(201,168,76,0.15)` : "var(--bg3)", color: active ? color : "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.08em", cursor: "pointer", transition: "all 0.2s" }),
+  navBar: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "var(--bg2)", borderTop: "1px solid var(--border)", display: "flex", padding: "8px 0 14px" },
+  navItem: (active) => ({ flex: 1, textAlign: "center", padding: "6px 2px", cursor: "pointer", opacity: active ? 1 : 0.35, transition: "opacity 0.2s" }),
+  navLabel: { fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 3, color: "var(--white)" },
+  exerciseRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "14px 0", borderBottom: "1px solid var(--border)" },
+  badge: (color) => ({ background: color || "var(--red)", padding: "2px 8px", borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" }),
   phaseBar: (color) => ({ height: 2, background: `linear-gradient(90deg, ${color}, transparent)`, borderRadius: 2, marginBottom: 20 }),
-  progressBar: (pct, color) => ({ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${color || "var(--gold)"}, ${color || "var(--red)"})`, borderRadius: 2, transition: "width 0.5s ease" }),
+  progressBar: (pct, color) => ({ height: "100%", width: `${pct}%`, background: color || "var(--red)", borderRadius: 2, transition: "width 0.5s ease" }),
 };
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
@@ -1215,7 +1216,7 @@ function ReadinessWidget({ authUser }) {
         marginBottom: 12,
         display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
       }}>
-        <div style={{ fontSize: 28, fontFamily: "'Barlow Condensed', sans-serif", color: "var(--gray2)" }}>ᚨ</div>
+        <div style={{ fontSize: 28, fontFamily: "'Cinzel', serif", color: "var(--gray2)" }}>I</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.2em", color: "var(--gray)", marginBottom: 2 }}>DAILY READINESS</div>
           <div style={{ fontSize: 12, color: "var(--gray2)" }}>How do you feel today? Tap to check in</div>
@@ -1258,7 +1259,7 @@ function ReadinessWidget({ authUser }) {
     <div style={{ ...s.card, border: `1px solid var(--gold-dim)`, marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.15em", color: "var(--gold)" }}>DAILY READINESS</div>
+          <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.15em", color: "var(--gold)" }}>DAILY READINESS</div>
           <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>Rate your state before training</div>
         </div>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 36, fontWeight: 900, color: getReadinessColor(readinessScore), lineHeight: 1 }}>
@@ -1529,7 +1530,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
     <div style={s.screen}>
       {/* Nordic header rune */}
       <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.5em", color: "var(--gray2)", marginBottom: 16, fontFamily: "'Barlow Condensed', sans-serif" }}>
-        ᛟ — KARLITO STRENGTH — ᛟ
+        · KARLITO STRENGTH ·
       </div>
 
       {/* Readiness check-in */}
@@ -1544,9 +1545,9 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
       {/* Program type badge */}
       {hasCoach ? (
         <div style={{ background: "rgba(201,168,76,0.08)", border: "1px solid var(--gold-dim)", borderRadius: 8, padding: "8px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 18, color: "var(--gold)" }}>ᚨ</span>
+          <span style={{ fontSize: 18, color: "var(--accent)" }}>⚔</span>
           <div>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, fontWeight: 700, color: "var(--gold)" }}>COACHED ATHLETE</div>
+            <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 13, fontWeight: 700, color: "var(--gold)" }}>COACHED ATHLETE</div>
             <div style={{ fontSize: 11, color: "var(--gray)" }}>Personalized program from your coach</div>
           </div>
         </div>
@@ -1554,7 +1555,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         <div style={{ background: "rgba(74,127,165,0.08)", border: "1px solid var(--steel-dim)", borderRadius: 8, padding: "8px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18, color: "var(--steel)" }}>ᛒ</span>
           <div>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, fontWeight: 700, color: "var(--steel)" }}>FREE 12-WEEK PROGRAM</div>
+            <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 13, fontWeight: 700, color: "var(--steel)" }}>FREE 12-WEEK PROGRAM</div>
             <div style={{ fontSize: 11, color: "var(--gray)" }}>SBD + Kettlebell periodization</div>
           </div>
         </div>
@@ -3384,7 +3385,7 @@ function ChatScreen({ authUser, isCoach }) {
               background: "var(--bg3)", border: "1px solid var(--border)",
               borderRadius: 6, padding: "12px 14px", color: "var(--white)",
               fontSize: 15, flex: 1, minWidth: 0,
-              fontFamily: "'Barlow', sans-serif", outline: "none",
+              fontFamily: "'DM Sans', sans-serif", outline: "none",
             }}
           />
           <button onClick={sendMessage}
@@ -3416,7 +3417,7 @@ function LandingScreen({ onSignUp }) {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--white)", fontFamily: "'Barlow', sans-serif", maxWidth: 480, margin: "0 auto", overflowX: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--white)", fontFamily: "'DM Sans', sans-serif", maxWidth: 480, margin: "0 auto", overflowX: "hidden" }}>
 
       {/* ── HERO ── */}
       <div style={{ position: "relative", minHeight: "100svh", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 24px 48px" }}>
@@ -3426,13 +3427,13 @@ function LandingScreen({ onSignUp }) {
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.45) 50%, rgba(13,13,13,0.92) 85%, var(--bg) 100%)", zIndex: 0 }} />
 
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div style={{ ...fade(0), fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.5em", color: "var(--red)", marginBottom: 16, textTransform: "uppercase" }}>
+          <div style={{ ...fade(0), fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: "0.5em", color: "var(--accent)", marginBottom: 16, textTransform: "uppercase" }}>
             Karlito Strength
           </div>
-          <div style={{ ...fade(100), fontFamily: "'Barlow Condensed', sans-serif", fontSize: 52, fontWeight: 900, lineHeight: 0.95, marginBottom: 20, textTransform: "uppercase" }}>
+          <div style={{ ...fade(100), fontFamily: "'Cinzel', serif", fontSize: 44, fontWeight: 900, lineHeight: 1.05, marginBottom: 20, textTransform: "uppercase" }}>
             FORGED<br />
             THROUGH<br />
-            <span style={{ color: "var(--red)", WebkitTextStroke: "1px var(--red)", WebkitTextFillColor: "transparent" }}>IRON</span>
+            <span style={{ color: "var(--accent)", WebkitTextStroke: "1px var(--accent)", WebkitTextFillColor: "transparent" }}>IRON</span>
           </div>
           <div style={{ ...fade(200), fontSize: 15, color: "var(--gray)", lineHeight: 1.75, marginBottom: 36, maxWidth: 340 }}>
             Strength training + kettlebell coaching. Built for people who want to get strong, move well, and actually enjoy the process.
@@ -3464,7 +3465,7 @@ function LandingScreen({ onSignUp }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 36 }}>
           {[["5+", "Years coaching"], ["12", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
             <div key={l} style={{ textAlign: "center", padding: "16px 8px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, fontWeight: 900, color: "var(--red)", lineHeight: 1 }}>{n}</div>
+              <div style={{ fontFamily: "'Cinzel', serif", fontSize: 24, fontWeight: 900, color: "var(--accent)", lineHeight: 1 }}>{n}</div>
               <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4, letterSpacing: "0.06em" }}>{l.toUpperCase()}</div>
             </div>
           ))}
@@ -3547,7 +3548,7 @@ function LandingScreen({ onSignUp }) {
         {/* ── FINAL CTA ── */}
         <div style={{ textAlign: "center", paddingBottom: 48 }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
-            READY TO GET<br /><span style={{ color: "var(--red)" }}>STRONG?</span>
+            READY TO ENTER<br /><span style={{ color: "var(--accent)" }}>THE ARENA?</span>
           </div>
           <button onClick={() => { localStorage.setItem("ks_invite", "KARLITO"); onSignUp(); }}
             style={{ background: "var(--red)", color: "#fff", border: "none", borderRadius: 10, padding: "18px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, fontWeight: 900, letterSpacing: "0.08em", cursor: "pointer", width: "100%", marginBottom: 12 }}>
@@ -3557,7 +3558,7 @@ function LandingScreen({ onSignUp }) {
             Already have an account? <span onClick={onSignUp} style={{ color: "var(--accent)", cursor: "pointer", textDecoration: "underline" }}>Sign in here</span>
           </div>
           <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.15em" }}>
-            KARLITO STRENGTH · FORGED THROUGH IRON
+            KARLITO STRENGTH · FERRUM · SANGUIS · GLORIA
           </div>
         </div>
       </div>
@@ -4147,7 +4148,7 @@ const [hasCoach, setHasCoach] = useState(false);
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={s.logo}>KARLITO <span style={s.logoRed}>STRENGTH</span></div>
-            <div style={s.tagline}>ᚠᚢᚦᚨᚱᚲ · Forged Through Iron</div>
+            <div style={s.tagline}>FERRUM · SANGUIS · GLORIA</div>
           </div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)", textAlign: "right", letterSpacing: "0.1em" }}>
             <div style={{ color: "var(--gold)", fontSize: 10 }}>WK {week}</div>

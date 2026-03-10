@@ -3421,7 +3421,7 @@ function LandingScreen({ onSignUp }) {
       {/* ── HERO ── */}
       <div style={{ position: "relative", minHeight: "100svh", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 24px 48px" }}>
         {/* Hero photo background */}
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/hero.jpg')", backgroundSize: "cover", backgroundPosition: "center 20%", zIndex: 0 }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/hero.jpg')", backgroundSize: "cover", backgroundPosition: "center 20%", filter: "grayscale(100%)", zIndex: 0 }} />
         {/* Dark overlay */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.45) 50%, rgba(13,13,13,0.92) 85%, var(--bg) 100%)", zIndex: 0 }} />
 
@@ -3435,7 +3435,7 @@ function LandingScreen({ onSignUp }) {
             <span style={{ color: "var(--red)", WebkitTextStroke: "1px var(--red)", WebkitTextFillColor: "transparent" }}>IRON</span>
           </div>
           <div style={{ ...fade(200), fontSize: 15, color: "var(--gray)", lineHeight: 1.75, marginBottom: 36, maxWidth: 340 }}>
-            Elite powerlifting + kettlebell coaching. Built for athletes who want to get strong, stay healthy, and actually enjoy training.
+            Strength training + kettlebell coaching. Built for people who want to get strong, move well, and actually enjoy the process.
           </div>
 
           {/* Two CTAs */}
@@ -3462,7 +3462,7 @@ function LandingScreen({ onSignUp }) {
       {/* ── SOCIAL PROOF ── */}
       <div style={{ padding: "36px 24px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 36 }}>
-          {[["50+", "Athletes coached"], ["12", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
+          {[["5+", "Years coaching"], ["12", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
             <div key={l} style={{ textAlign: "center", padding: "16px 8px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, fontWeight: 900, color: "var(--red)", lineHeight: 1 }}>{n}</div>
               <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4, letterSpacing: "0.06em" }}>{l.toUpperCase()}</div>
@@ -3473,7 +3473,7 @@ function LandingScreen({ onSignUp }) {
         {/* ── WHAT YOU GET ── */}
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 20 }}>WHAT'S INCLUDED</div>
         {[
-          ["🏋️", "Personalised Program", "Custom SBD + kettlebell plan built around your lifts, schedule and goals. Updated weekly."],
+          ["🏋️", "Personalised Program", "Custom strength + kettlebell plan built around your lifts, schedule and goals. Updated weekly."],
           ["🎯", "Direct Coach Access", "Message Coach Karlito anytime. Get technique feedback, program adjustments, and accountability."],
           ["📹", "Video Technique Library", "Exercise demos for every movement. Watch before you lift, never guess on form."],
           ["📊", "Progress Tracking", "Log every session, track volume and intensity. See exactly how you're improving."],
@@ -3492,7 +3492,7 @@ function LandingScreen({ onSignUp }) {
         {/* ── HOW IT WORKS ── */}
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginTop: 32, marginBottom: 20 }}>HOW IT WORKS</div>
         {[
-          ["01", "Create your account", "Sign up and complete your athlete profile — lifts, goals, schedule."],
+          ["01", "Create your account", "Sign up and complete your profile — current lifts, goals, training history."],
           ["02", "Pay via Revolut", `Send ${MONTHLY_PRICE} to @karolz7hb. Use your name as reference.`],
           ["03", "Get your program", "Within 24h your coach builds and assigns your first week."],
           ["04", "Train & communicate", "Log sessions, message your coach, get feedback. Every week."],

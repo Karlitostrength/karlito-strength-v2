@@ -1835,6 +1835,21 @@ function CoachScreen() {
   const [programDays, setProgramDays] = useState([]);
   const [buildMode, setBuildMode] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null); // workout object for detail view
+  // Templates
+  const [templates, setTemplates] = useState([]);
+  const [tplMode, setTplMode] = useState("list"); // list | create | assign
+  const [tplName, setTplName] = useState("");
+  const [tplDays, setTplDays] = useState([{ day: "A", title: "", notes: "", exercises: [{ name: "", sets: 3, reps: 5, weight: 0 }] }]);
+  const [selectedTpl, setSelectedTpl] = useState(null);
+  const [tplWeekStart, setTplWeekStart] = useState(1);
+  const [tplAssignClients, setTplAssignClients] = useState([]);
+  const [savingTpl, setSavingTpl] = useState(false);
+  // Diet
+  const [dietClient, setDietClient] = useState(null);
+  const [dietUploading, setDietUploading] = useState(false);
+  const [dietFiles, setDietFiles] = useState([]);
+  const [dietError, setDietError] = useState("");
+  const dietFileRef = useRef(null);
   const [coachComment, setCoachComment] = useState("");
   const [savingComment, setSavingComment] = useState(false);
   const [commentSaved, setCommentSaved] = useState(false);
@@ -1854,6 +1869,93 @@ function CoachScreen() {
   const [copyWeekTo, setCopyWeekTo] = useState(2);
   const [copyingWeek, setCopyingWeek] = useState(false);
   const [showCopyWeek, setShowCopyWeek] = useState(false);
+
+  const loadTemplates = async () => {
+    const { data } = await supabase.from("program_templates")
+      .select("*").order("created_at", { ascending: false });
+    setTemplates(data || []);
+  };
+
+  const saveTemplate = async () => {
+    if (!tplName.trim()) return;
+    setSavingTpl(true);
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      const { data: tpl } = await supabase.from("program_templates").insert({
+        coach_id: au.id,
+        name: tplName,
+        days: tplDays,
+      }).select().single();
+      setTemplates(prev => [tpl, ...prev]);
+      setTplMode("list");
+      setTplName("");
+      setTplDays([{ day: "A", title: "", notes: "", exercises: [{ name: "", sets: 3, reps: 5, weight: 0 }] }]);
+    } catch(e) { console.log("Template save error:", e); }
+    setSavingTpl(false);
+  };
+
+  const assignTemplate = async () => {
+    if (!selectedTpl || tplAssignClients.length === 0) return;
+    setSavingTpl(true);
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      for (const clientId of tplAssignClients) {
+        for (const tday of (selectedTpl.days || [])) {
+          const { data: newDay } = await supabase.from("program_days").insert({
+            coach_id: au.id, athlete_id: clientId,
+            week: tplWeekStart, day: tday.day,
+            title: tday.title || selectedTpl.name, notes: tday.notes || "",
+          }).select().single();
+          if (newDay) {
+            for (const ex of (tday.exercises || []).filter(e => e.name?.trim())) {
+              await supabase.from("custom_exercises").insert({
+                coach_id: au.id, athlete_id: clientId,
+                name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
+                day: tday.day, week: tplWeekStart,
+              });
+            }
+          }
+          sendPushToUser(clientId, "💪 New program from Coach Karlito", `Week ${tplWeekStart} — ${selectedTpl.name}`, "program", "/");
+        }
+      }
+      setTplMode("list");
+      setSelectedTpl(null);
+      setTplAssignClients([]);
+      await loadData();
+    } catch(e) { console.log("Assign template error:", e); }
+    setSavingTpl(false);
+  };
+
+  const loadDietFiles = async (clientId) => {
+    if (!clientId) return;
+    try {
+      const { data } = await supabase.from("diet_files")
+        .select("*").eq("athlete_id", clientId)
+        .order("created_at", { ascending: false });
+      setDietFiles(data || []);
+    } catch(e) {}
+  };
+
+  const uploadDiet = async (file, clientId) => {
+    if (!file || !clientId) return;
+    setDietUploading(true);
+    setDietError("");
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      const fileName = `diets/${clientId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error: upErr } = await supabase.storage
+        .from("diet-files").upload(fileName, file, { contentType: "application/pdf", upsert: false });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("diet-files").getPublicUrl(fileName);
+      await supabase.from("diet_files").insert({
+        coach_id: au.id, athlete_id: clientId,
+        file_name: file.name, file_url: urlData.publicUrl,
+      });
+      sendPushToUser(clientId, "🥗 New diet plan from Coach Karlito", "Tap to download your nutrition plan", "diet", "/");
+      await loadDietFiles(clientId);
+    } catch(e) { setDietError(e.message || "Upload failed"); }
+    setDietUploading(false);
+  };
 
   const loadLibraryList = async () => {
     if (libraryList.length > 0) return;
@@ -1891,7 +1993,7 @@ function CoachScreen() {
     setCopyingWeek(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); loadTemplates(); }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -2037,10 +2139,10 @@ const saveCoachComment = async () => {
           {/* View toggle */}
       {/* View toggle */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[["dashboard", "📊 OVERVIEW"], ["sessions", "📋 SESSIONS"]].map(([v, label]) => (
+        {[["dashboard", "📊"], ["sessions", "📋"], ["templates", "📁"], ["diet", "🥗"]].map(([v, icon]) => (
           <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); setEditingDay(null); }}
-            style={{ ...s.pill(view === v && !selectedClient), padding: "8px 14px", flex: 1, textAlign: "center", fontSize: 12 }}>
-            {label}
+            style={{ ...s.pill(view === v && !selectedClient), padding: "8px 0", flex: 1, textAlign: "center", fontSize: 18 }}>
+            {icon}
           </div>
         ))}
       </div>
@@ -2328,6 +2430,173 @@ const saveCoachComment = async () => {
         </div>
       )}
 
+      {/* ── TEMPLATES VIEW ── */}
+      {view === "templates" && !selectedClient && (
+        <div>
+          {tplMode === "list" && (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={s.sectionLabel}>PROGRAM TEMPLATES</div>
+                <button onClick={() => setTplMode("create")} style={{ ...s.btn, width: "auto", padding: "8px 16px", fontSize: 12 }}>+ NEW</button>
+              </div>
+              {templates.length === 0 ? (
+                <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>📁</div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 6 }}>NO TEMPLATES YET</div>
+                  <div style={{ fontSize: 13, color: "var(--gray)" }}>Create reusable program templates to assign to multiple athletes at once.</div>
+                </div>
+              ) : templates.map(tpl => (
+                <div key={tpl.id} style={{ ...s.card, marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900 }}>{tpl.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>{(tpl.days || []).length} days · {(tpl.days || []).reduce((s, d) => s + (d.exercises || []).filter(e => e.name).length, 0)} exercises</div>
+                    </div>
+                    <button onClick={() => { setSelectedTpl(tpl); setTplWeekStart(1); setTplAssignClients([]); setTplMode("assign"); }}
+                      style={{ ...s.btn, width: "auto", padding: "8px 14px", fontSize: 11 }}>ASSIGN →</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                    {(tpl.days || []).map((d, di) => {
+                      const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)", D: "#a78bfa" }[d.day] || "var(--red)";
+                      return (
+                        <div key={di} style={{ background: "var(--bg3)", borderRadius: 6, padding: "4px 10px", borderLeft: `2px solid ${col}`, fontSize: 11 }}>
+                          Day {d.day} — {d.title || "Untitled"}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {tplMode === "create" && (
+            <div>
+              <button onClick={() => setTplMode("list")} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>CREATE TEMPLATE</div>
+              <label style={s.label}>TEMPLATE NAME</label>
+              <input value={tplName} onChange={e => setTplName(e.target.value)} placeholder="e.g. Week 1 Accumulation, Beginner Base..." style={{ ...s.input, marginBottom: 16 }} />
+
+              {tplDays.map((tday, di) => (
+                <div key={di} style={{ ...s.card, marginBottom: 12, borderColor: "var(--red-dim)" }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={s.label}>DAY</label>
+                      <select value={tday.day} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, day: e.target.value } : d))} style={s.input}>
+                        {["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ flex: 3 }}>
+                      <label style={s.label}>DAY TITLE</label>
+                      <input value={tday.title} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, title: e.target.value } : d))} placeholder="e.g. Squat / Deadlift" style={s.input} />
+                    </div>
+                    {tplDays.length > 1 && (
+                      <div onClick={() => setTplDays(p => p.filter((_, i) => i !== di))} style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "24px 4px 0", alignSelf: "flex-start" }}>✕</div>
+                    )}
+                  </div>
+                  {(tday.exercises || []).map((ex, ei) => (
+                    <div key={ei} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+                      <input value={ex.name} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: d.exercises.map((x, j) => j === ei ? { ...x, name: e.target.value } : x) } : d))} placeholder="Exercise" style={{ ...s.input, flex: 3, marginBottom: 0 }} />
+                      <input type="number" value={ex.sets} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: d.exercises.map((x, j) => j === ei ? { ...x, sets: +e.target.value } : x) } : d))} style={{ ...s.input, width: 48, marginBottom: 0, textAlign: "center", padding: "10px 4px" }} />
+                      <span style={{ fontSize: 11, color: "var(--gray2)" }}>×</span>
+                      <input type="number" value={ex.reps} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: d.exercises.map((x, j) => j === ei ? { ...x, reps: +e.target.value } : x) } : d))} style={{ ...s.input, width: 48, marginBottom: 0, textAlign: "center", padding: "10px 4px" }} />
+                      <input type="number" value={ex.weight} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: d.exercises.map((x, j) => j === ei ? { ...x, weight: +e.target.value } : x) } : d))} placeholder="kg" style={{ ...s.input, width: 52, marginBottom: 0, textAlign: "center", padding: "10px 4px" }} />
+                      <div onClick={() => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: d.exercises.filter((_, j) => j !== ei) } : d))} style={{ color: "var(--gray2)", fontSize: 14, cursor: "pointer", padding: "0 4px" }}>✕</div>
+                    </div>
+                  ))}
+                  <button onClick={() => setTplDays(p => p.map((d, i) => i === di ? { ...d, exercises: [...d.exercises, { name: "", sets: 3, reps: 5, weight: 0 }] } : d))} style={{ ...s.btnGhost, fontSize: 11, padding: "6px 12px", marginTop: 4 }}>+ Exercise</button>
+                </div>
+              ))}
+              <button onClick={() => setTplDays(p => [...p, { day: "B", title: "", notes: "", exercises: [{ name: "", sets: 3, reps: 5, weight: 0 }] }])} style={{ ...s.btnGhost, marginBottom: 12 }}>+ ADD DAY</button>
+              <button onClick={saveTemplate} disabled={savingTpl || !tplName.trim()} style={{ ...s.btn, opacity: savingTpl || !tplName.trim() ? 0.5 : 1 }}>
+                {savingTpl ? "SAVING..." : "SAVE TEMPLATE"}
+              </button>
+            </div>
+          )}
+
+          {tplMode === "assign" && selectedTpl && (
+            <div>
+              <button onClick={() => { setTplMode("list"); setSelectedTpl(null); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>ASSIGN: {selectedTpl.name.toUpperCase()}</div>
+              <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 16 }}>{(selectedTpl.days || []).length} days · select athletes + week</div>
+
+              <label style={s.label}>START WEEK</label>
+              <input type="number" min="1" max="12" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
+
+              <label style={s.label}>SELECT ATHLETES</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {athletes.map(a => {
+                  const selected = tplAssignClients.includes(a.id);
+                  return (
+                    <div key={a.id} onClick={() => setTplAssignClients(p => selected ? p.filter(id => id !== a.id) : [...p, a.id])}
+                      style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", borderColor: selected ? "var(--red)" : "var(--border)", padding: "12px 16px" }}>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{a.name || a.email}</div>
+                      <div style={{ width: 24, height: 24, borderRadius: 5, background: selected ? "var(--red)" : "var(--bg3)", border: `1px solid ${selected ? "var(--red)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                        {selected ? "✓" : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={assignTemplate} disabled={savingTpl || tplAssignClients.length === 0}
+                style={{ ...s.btn, opacity: savingTpl || tplAssignClients.length === 0 ? 0.5 : 1 }}>
+                {savingTpl ? "ASSIGNING..." : `ASSIGN TO ${tplAssignClients.length} ATHLETE${tplAssignClients.length !== 1 ? "S" : ""} →`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DIET VIEW ── */}
+      {view === "diet" && !selectedClient && (
+        <div>
+          <div style={s.sectionLabel}>DIET PLANS</div>
+          <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 16 }}>Upload PDF nutrition plans for your athletes.</div>
+
+          {/* Select athlete */}
+          <label style={s.label}>SELECT ATHLETE</label>
+          <select value={dietClient || ""} onChange={e => { setDietClient(e.target.value || null); setDietFiles([]); if (e.target.value) loadDietFiles(e.target.value); }}
+            style={{ ...s.input, marginBottom: 16 }}>
+            <option value="">— Choose athlete —</option>
+            {athletes.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+          </select>
+
+          {dietClient && (
+            <>
+              {/* Upload area */}
+              <div onClick={() => dietFileRef.current?.click()}
+                style={{ ...s.card, borderColor: dietUploading ? "var(--red)" : "var(--border)", borderStyle: "dashed", textAlign: "center", padding: "28px 16px", cursor: "pointer", marginBottom: 12 }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{dietUploading ? "⏳" : "📄"}</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 900, marginBottom: 4 }}>
+                  {dietUploading ? "UPLOADING..." : "TAP TO UPLOAD PDF"}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--gray2)" }}>PDF files only · Max 10MB</div>
+              </div>
+              <input ref={dietFileRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadDiet(f, dietClient); e.target.value = ""; }} />
+              {dietError && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>⚠ {dietError}</div>}
+
+              {/* Existing files */}
+              {dietFiles.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", marginBottom: 10, marginTop: 8 }}>UPLOADED PLANS</div>
+                  {dietFiles.map((f, i) => (
+                    <div key={i} style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "12px 16px" }}>
+                      <div>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>📄 {f.file_name}</div>
+                        <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                      </div>
+                      <a href={f.file_url} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 12, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, textDecoration: "none" }}>VIEW →</a>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* LIBRARY PICKER MODAL */}
       {libraryPicker !== null && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end" }}
@@ -2511,6 +2780,48 @@ const saveCoachComment = async () => {
   );
 }
 
+function DietFilesSection({ authUser }) {
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await supabase.from("diet_files")
+          .select("*").eq("athlete_id", authUser.id)
+          .order("created_at", { ascending: false });
+        setFiles(data || []);
+      } catch(e) {}
+      setLoading(false);
+    };
+    load();
+  }, [authUser]);
+
+  if (loading || files.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={s.sectionLabel}>🥗 NUTRITION PLANS</div>
+      <div style={s.card}>
+        {files.map((f, i) => (
+          <div key={i} style={{ ...s.exerciseRow, alignItems: "center", ...(i === files.length - 1 ? { borderBottom: "none" } : {}) }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>📄 {f.file_name}</div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>
+                {new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </div>
+            </div>
+            <a href={f.file_url} target="_blank" rel="noopener noreferrer"
+              style={{ padding: "8px 14px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, color: "var(--accent)", textDecoration: "none" }}>
+              OPEN →
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProfileScreen({ user, authUser }) {
   const [goals, setGoals] = useState({ main_goal: "", competition_date: "", notes: "" });
   const [savingGoals, setSavingGoals] = useState(false);
@@ -2643,6 +2954,9 @@ function ProfileScreen({ user, authUser }) {
             ⚠ {pushError}
           </div>
         ) : null}
+
+        {/* DIET FILES */}
+        <DietFilesSection authUser={authUser} />
 
         {/* GOALS SECTION */}
         <div style={{ marginBottom: 20 }}>
@@ -3086,45 +3400,105 @@ function ChatScreen({ authUser, isCoach }) {
 // ─── LANDING / ONBOARDING PAGE ───────────────────────────────────────────────
 
 function LandingScreen({ onSignUp }) {
-  const REVOLUT_TAG = "@karolz7hb";
   const REVOLUT_LINK = "https://revolut.me/karolz7hb";
-  const MONTHLY_PRICE = "£79"; // <-- change to your price
-  const [copied, setCopied] = useState(false); // eslint-disable-line
+  const MONTHLY_PRICE = "£99";
+  const [heroVisible, setHeroVisible] = useState(false);
 
+  useEffect(() => {
+    const t = setTimeout(() => setHeroVisible(true), 80);
+    return () => clearTimeout(t);
+  }, []);
 
+  const fade = (delay = 0) => ({
+    opacity: heroVisible ? 1 : 0,
+    transform: heroVisible ? "translateY(0)" : "translateY(18px)",
+    transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+  });
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--white)", fontFamily: "'Barlow', sans-serif", maxWidth: 480, margin: "0 auto", padding: "0 0 40px" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--white)", fontFamily: "'Barlow', sans-serif", maxWidth: 480, margin: "0 auto", overflowX: "hidden" }}>
 
-      {/* Hero */}
-      <div style={{ background: "linear-gradient(180deg, #1a0a0a 0%, var(--bg) 100%)", padding: "48px 24px 32px", textAlign: "center" }}>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.35em", color: "var(--red)", marginBottom: 12 }}>KARLITO STRENGTH</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 42, fontWeight: 900, lineHeight: 1.05, marginBottom: 16 }}>
-          TRAIN SMARTER.<br />
-          <span style={{ color: "var(--red)" }}>LIFT HEAVIER.</span>
+      {/* ── HERO ── */}
+      <div style={{ position: "relative", minHeight: "100svh", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 24px 48px" }}>
+        {/* Hero photo background */}
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/hero.jpg')", backgroundSize: "cover", backgroundPosition: "center 20%", zIndex: 0 }} />
+        {/* Dark overlay */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.45) 50%, rgba(13,13,13,0.92) 85%, var(--bg) 100%)", zIndex: 0 }} />
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ ...fade(0), fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.5em", color: "var(--red)", marginBottom: 16, textTransform: "uppercase" }}>
+            Karlito Strength
+          </div>
+          <div style={{ ...fade(100), fontFamily: "'Barlow Condensed', sans-serif", fontSize: 52, fontWeight: 900, lineHeight: 0.95, marginBottom: 20, textTransform: "uppercase" }}>
+            FORGED<br />
+            THROUGH<br />
+            <span style={{ color: "var(--red)", WebkitTextStroke: "1px var(--red)", WebkitTextFillColor: "transparent" }}>IRON</span>
+          </div>
+          <div style={{ ...fade(200), fontSize: 15, color: "var(--gray)", lineHeight: 1.75, marginBottom: 36, maxWidth: 340 }}>
+            Elite powerlifting + kettlebell coaching. Built for athletes who want to get strong, stay healthy, and actually enjoy training.
+          </div>
+
+          {/* Two CTAs */}
+          <div style={{ ...fade(300), display: "flex", flexDirection: "column", gap: 12 }}>
+            <button onClick={() => { localStorage.setItem("ks_invite", "KARLITO"); onSignUp(); }}
+              style={{ background: "var(--red)", color: "#fff", border: "none", borderRadius: 10, padding: "18px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, fontWeight: 900, letterSpacing: "0.08em", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>GET COACHED</span>
+              <span style={{ fontSize: 13, opacity: 0.85 }}>{MONTHLY_PRICE}/mo →</span>
+            </button>
+            <button onClick={onSignUp}
+              style={{ background: "transparent", color: "var(--gray)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: "0.08em", cursor: "pointer" }}>
+              Try Free 12-Week Program
+            </button>
+          </div>
+          <div style={{ ...fade(400), fontSize: 11, color: "var(--gray2)", marginTop: 14, textAlign: "center", letterSpacing: "0.05em" }}>
+            No credit card · Cancel anytime
+          </div>
         </div>
-        <div style={{ fontSize: 15, color: "var(--gray)", lineHeight: 1.7, marginBottom: 28, maxWidth: 340, margin: "0 auto 28px" }}>
-          12-week SBD + Kettlebell program. Personal coaching. Direct access to your coach — all in one app.
-        </div>
-        <button onClick={onSignUp}
-          style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 8, padding: "16px 40px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer", width: "100%", maxWidth: 320 }}>
-          START NOW →
-        </button>
-        <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 10 }}>Free 7-day trial · No card required</div>
       </div>
 
-      {/* What you get */}
-      <div style={{ padding: "0 20px" }}>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.25em", color: "var(--gray2)", textAlign: "center", marginBottom: 16 }}>WHAT YOU GET</div>
+      {/* ── DIVIDER ── */}
+      <div style={{ height: 1, background: "linear-gradient(90deg, transparent, var(--border), transparent)", margin: "0 24px" }} />
+
+      {/* ── SOCIAL PROOF ── */}
+      <div style={{ padding: "36px 24px 0" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 36 }}>
+          {[["50+", "Athletes coached"], ["12", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
+            <div key={l} style={{ textAlign: "center", padding: "16px 8px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, fontWeight: 900, color: "var(--red)", lineHeight: 1 }}>{n}</div>
+              <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4, letterSpacing: "0.06em" }}>{l.toUpperCase()}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── WHAT YOU GET ── */}
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 20 }}>WHAT'S INCLUDED</div>
         {[
-          ["🏋️", "12-Week Program", "Periodised SBD + Kettlebell. Accumulation → Intensification → Peak. Auto-adjusts to your 1RM."],
-          ["📊", "RPE Autoregulation", "Log every set with weight, reps and RPE. Track progress week by week."],
-          ["💬", "Direct Coach Access", "Message your coach anytime. Send meal photos, ask questions, get feedback."],
-          ["📚", "Exercise Library", "Video library with technique cues for every movement in the program."],
-          ["🔔", "Push Notifications", "Get notified when your coach assigns a new program or sends a message."],
+          ["🏋️", "Personalised Program", "Custom SBD + kettlebell plan built around your lifts, schedule and goals. Updated weekly."],
+          ["🎯", "Direct Coach Access", "Message Coach Karlito anytime. Get technique feedback, program adjustments, and accountability."],
+          ["📹", "Video Technique Library", "Exercise demos for every movement. Watch before you lift, never guess on form."],
+          ["📊", "Progress Tracking", "Log every session, track volume and intensity. See exactly how you're improving."],
+          ["🥗", "Nutrition Guidance", "Personalised diet plans uploaded directly to your app by your coach."],
+          ["🔔", "Smart Notifications", "Get notified when your program updates or your coach sends feedback."],
         ].map(([icon, title, desc]) => (
-          <div key={title} style={{ display: "flex", gap: 14, marginBottom: 18, padding: "14px 16px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>{icon}</div>
+          <div key={title} style={{ display: "flex", gap: 16, marginBottom: 16, padding: "16px", background: "var(--bg2)", borderRadius: 12, border: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 26, flexShrink: 0, width: 36, textAlign: "center" }}>{icon}</div>
+            <div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4, letterSpacing: "0.02em" }}>{title}</div>
+              <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.65 }}>{desc}</div>
+            </div>
+          </div>
+        ))}
+
+        {/* ── HOW IT WORKS ── */}
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginTop: 32, marginBottom: 20 }}>HOW IT WORKS</div>
+        {[
+          ["01", "Create your account", "Sign up and complete your athlete profile — lifts, goals, schedule."],
+          ["02", "Pay via Revolut", `Send ${MONTHLY_PRICE} to @karolz7hb. Use your name as reference.`],
+          ["03", "Get your program", "Within 24h your coach builds and assigns your first week."],
+          ["04", "Train & communicate", "Log sessions, message your coach, get feedback. Every week."],
+        ].map(([num, title, desc]) => (
+          <div key={num} style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, color: "rgba(196,30,30,0.35)", flexShrink: 0, width: 36, lineHeight: 1 }}>{num}</div>
             <div>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 3 }}>{title}</div>
               <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>{desc}</div>
@@ -3132,54 +3506,59 @@ function LandingScreen({ onSignUp }) {
           </div>
         ))}
 
-        {/* Pricing */}
-        <div style={{ background: "linear-gradient(135deg, rgba(196,30,30,0.15), rgba(196,30,30,0.05))", border: "1px solid var(--red-dim)", borderRadius: 12, padding: "24px 20px", marginTop: 8, marginBottom: 20, textAlign: "center" }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.25em", color: "var(--gray2)", marginBottom: 8 }}>MONTHLY COACHING</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 52, fontWeight: 900, lineHeight: 1, color: "var(--white)", marginBottom: 4 }}>{MONTHLY_PRICE}</div>
-          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 20 }}>/ month · cancel anytime</div>
-          {[
-            "Full 12-week SBD program",
-            "Kettlebell conditioning",
-            "Weekly program updates",
-            "Direct messaging with coach",
-            "Video technique library",
-            "Progress tracking",
-          ].map(item => (
-            <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, textAlign: "left" }}>
-              <div style={{ color: "var(--red)", fontWeight: 900, flexShrink: 0 }}>✓</div>
+        {/* ── PRICING ── */}
+        <div style={{ background: "linear-gradient(135deg, rgba(196,30,30,0.12) 0%, rgba(196,30,30,0.04) 100%)", border: "1px solid rgba(196,30,30,0.35)", borderRadius: 16, padding: "28px 24px", margin: "32px 0" }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 12 }}>MONTHLY COACHING</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 58, fontWeight: 900, lineHeight: 1 }}>{MONTHLY_PRICE}</div>
+            <div style={{ fontSize: 14, color: "var(--gray)" }}>/ month</div>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--gray2)", marginBottom: 24 }}>Cancel anytime · No contracts</div>
+          {["Custom weekly program", "Unlimited coach messaging", "Video technique library", "Nutrition plan uploads", "Progress analytics", "Push notifications"].map(item => (
+            <div key={item} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              <div style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 10, color: "#fff", fontWeight: 900 }}>✓</span>
+              </div>
               <div style={{ fontSize: 14, color: "var(--gray)" }}>{item}</div>
             </div>
           ))}
-        </div>
-
-        {/* Payment section */}
-        <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12, padding: "20px", marginBottom: 20 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4 }}>HOW TO PAY</div>
-          <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 16, lineHeight: 1.6 }}>
-            Send payment via Revolut. Use your name as the reference. Access activated within 24h.
-          </div>
-          <div style={{ background: "var(--bg3)", borderRadius: 8, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, border: "1px solid var(--border)" }}>
-            <div>
-              <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>REVOLUT TAG</div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, letterSpacing: "0.05em" }}>{REVOLUT_TAG}</div>
-            </div>
-            <a href={REVOLUT_LINK} target="_blank" rel="noopener noreferrer"
-              style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 6, padding: "10px 16px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, cursor: "pointer", textDecoration: "none", letterSpacing: "0.05em" }}>
-              PAY NOW
-            </a>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--gray2)", lineHeight: 1.6 }}>
-            After payment, message on Revolut or via the app chat. You will receive your login link within 24 hours.
+          <a href={REVOLUT_LINK} target="_blank" rel="noopener noreferrer"
+            style={{ display: "block", marginTop: 24, background: "var(--red)", color: "#fff", borderRadius: 10, padding: "16px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, fontWeight: 900, letterSpacing: "0.08em", textAlign: "center", textDecoration: "none" }}>
+            PAY {MONTHLY_PRICE} VIA REVOLUT →
+          </a>
+          <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 12, textAlign: "center", lineHeight: 1.6 }}>
+            After payment, message @karolz7hb on Revolut with your name.<br />Access activated within 24h.
           </div>
         </div>
 
-        {/* CTA bottom */}
-        <button onClick={onSignUp}
-          style={{ background: "var(--red)", color: "var(--white)", border: "none", borderRadius: 8, padding: "16px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer", width: "100%", marginBottom: 12 }}>
-          CREATE ACCOUNT →
-        </button>
-        <div style={{ fontSize: 12, color: "var(--gray2)", textAlign: "center" }}>
-          Already have an account? <span onClick={onSignUp} style={{ color: "var(--accent)", cursor: "pointer" }}>Sign in</span>
+        {/* ── FREE PROGRAM ── */}
+        <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 16, padding: "24px", marginBottom: 32 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 12 }}>FREE OPTION</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 8 }}>12-WEEK AUTO PROGRAM</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7, marginBottom: 20 }}>
+            No coach, no payment. Get a full periodised SBD + kettlebell program that auto-generates based on your 1RM. Track your sessions, access the exercise library.
+          </div>
+          <button onClick={onSignUp}
+            style={{ background: "var(--bg3)", color: "var(--white)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.06em", cursor: "pointer", width: "100%" }}>
+            START FREE PROGRAM →
+          </button>
+        </div>
+
+        {/* ── FINAL CTA ── */}
+        <div style={{ textAlign: "center", paddingBottom: 48 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
+            READY TO GET<br /><span style={{ color: "var(--red)" }}>STRONG?</span>
+          </div>
+          <button onClick={() => { localStorage.setItem("ks_invite", "KARLITO"); onSignUp(); }}
+            style={{ background: "var(--red)", color: "#fff", border: "none", borderRadius: 10, padding: "18px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, fontWeight: 900, letterSpacing: "0.08em", cursor: "pointer", width: "100%", marginBottom: 12 }}>
+            GET COACHED — {MONTHLY_PRICE}/MONTH →
+          </button>
+          <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 20 }}>
+            Already have an account? <span onClick={onSignUp} style={{ color: "var(--accent)", cursor: "pointer", textDecoration: "underline" }}>Sign in here</span>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.15em" }}>
+            KARLITO STRENGTH · FORGED THROUGH IRON
+          </div>
         </div>
       </div>
     </div>

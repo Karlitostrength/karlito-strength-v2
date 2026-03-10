@@ -2976,7 +2976,7 @@ function ProfileScreen({ user, authUser }) {
               onChange={e => setGoals(g => ({ ...g, competition_date: e.target.value }))}
               style={{ ...s.input, marginBottom: 12, colorScheme: "dark" }}
             />
-            <label style={s.label}>NOTES FOR COACH</label>
+            <label style={s.label}>NOTES FOR YOUR COACH</label>
             <textarea
               value={goals.notes}
               onChange={e => setGoals(g => ({ ...g, notes: e.target.value }))}
@@ -4001,15 +4001,15 @@ const NAV_ATHLETE = [
   { id: "workout", icon: "🏋️", label: "TRAIN" },
   { id: "schedule", icon: "📅", label: "PLAN" },
   { id: "chat", icon: "💬", label: "CHAT" },
-  { id: "profile", icon: "👤", label: "JA" },
+  { id: "profile", icon: "👤", label: "ME" },
 ];
 
 const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
-  { id: "library", icon: "📚", label: "BAZA" },
+  { id: "library", icon: "📚", label: "LIBRARY" },
   { id: "chat", icon: "💬", label: "CHAT" },
   { id: "coach", icon: "🎯", label: "COACH" },
-  { id: "profile", icon: "👤", label: "JA" },
+  { id: "profile", icon: "👤", label: "ME" },
 ];
 
 export default function App() {

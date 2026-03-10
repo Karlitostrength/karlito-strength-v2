@@ -1134,7 +1134,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 4 }}>WORKOUT SAVED</div>
           <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 16 }}>Week {week} · Day {dayKey} · {doneCount}/{totalExs} exercises done</div>
-          <button style={s.btn} onClick={onComplete}>DONE →</button>
+          <button style={s.btn} onClick={() => onComplete({ day: dayKey, week })}>DONE →</button>
         </div>
       )}
     </div>
@@ -1471,6 +1471,13 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
   const [loadingDays, setLoadingDays] = useState(true);
   const [streak, setStreak] = useState(0);
   const [thisWeekCount, setThisWeekCount] = useState(0);
+  const [todayDone, setTodayDone] = useState(false);
+
+  // Detect today's day of week → suggest which day to train
+  const now = new Date();
+  const dowMap = [null, "A", "B", "C", "A", "B", "C", null]; // Sun=0 rest, Mon=A, Tue=B...
+  const suggestedDay = dowMap[now.getDay()];
+  const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 
   useEffect(() => {
     const loadCoachDays = async () => {
@@ -1636,6 +1643,30 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
       </div>}
 
       {/* This week's sessions */}
+      {/* TODAY BANNER */}
+      <div style={{ ...s.card, borderColor: "rgba(192,57,43,0.5)", background: "linear-gradient(135deg, rgba(192,57,43,0.1) 0%, rgba(192,57,43,0.03) 100%)", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Cinzel', serif", letterSpacing: "0.2em", marginBottom: 4 }}>TODAY</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>{todayStr}</div>
+            {suggestedDay && !hasCoach && (
+              <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>
+                Suggested: <span style={{ color: "var(--accent)", fontWeight: 600 }}>Day {suggestedDay}</span>
+              </div>
+            )}
+            {suggestedDay === null && (
+              <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 3 }}>Rest day — recover well</div>
+            )}
+          </div>
+          {suggestedDay && (
+            <button onClick={() => onStartWorkout(suggestedDay)}
+              style={{ background: "var(--red)", border: "none", borderRadius: 4, padding: "10px 18px", fontFamily: "'Cinzel', serif", fontSize: 12, fontWeight: 700, letterSpacing: "0.15em", color: "#fff", cursor: "pointer" }}>
+              TRAIN →
+            </button>
+          )}
+        </div>
+      </div>
+
       <div style={s.sectionLabel}>THIS WEEK'S SESSIONS</div>
 
       {loadingDays ? (
@@ -2164,6 +2195,66 @@ const saveCoachComment = async () => {
               </div>
             ))}
           </div>
+
+          {/* WEEKLY SUMMARY */}
+          {(() => {
+            const thisWeekStart = startOfWeek;
+            const athleteIds = [...new Set(workouts.map(w => w.user_id))];
+            const summary = athletes.map(a => {
+              const wkSessions = workouts.filter(w =>
+                w.user_id === a.id && new Date(w.created_at) >= thisWeekStart
+              );
+              const lastSession = workouts
+                .filter(w => w.user_id === a.id)
+                .sort((x, y) => new Date(y.created_at) - new Date(x.created_at))[0];
+              const daysSince = lastSession
+                ? Math.floor((new Date() - new Date(lastSession.created_at)) / 86400000)
+                : null;
+              return { ...a, wkSessions: wkSessions.length, daysSince, lastDay: lastSession?.day };
+            });
+
+            return (
+              <div style={{ marginBottom: 20 }}>
+                <div style={s.sectionLabel}>THIS WEEK — ATHLETE STATUS</div>
+                {summary.length === 0 && (
+                  <div style={{ ...s.card, textAlign: "center", padding: 20, fontSize: 13, color: "var(--gray2)" }}>No athletes yet</div>
+                )}
+                {summary.map(a => {
+                  const isActive = a.wkSessions > 0;
+                  const isInactive = a.daysSince !== null && a.daysSince >= 5;
+                  const statusColor = isActive ? "var(--red)" : isInactive ? "#b8860b" : "var(--gray2)";
+                  const statusText = isActive
+                    ? `${a.wkSessions} session${a.wkSessions > 1 ? "s" : ""} this week`
+                    : a.daysSince === null ? "No sessions yet"
+                    : a.daysSince === 0 ? "Trained today"
+                    : `Last trained ${a.daysSince}d ago`;
+                  return (
+                    <div key={a.id}
+                      onClick={() => { setSelectedClient(a.id); setView("profile"); }}
+                      style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: "12px 14px", marginBottom: 8, borderLeft: `3px solid ${statusColor}` }}>
+                      <div>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>{a.name || a.email?.split("@")[0] || "Athlete"}</div>
+                        <div style={{ fontSize: 11, color: statusColor, marginTop: 2 }}>{statusText}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {isInactive && (
+                          <div style={{ fontSize: 10, background: "rgba(184,134,11,0.15)", color: "#b8860b", padding: "2px 8px", borderRadius: 3, fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
+                            INACTIVE
+                          </div>
+                        )}
+                        {isActive && (
+                          <div style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "var(--red)", padding: "2px 8px", borderRadius: 3, fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
+                            ACTIVE
+                          </div>
+                        )}
+                        <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <div style={s.sectionLabel}>CLIENTS</div>
           {athletes.length === 0 ? (
             <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
@@ -2268,34 +2359,74 @@ const saveCoachComment = async () => {
               ))}
             </div>
           </div>
-          {/* Athlete Goals */}
-          {(selectedClientData.main_goal || selectedClientData.competition_date || selectedClientData.athlete_notes) && (
-            <div style={{ ...s.card, borderColor: "rgba(200,160,40,0.3)", background: "rgba(200,160,40,0.03)", marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 8 }}>🎯 ATHLETE GOALS</div>
-              {selectedClientData.main_goal && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>GOAL</div>
-                  <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>{selectedClientData.main_goal}</div>
+          {/* Full Athlete Profile */}
+          <div style={{ ...s.card, borderColor: "rgba(184,134,11,0.25)", background: "rgba(184,134,11,0.03)", marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", marginBottom: 14, fontFamily: "'Cinzel', serif" }}>ATHLETE PROFILE</div>
+
+            {/* 1RM */}
+            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.12em", marginBottom: 8 }}>1RM</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {[["SQUAT", selectedClientData.squat], ["BENCH", selectedClientData.bench], ["DEADLIFT", selectedClientData.deadlift]].map(([k, v]) => (
+                <div key={k} style={{ background: "var(--bg3)", borderRadius: 4, padding: "10px 8px", textAlign: "center", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>{k}</div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, color: v ? "var(--white)" : "var(--gray2)" }}>{v ? `${v}` : "—"}</div>
+                  {v && <div style={{ fontSize: 9, color: "var(--gray2)" }}>kg</div>}
                 </div>
-              )}
-              {selectedClientData.competition_date && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>COMPETITION</div>
-                  <div style={{ fontSize: 13, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                    {new Date(selectedClientData.competition_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                    {" · "}
-                    {Math.ceil((new Date(selectedClientData.competition_date) - new Date()) / (1000*60*60*24))} days out
-                  </div>
-                </div>
-              )}
-              {selectedClientData.athlete_notes && (
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.08em", marginBottom: 2 }}>NOTES</div>
-                  <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.5 }}>{selectedClientData.athlete_notes}</div>
-                </div>
-              )}
+              ))}
             </div>
-          )}
+
+            {/* Other stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {[["KB WEIGHT", selectedClientData.kb_weight ? `${selectedClientData.kb_weight}kg` : "—"],
+                ["LEVEL", selectedClientData.level ? selectedClientData.level.toUpperCase() : "—"],
+                ["PULL-UPS MAX", selectedClientData.pullups || "—"],
+                ["RECOVERY", selectedClientData.recovery ? `${selectedClientData.recovery}/5` : "—"],
+              ].map(([k, v]) => (
+                <div key={k} style={{ background: "var(--bg3)", borderRadius: 4, padding: "10px 12px", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>{k}</div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Goals */}
+            {(selectedClientData.main_goal || selectedClientData.competition_date || selectedClientData.athlete_notes) && (
+              <>
+                <div style={{ height: 1, background: "var(--border)", margin: "4px 0 14px" }} />
+                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.12em", marginBottom: 12, fontFamily: "'Cinzel', serif" }}>GOALS</div>
+                {selectedClientData.main_goal && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>MAIN GOAL</div>
+                    <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 600, lineHeight: 1.4 }}>{selectedClientData.main_goal}</div>
+                  </div>
+                )}
+                {selectedClientData.competition_date && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>COMPETITION DATE</div>
+                    <div style={{ fontSize: 13, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                      {new Date(selectedClientData.competition_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                      <span style={{ color: "var(--gray2)", fontWeight: 400, marginLeft: 8 }}>
+                        ({Math.ceil((new Date(selectedClientData.competition_date) - new Date()) / (1000*60*60*24))} days out)
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {selectedClientData.athlete_notes && (
+                  <div>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>NOTES FOR COACH</div>
+                    <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, background: "var(--bg3)", borderRadius: 4, padding: "10px 12px", borderLeft: "2px solid var(--accent)" }}>{selectedClientData.athlete_notes}</div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* No data fallback */}
+            {!selectedClientData.squat && !selectedClientData.main_goal && (
+              <div style={{ fontSize: 12, color: "var(--gray2)", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>
+                Athlete hasn't completed their profile yet
+              </div>
+            )}
+          </div>
 
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAM DAY</button>
@@ -2446,7 +2577,7 @@ const saveCoachComment = async () => {
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 6 }}>NO TEMPLATES YET</div>
                   <div style={{ fontSize: 13, color: "var(--gray)" }}>Create reusable program templates to assign to multiple athletes at once.</div>
                 </div>
-              ) : templates.map(tpl => (
+              ) : (templates || []).map(tpl => (
                 <div key={tpl.id} style={{ ...s.card, marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
@@ -2581,7 +2712,7 @@ const saveCoachComment = async () => {
               {dietFiles.length > 0 && (
                 <>
                   <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", marginBottom: 10, marginTop: 8 }}>UPLOADED PLANS</div>
-                  {dietFiles.map((f, i) => (
+                  {(dietFiles || []).map((f, i) => (
                     <div key={i} style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "12px 16px" }}>
                       <div>
                         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>📄 {f.file_name}</div>
@@ -3072,7 +3203,7 @@ function ChatScreen({ authUser, isCoach }) {
 
         // Load profiles for all IDs
         let contacts = byCoachId || [];
-        const existingIds = new Set(contacts.map(c => c.id));
+        const existingIds = new Set((contacts || []).map(c => c.id));
         const missing = [...ids].filter(id => !existingIds.has(id));
         if (missing.length > 0) {
           const { data: extra } = await supabase
@@ -3246,7 +3377,7 @@ function ChatScreen({ authUser, isCoach }) {
       {/* Contact selector for coach */}
       {isCoach && contacts.length > 1 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
-          {contacts.map(c => (
+          {(contacts || []).map(c => (
             <div 
               key={c.id} 
               onClick={() => setSelectedContact(c.id)}
@@ -3276,7 +3407,7 @@ function ChatScreen({ authUser, isCoach }) {
             No messages yet. Say hi! 👋
           </div>
         ) : (
-          messages.map((msg, i) => {
+          (messages || []).map((msg, i) => {
             const isMe = msg.from_id === authUser.id;
             const showDate = i === 0 || fmtDate(messages[i-1].created_at) !== fmtDate(msg.created_at);
             
@@ -4060,18 +4191,39 @@ const [hasCoach, setHasCoach] = useState(false);
 
  useEffect(() => {
     if (!authUser) return;
+
+    // Load from localStorage first (instant)
     const saved = localStorage.getItem("ks_profile");
     if (saved) setUser(JSON.parse(saved));
 
-    // Check role and coach_id
+    // Sync full profile from Supabase
     supabase.from("profiles")
-      .select("role, coach_id")
+      .select("role, coach_id, name, squat, bench, deadlift, kb_weight, level, pullups, recovery, main_goal, competition_date, athlete_notes")
       .eq("id", authUser.id)
       .single()
-     .then(({ data }) => {
-        // Reset and set roles
-        setIsCoach(data?.role === "coach");
-        setHasCoach(data?.role === "athlete" && !!data?.coach_id);
+      .then(({ data }) => {
+        if (!data) return;
+        setIsCoach(data.role === "coach");
+        setHasCoach(data.role === "athlete" && !!data.coach_id);
+
+        // Merge DB data into user profile
+        if (data.squat || data.bench || data.level) {
+          const merged = {
+            ...(saved ? JSON.parse(saved) : {}),
+            name: data.name,
+            level: data.level || (saved ? JSON.parse(saved).level : "intermediate"),
+            oneRM: {
+              squat: data.squat || (saved ? JSON.parse(saved).oneRM?.squat : ""),
+              bench: data.bench || (saved ? JSON.parse(saved).oneRM?.bench : ""),
+              deadlift: data.deadlift || (saved ? JSON.parse(saved).oneRM?.deadlift : ""),
+            },
+            kgKB: data.kb_weight || (saved ? JSON.parse(saved).kgKB : 16),
+            pullups: data.pullups || (saved ? JSON.parse(saved).pullups : ""),
+            recovery: data.recovery || (saved ? JSON.parse(saved).recovery : 3),
+          };
+          localStorage.setItem("ks_profile", JSON.stringify(merged));
+          setUser(merged);
+        }
       });
   }, [authUser]);
 
@@ -4115,15 +4267,43 @@ const [hasCoach, setHasCoach] = useState(false);
   }
 
   if (!user) {
-    return <OnboardingScreen onComplete={(u) => {
+    return <OnboardingScreen onComplete={async (u) => {
       localStorage.setItem("ks_profile", JSON.stringify(u));
       setUser(u);
+      // Save to Supabase so coach can see it
+      try {
+        await supabase.from("profiles").update({
+          squat: u.oneRM?.squat || null,
+          bench: u.oneRM?.bench || null,
+          deadlift: u.oneRM?.deadlift || null,
+          kb_weight: u.kgKB || null,
+          level: u.level || null,
+          pullups: u.pullups || null,
+          recovery: u.recovery || null,
+        }).eq("id", authUser.id);
+      } catch(e) {}
       setTab("dashboard");
     }} />;
   }
 
   const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };
-  const handleWorkoutDone = () => { setActiveDay(null); setTab("history"); };
+  const handleWorkoutDone = async (workoutInfo) => {
+    // Push to coach when athlete completes workout
+    if (!isCoach && authUser) {
+      const athleteName = user?.name || authUser.email?.split("@")[0] || "Athlete";
+      const dayLabel = workoutInfo?.day ? `Day ${workoutInfo.day}` : "a session";
+      const weekLabel = workoutInfo?.week ? `Wk ${workoutInfo.week}` : "";
+      sendPushToUser(
+        "a6efb4f6-a5aa-4829-89c3-adb486cf187c",
+        `💪 ${athleteName} just logged ${dayLabel}`,
+        `${weekLabel} — tap to review their session`,
+        "workout",
+        "/"
+      );
+    }
+    setActiveDay(null);
+    setTab("history");
+  };
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 

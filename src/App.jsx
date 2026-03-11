@@ -1038,135 +1038,251 @@ function ClaimLevelModal({ level, authUser, onClose, onSuccess }) {
 
 // ─── RANKS COACH VIEW ─────────────────────────────────────────────────────────
 function RanksCoachView({ athletes }) {
+  const COACH_ID = "a6efb4f6-a5aa-4829-89c3-adb486cf187c";
+  const [subview, setSubview] = useState("pending"); // pending | manual | feed
   const [pending, setPending] = useState([]);
-  const [approved, setApproved] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null);
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [personAchievements, setPersonAchievements] = useState([]);
+  const [loadingPerson, setLoadingPerson] = useState(false);
+  const [awardingLevel, setAwardingLevel] = useState(null);
 
-  const load = async () => {
+  const loadPending = async () => {
     setLoading(true);
     try {
       const { data } = await supabase
         .from("level_achievements")
         .select("*, profiles:user_id(name, email)")
+        .eq("status", "pending")
         .order("created_at", { ascending: false });
-      setPending((data||[]).filter(a => a.status === "pending"));
-      setApproved((data||[]).filter(a => a.status === "approved").slice(0, 20));
+      setPending(data || []);
     } catch(e) {}
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadPending(); }, []);
+
+  const loadPersonAchievements = async (userId) => {
+    setLoadingPerson(true);
+    try {
+      const { data } = await supabase
+        .from("level_achievements")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("status", "approved");
+      setPersonAchievements(data || []);
+    } catch(e) { setPersonAchievements([]); }
+    setLoadingPerson(false);
+  };
 
   const decide = async (id, userId, levelId, levelRank, approve) => {
     setProcessing(id);
     try {
-      const { data: { user: au } } = await supabase.auth.getUser();
       await supabase.from("level_achievements").update({
         status: approve ? "approved" : "rejected",
-        approved_by: au.id,
+        approved_by: COACH_ID,
         approved_at: approve ? new Date().toISOString() : null,
       }).eq("id", id);
-
       if (approve) {
         const lv = DOM_SILY_LEVELS.find(l => l.id === levelId);
-        const { data: profile } = await supabase.from("profiles").select("name").eq("id", userId).single();
-        const name = profile?.name || "An athlete";
-        // Push to the athlete
+        const claim = pending.find(a => a.id === id);
+        const name = claim?.profiles?.name || "An athlete";
         sendPushToUser(userId, `🏆 Rank approved: ${lv?.name}!`,
           `Coach Karlito confirmed your ${lv?.name} rank. Keep going!`, "achievement", "/");
-        // Push to everyone else
-        sendPushToAllUsers(
-          `🏛️ ${name} reached ${lv?.name}!`,
-          `${name} just earned the ${lv?.name} rank at House of Strength`,
-          "achievement", "/"
-        );
+        sendPushToAllUsers(`🏛️ ${name} reached ${lv?.name}!`,
+          `${name} just earned the ${lv?.name} rank at House of Strength`, "achievement", "/");
       }
-      await load();
+      await loadPending();
     } catch(e) {}
     setProcessing(null);
   };
 
-  const levelMeta = (id) => DOM_SILY_LEVELS.find(l => l.id === id);
+  const manualAward = async (userId, userName, levelId, levelRank, revoke) => {
+    setAwardingLevel(levelId);
+    try {
+      if (revoke) {
+        await supabase.from("level_achievements")
+          .delete().eq("user_id", userId).eq("level_id", levelId).eq("status", "approved");
+      } else {
+        await supabase.from("level_achievements").insert({
+          user_id: userId, level_id: levelId, level_rank: levelRank,
+          status: "approved", approved_by: COACH_ID,
+          approved_at: new Date().toISOString(), note: "Awarded by coach",
+        });
+        const lv = DOM_SILY_LEVELS.find(l => l.id === levelId);
+        sendPushToUser(userId, `🏆 ${lv?.name} awarded by Coach Karlito!`,
+          `Your ${lv?.name} rank has been officially confirmed.`, "achievement", "/");
+        if (userId !== COACH_ID) {
+          sendPushToAllUsers(`🏛️ ${userName} reached ${lv?.name}!`,
+            `${userName} just earned the ${lv?.name} rank at House of Strength`, "achievement", "/");
+        }
+      }
+      await loadPersonAchievements(userId);
+    } catch(e) {}
+    setAwardingLevel(null);
+  };
+
+  const allPeople = [
+    { id: COACH_ID, name: "👑 Karlito (you)" },
+    ...(athletes || []).map(a => ({
+      id: a.id,
+      name: a.profiles?.name || a.name || a.email?.split("@")[0] || "Athlete"
+    }))
+  ];
 
   if (loading) return <div style={{ textAlign: "center", padding: 30, color: "var(--gray2)" }}>Loading...</div>;
 
   return (
     <div>
-      {/* Pending claims */}
-      <div style={s.sectionLabel}>PENDING CLAIMS ({pending.length})</div>
-      {pending.length === 0 ? (
-        <div style={{ ...s.card, textAlign: "center", padding: 24 }}>
-          <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-          <div style={{ fontSize: 13, color: "var(--gray2)" }}>No pending claims</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[["pending", `⏳ CLAIMS${pending.length > 0 ? ` (${pending.length})` : ""}`],
+          ["manual", "⚔️ AWARD"],
+          ["feed", "🏛️ FEED"]].map(([v, label]) => (
+          <button key={v} onClick={() => { setSubview(v); setSelectedPerson(null); }}
+            style={{ flex: 1, ...s.btnGhost, fontSize: 11, padding: "9px 4px",
+              borderColor: subview === v ? "var(--accent)" : "var(--border)",
+              color: subview === v ? "var(--accent)" : "var(--gray)",
+              background: subview === v ? "rgba(232,213,160,0.08)" : "transparent" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {subview === "pending" && (
+        <div>
+          <div style={s.sectionLabel}>PENDING CLAIMS</div>
+          {pending.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 24 }}>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+              <div style={{ fontSize: 13, color: "var(--gray2)" }}>No pending claims</div>
+            </div>
+          ) : pending.map(a => {
+            const lv = DOM_SILY_LEVELS.find(l => l.id === a.level_id);
+            if (!lv) return null;
+            return (
+              <div key={a.id} style={{ ...s.card, borderColor: lv.color + "44", background: lv.color + "08", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <div style={{ fontSize: 28 }}>{lv.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>
+                      {a.profiles?.name || a.profiles?.email?.split("@")[0] || "Athlete"}
+                    </div>
+                    <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: lv.color, letterSpacing: "0.1em" }}>{lv.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 2 }}>
+                      {new Date(a.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                </div>
+                {a.video_url && (
+                  <a href={a.video_url} target="_blank" rel="noreferrer"
+                    style={{ display: "block", fontSize: 12, color: "var(--accent)", marginBottom: 8, textDecoration: "underline" }}>
+                    🎥 View video
+                  </a>
+                )}
+                {a.note && (
+                  <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 10,
+                    background: "var(--bg3)", padding: "8px 10px", borderRadius: 4, borderLeft: "2px solid var(--accent)" }}>
+                    "{a.note}"
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, true)}
+                    disabled={processing === a.id}
+                    style={{ ...s.btn, flex: 1, background: lv.color, fontSize: 13, opacity: processing === a.id ? 0.6 : 1 }}>
+                    ✓ APPROVE
+                  </button>
+                  <button onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, false)}
+                    disabled={processing === a.id}
+                    style={{ ...s.btnGhost, flex: 1, fontSize: 13, color: "var(--red-dim)", borderColor: "var(--red-dim)" }}>
+                    ✗ REJECT
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : pending.map(a => {
-        const lv = levelMeta(a.level_id);
-        if (!lv) return null;
-        return (
-          <div key={a.id} style={{ ...s.card, borderColor: lv.color + "44",
-            background: lv.color + "08", marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ fontSize: 28 }}>{lv.icon}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>
-                  {a.profiles?.name || a.profiles?.email?.split("@")[0] || "Athlete"}
-                </div>
-                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: lv.color,
-                  letterSpacing: "0.1em" }}>{lv.name}</div>
-                <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 2 }}>
-                  {new Date(a.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                </div>
+      )}
+
+      {subview === "manual" && (
+        <div>
+          {!selectedPerson ? (
+            <div>
+              <div style={s.sectionLabel}>SELECT PERSON</div>
+              <div style={s.card}>
+                {allPeople.map(p => (
+                  <div key={p.id} onClick={() => { setSelectedPerson(p); loadPersonAchievements(p.id); }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "12px 0", borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--accent)" }}>SET RANKS →</div>
+                  </div>
+                ))}
               </div>
             </div>
-
-            {a.video_url && (
-              <a href={a.video_url} target="_blank" rel="noreferrer"
-                style={{ display: "block", fontSize: 12, color: "var(--accent)",
-                  marginBottom: 8, textDecoration: "underline" }}>
-                🎥 View video
-              </a>
-            )}
-            {a.note && (
-              <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 10,
-                background: "var(--bg3)", padding: "8px 10px", borderRadius: 4,
-                borderLeft: "2px solid var(--accent)" }}>
-                "{a.note}"
+          ) : (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <button onClick={() => setSelectedPerson(null)}
+                  style={{ ...s.btnGhost, width: "auto", padding: "6px 14px", fontSize: 12 }}>← BACK</button>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>
+                  {selectedPerson.name}
+                </div>
               </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, true)}
-                disabled={processing === a.id}
-                style={{ ...s.btn, flex: 1, background: lv.color, fontSize: 13,
-                  opacity: processing === a.id ? 0.6 : 1 }}>
-                ✓ APPROVE
-              </button>
-              <button
-                onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, false)}
-                disabled={processing === a.id}
-                style={{ ...s.btnGhost, flex: 1, fontSize: 13,
-                  color: "var(--red-dim)", borderColor: "var(--red-dim)" }}>
-                ✗ REJECT
-              </button>
+              <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 14, padding: "8px 12px",
+                background: "var(--bg3)", borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
+                Tap a rank to AWARD or REVOKE it. Push notification sent on award.
+              </div>
+              {loadingPerson ? (
+                <div style={{ textAlign: "center", padding: 20, color: "var(--gray2)" }}>Loading...</div>
+              ) : DOM_SILY_LEVELS.map(lv => {
+                const hasIt = personAchievements.some(a => a.level_id === lv.id);
+                const isProcessing = awardingLevel === lv.id;
+                return (
+                  <div key={lv.id} style={{ ...s.card, borderColor: hasIt ? lv.color : "var(--border)",
+                    background: hasIt ? lv.color + "14" : "var(--bg2)",
+                    display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                    <div style={{ fontSize: 26, flexShrink: 0 }}>{lv.icon}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, fontWeight: 900,
+                        color: hasIt ? lv.color : "var(--gray)", letterSpacing: "0.1em" }}>{lv.name}</div>
+                      <div style={{ fontSize: 10, color: "var(--gray2)" }}>{lv.subtitle}</div>
+                    </div>
+                    <button
+                      onClick={() => manualAward(selectedPerson.id, selectedPerson.name, lv.id, lv.rank, hasIt)}
+                      disabled={isProcessing}
+                      style={{
+                        flexShrink: 0, minWidth: 72, textAlign: "center",
+                        background: hasIt ? "transparent" : lv.color,
+                        color: hasIt ? "var(--red-dim)" : "#fff",
+                        border: hasIt ? "1px solid var(--red-dim)" : "none",
+                        borderRadius: 6, padding: "8px 10px",
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
+                        cursor: "pointer", opacity: isProcessing ? 0.4 : 1,
+                      }}>
+                      {isProcessing ? "..." : hasIt ? "REVOKE" : "AWARD"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </div>
+      )}
+
+      {subview === "feed" && (
+        <div>
+          <div style={s.sectionLabel}>HALL OF STRENGTH — ALL TIME</div>
+          <div style={s.card}>
+            <CommunityFeed authUser={{ id: COACH_ID }} compact={false} />
           </div>
-        );
-      })}
-
-      {/* Recent approved */}
-      <div style={{ ...s.sectionLabel, marginTop: 20 }}>RECENTLY APPROVED</div>
-      {approved.length === 0 ? (
-        <div style={{ fontSize: 12, color: "var(--gray2)", textAlign: "center", padding: 16 }}>None yet</div>
-      ) : (
-        <div style={s.card}>
-          <CommunityFeed authUser={null} compact={false} />
         </div>
       )}
     </div>
   );
 }
+
 
 
 const s = {
@@ -4458,6 +4574,48 @@ function LandingScreen({ onSignUp }) {
               <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4, letterSpacing: "0.06em" }}>{l.toUpperCase()}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── DOM SIŁY PHILOSOPHY ── */}
+        <div style={{ margin: "0 0 40px", padding: "28px 24px", background: "linear-gradient(135deg, rgba(184,134,11,0.08) 0%, rgba(184,134,11,0.02) 100%)", border: "1px solid rgba(184,134,11,0.2)", borderRadius: 16 }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--accent)", marginBottom: 14 }}>PHILOSOPHY</div>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 26, fontWeight: 900, lineHeight: 1.15, marginBottom: 16, color: "var(--white)" }}>
+            DOM SIŁY<br />
+            <span style={{ fontSize: 14, fontWeight: 400, color: "var(--accent)", letterSpacing: "0.15em" }}>HOUSE OF STRENGTH</span>
+          </div>
+          <div style={{ fontSize: 14, color: "var(--gray)", lineHeight: 1.8, marginBottom: 20 }}>
+            This is not a fitness app. This is a school of strength — built on the model of a dojo, where training is a tool for human development. Physically and mentally.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
+            {[["⚔️", "IRON", "Barbell strength"], ["🔔", "BELL", "Kettlebell skill"], ["🔥", "ENGINE", "Endurance"]].map(([icon, name, desc]) => (
+              <div key={name} style={{ textAlign: "center", padding: "14px 8px", background: "var(--bg3)", borderRadius: 8, border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.1em" }}>{name}</div>
+                <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 3 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ height: 1, background: "rgba(184,134,11,0.15)", margin: "0 0 16px" }} />
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: "0.3em", color: "var(--accent)", marginBottom: 12 }}>THE PATH — 6 RANKS</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            {[
+              { icon: "🔰", name: "ADEPT", color: "#6B7280" },
+              { icon: "⚒️", name: "APP.", color: "#B8860B" },
+              { icon: "🏋️", name: "LIFTER", color: "#C0392B" },
+              { icon: "⚔️", name: "WARRIOR", color: "#7B3F00" },
+              { icon: "🔱", name: "TITAN", color: "#1A237E" },
+              { icon: "🏛️", name: "GLAD.", color: "#4A0000" },
+            ].map((l, i) => (
+              <div key={l.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                {i > 0 && <div style={{ display: "none" }} />}
+                <div style={{ fontSize: 18 }}>{l.icon}</div>
+                <div style={{ fontSize: 8, color: l.color, fontFamily: "'Cinzel', serif", letterSpacing: "0.05em" }}>{l.name}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--gray2)", lineHeight: 1.7, marginTop: 12, fontStyle: "italic" }}>
+            "Each rank is earned through tested standards — not time served, not money paid. Like a belt in BJJ, it means something."
+          </div>
         </div>
 
         {/* ── WHAT YOU GET ── */}

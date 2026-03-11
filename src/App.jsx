@@ -798,7 +798,49 @@ function DomSilyPathScreen({ user, authUser }) {
 
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
 
-// ─── COMMUNITY FEED ───────────────────────────────────────────────────────────
+// ─── HALL OF STRENGTH WIDGET (Dashboard) ─────────────────────────────────────
+function HallOfStrengthWidget() {
+  const [recentAch, setRecentAch] = useState([]);
+
+  useEffect(() => {
+    supabase.from("level_achievements")
+      .select("*, profiles:user_id(name)")
+      .eq("status", "approved")
+      .order("approved_at", { ascending: false })
+      .limit(3)
+      .then(({ data }) => setRecentAch(data || []));
+  }, []);
+
+  if (!recentAch.length) return null;
+
+  return (
+    <div style={{ ...s.card, marginBottom: 16, borderColor: "rgba(184,134,11,0.3)",
+      background: "rgba(184,134,11,0.04)" }}>
+      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)",
+        letterSpacing: "0.2em", marginBottom: 10 }}>HALL OF STRENGTH</div>
+      {recentAch.map(a => {
+        const level = DOM_SILY_LEVELS.find(l => l.id === a.level_id);
+        if (!level) return null;
+        return (
+          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8,
+            paddingBottom: 6, marginBottom: 6, borderBottom: "1px solid var(--border)" }}>
+            <span style={{ fontSize: 16 }}>{level.icon}</span>
+            <div style={{ flex: 1, fontSize: 12 }}>
+              <span style={{ color: "var(--accent)", fontWeight: 600 }}>
+                {a.profiles?.name || "Athlete"}
+              </span>
+              {" → "}
+              <span style={{ fontFamily: "'Cinzel', serif", color: level.color,
+                fontSize: 11 }}>{level.name}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
 function CommunityFeed({ authUser, compact = false }) {
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2412,44 +2454,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
 
       {/* This week's sessions */}
       {/* HALL OF STRENGTH mini feed */}
-      {(() => {
-        const [recentAch, setRecentAch] = React.useState([]);
-        React.useEffect(() => {
-          supabase.from("level_achievements")
-            .select("*, profiles:user_id(name)")
-            .eq("status", "approved")
-            .order("approved_at", { ascending: false })
-            .limit(3)
-            .then(({ data }) => setRecentAch(data || []));
-        }, []);
-        if (!recentAch.length) return null;
-        const lv = (id) => DOM_SILY_LEVELS.find(l => l.id === id);
-        return (
-          <div style={{ ...s.card, marginBottom: 16, borderColor: "rgba(184,134,11,0.3)",
-            background: "rgba(184,134,11,0.04)" }}>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)",
-              letterSpacing: "0.2em", marginBottom: 10 }}>HALL OF STRENGTH</div>
-            {recentAch.map(a => {
-              const level = lv(a.level_id);
-              if (!level) return null;
-              return (
-                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8,
-                  paddingBottom: 6, marginBottom: 6, borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 16 }}>{level.icon}</span>
-                  <div style={{ flex: 1, fontSize: 12 }}>
-                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>
-                      {a.profiles?.name || "Athlete"}
-                    </span>
-                    {" → "}
-                    <span style={{ fontFamily: "'Cinzel', serif", color: level.color,
-                      fontSize: 11 }}>{level.name}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+      <HallOfStrengthWidget />
 
       {/* TODAY BANNER */}
       <div style={{ ...s.card, borderColor: "rgba(192,57,43,0.5)", background: "linear-gradient(135deg, rgba(192,57,43,0.1) 0%, rgba(192,57,43,0.03) 100%)", marginBottom: 16 }}>

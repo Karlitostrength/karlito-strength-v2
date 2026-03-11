@@ -16,6 +16,17 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
+async function sendPushToAllUsers(title, message, tag = "ks", url = "/") {
+  try {
+    const { data: subs } = await supabase.from("push_subscriptions").select("user_id");
+    if (!subs) return;
+    const ids = [...new Set(subs.map(s => s.user_id))];
+    for (const uid of ids) {
+      await sendPushToUser(uid, title, message, tag, url);
+    }
+  } catch(e) { console.log("push all error:", e); }
+}
+
 async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
   try {
     await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
@@ -357,7 +368,764 @@ function generateWorkout(day, week, level, oneRM, injuries) {
   };
 }
 
+
+// ─── DOM SIŁY — LEVEL SYSTEM ──────────────────────────────────────────────────
+
+const DOM_SILY_LEVELS = [
+  {
+    id: "adept",
+    rank: 1,
+    name: "ADEPT",
+    subtitle: "Movement Literacy",
+    color: "#6B7280",
+    icon: "🔰",
+    description: "Learn the movements. Build the foundation.",
+    men: {
+      push:   { label: "Push Ups × 10", fn: u => (u.pushups || 0) >= 10 },
+      pull:   { label: "Inverted Rows × 10", fn: u => (u.inverted_rows || 0) >= 10 },
+      hinge:  { label: "KB Swing 16kg × 20", fn: u => (u.kb_swing_test || 0) >= 16 },
+      squat:  { label: "Goblet Squat 16kg × 10", fn: u => (u.goblet_test || 0) >= 16 },
+      carry:  { label: "Farmer Walk 16kg / hand", fn: u => (u.farmers_carry || 0) >= 16 },
+      engine: { label: "TGU 12kg (quality)", fn: u => (u.tgu_test || 0) >= 12 },
+    },
+    women: {
+      push:   { label: "Push Ups × 5", fn: u => (u.pushups || 0) >= 5 },
+      pull:   { label: "Inverted Rows × 8", fn: u => (u.inverted_rows || 0) >= 8 },
+      hinge:  { label: "KB Swing 12kg × 20", fn: u => (u.kb_swing_test || 0) >= 12 },
+      squat:  { label: "Goblet Squat 12kg × 10", fn: u => (u.goblet_test || 0) >= 12 },
+      carry:  { label: "Farmer Walk 12kg / hand", fn: u => (u.farmers_carry || 0) >= 12 },
+      engine: { label: "TGU 8kg (quality)", fn: u => (u.tgu_test || 0) >= 8 },
+    },
+  },
+  {
+    id: "apprentice",
+    rank: 2,
+    name: "APPRENTICE",
+    subtitle: "First Real Strength",
+    color: "#B8860B",
+    icon: "⚒️",
+    description: "Basic strength developed. You are becoming a lifter.",
+    men: {
+      push:   { label: "KB Press 24kg × 5 / side", fn: u => (u.kb_press_test || 0) >= 24 },
+      pull:   { label: "3 Pull Ups", fn: u => (u.pullups || 0) >= 3 },
+      hinge:  { label: "Deadlift = Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw },
+      squat:  { label: "Goblet Squat 24kg × 10", fn: u => (u.goblet_test || 0) >= 24 },
+      carry:  { label: "Farmer Walk 24kg / hand", fn: u => (u.farmers_carry || 0) >= 24 },
+      engine: { label: "TGU 24kg (quality)", fn: u => (u.tgu_test || 0) >= 24 },
+    },
+    women: {
+      push:   { label: "KB Press 12kg × 5 / side", fn: u => (u.kb_press_test || 0) >= 12 },
+      pull:   { label: "1 Pull Up / 5 Chin Ups (band)", fn: u => (u.pullups || 0) >= 1 },
+      hinge:  { label: "Deadlift 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 0.75 },
+      squat:  { label: "Goblet Squat 16kg × 10", fn: u => (u.goblet_test || 0) >= 16 },
+      carry:  { label: "Farmer Walk 16kg / hand", fn: u => (u.farmers_carry || 0) >= 16 },
+      engine: { label: "TGU 16kg (quality)", fn: u => (u.tgu_test || 0) >= 16 },
+    },
+  },
+  {
+    id: "lifter",
+    rank: 3,
+    name: "LIFTER",
+    subtitle: "True Strength Foundation",
+    color: "#C0392B",
+    icon: "🏋️",
+    description: "This is where real strength begins. Most people never get here.",
+    men: {
+      push:   { label: "Bench Press = Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw },
+      pull:   { label: "5 Pull Ups", fn: u => (u.pullups || 0) >= 5 },
+      hinge:  { label: "Deadlift 1.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.5 },
+      squat:  { label: "Back Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.squat || 0) >= bw },
+      carry:  { label: "Farmer Walk = Bodyweight total", fn: (u, bw) => (u.farmers_carry || 0) >= bw / 2 },
+      engine: { label: "100 One-Hand Swings 24kg", fn: u => (u.swing_100_test || 0) >= 24 },
+    },
+    women: {
+      push:   { label: "Bench Press 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw * 0.75 },
+      pull:   { label: "3 Pull Ups", fn: u => (u.pullups || 0) >= 3 },
+      hinge:  { label: "Deadlift 1.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.25 },
+      squat:  { label: "Back Squat 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.squat || 0) >= bw * 0.75 },
+      carry:  { label: "Farmer Walk 0.75 BW total", fn: (u, bw) => (u.farmers_carry || 0) >= bw * 0.375 },
+      engine: { label: "100 Swings 16kg", fn: u => (u.swing_100_test || 0) >= 16 },
+    },
+  },
+  {
+    id: "warrior",
+    rank: 4,
+    name: "WARRIOR",
+    subtitle: "Strong Human Performance",
+    color: "#7B3F00",
+    icon: "⚔️",
+    description: "A strong human by any measure. Top 20% of people who train.",
+    men: {
+      push:   { label: "Strict Press 0.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.press || 0) >= bw * 0.5 },
+      pull:   { label: "10 Pull Ups", fn: u => (u.pullups || 0) >= 10 },
+      hinge:  { label: "Deadlift 2 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2 },
+      squat:  { label: "Back Squat = Bodyweight × 15", fn: (u, bw) => (u.squat_15_test || 0) >= bw },
+      carry:  { label: "Farmer Walk 32kg / hand", fn: u => (u.farmers_carry || 0) >= 32 },
+      engine: { label: "Snatch Test: 100 reps / 5 min / 24kg", fn: u => (u.snatch_test_kg || 0) >= 24 },
+    },
+    women: {
+      push:   { label: "Strict Press 0.35 × Bodyweight", fn: (u, bw) => (u.oneRM?.press || 0) >= bw * 0.35 },
+      pull:   { label: "5 Pull Ups", fn: u => (u.pullups || 0) >= 5 },
+      hinge:  { label: "Deadlift 1.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.75 },
+      squat:  { label: "Back Squat = Bodyweight × 15", fn: (u, bw) => (u.squat_15_test || 0) >= bw },
+      carry:  { label: "Farmer Walk 24kg / hand", fn: u => (u.farmers_carry || 0) >= 24 },
+      engine: { label: "Snatch Test: 100 reps / 5 min / 16kg", fn: u => (u.snatch_test_kg || 0) >= 16 },
+    },
+  },
+  {
+    id: "titan",
+    rank: 5,
+    name: "TITAN",
+    subtitle: "Rare Strength",
+    color: "#1A237E",
+    icon: "🔱",
+    description: "Rarely seen. Earned through years of consistent, intelligent training.",
+    men: {
+      push:   { label: "Bench Press = Bodyweight × 15", fn: (u, bw) => (u.bench_15_test || 0) >= bw },
+      pull:   { label: "15 Pull Ups", fn: u => (u.pullups || 0) >= 15 },
+      hinge:  { label: "Deadlift 2.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.25 },
+      squat:  { label: "Front Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.front_squat || 0) >= bw },
+      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
+      engine: { label: "Snatch Test: 100 reps / 5 min / 28kg", fn: u => (u.snatch_test_kg || 0) >= 28 },
+    },
+    women: {
+      push:   { label: "Bench Press = Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw },
+      pull:   { label: "8 Pull Ups", fn: u => (u.pullups || 0) >= 8 },
+      hinge:  { label: "Deadlift 2 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2 },
+      squat:  { label: "Front Squat 0.85 × Bodyweight", fn: (u, bw) => (u.oneRM?.front_squat || 0) >= bw * 0.85 },
+      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
+      engine: { label: "Snatch Test: 100 reps / 5 min / 20kg", fn: u => (u.snatch_test_kg || 0) >= 20 },
+    },
+  },
+  {
+    id: "gladiator",
+    rank: 6,
+    name: "GLADIATOR",
+    subtitle: "Elite of the House of Strength",
+    color: "#4A0000",
+    icon: "🏛️",
+    description: "The horizon. Few reach it. Fewer stay there.",
+    men: {
+      push:   { label: "Double KB Press = Bodyweight", fn: (u, bw) => (u.dbl_kb_press_test || 0) >= bw },
+      pull:   { label: "Weighted Pull Up +48kg", fn: u => (u.weighted_pullup_kg || 0) >= 48 },
+      hinge:  { label: "Deadlift 2.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.5 },
+      squat:  { label: "Overhead Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.ohs || 0) >= bw },
+      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
+      engine: { label: "Engine: one of 3 tests (see below)", fn: u => !!(u.gladiator_engine) },
+    },
+    women: {
+      push:   { label: "Double KB Press 0.75 × Bodyweight", fn: (u, bw) => (u.dbl_kb_press_test || 0) >= bw * 0.75 },
+      pull:   { label: "Weighted Pull Up +24kg", fn: u => (u.weighted_pullup_kg || 0) >= 24 },
+      hinge:  { label: "Deadlift 2.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.25 },
+      squat:  { label: "Overhead Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.ohs || 0) >= bw },
+      carry:  { label: "Farmer Walk 0.75 BW / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw * 0.75 },
+      engine: { label: "Engine: one of 3 tests (see below)", fn: u => !!(u.gladiator_engine) },
+    },
+    engineOptions: [
+      "Long Cycle 40kg — 5 min set",
+      "Long Cycle 32kg — 10 min / 100 reps",
+      "200 Snatch 24kg — 10 min",
+    ],
+  },
+];
+
+// Determine user's current level based on 1RM data and test results
+function getDomSilyLevel(user, bodyweight, gender = "men") {
+  if (!user || !bodyweight) return { current: null, rank: 0 };
+  let highestPassed = null;
+  for (const level of DOM_SILY_LEVELS) {
+    const standards = level[gender] || level.men;
+    const allPassed = Object.values(standards).every(s => {
+      try { return s.fn(user, bodyweight); } catch { return false; }
+    });
+    if (allPassed) highestPassed = level;
+  }
+  return highestPassed || null;
+}
+
+// Get checklist of what's missing for the next level
+function getNextLevelGaps(user, bodyweight, currentRank, gender = "men") {
+  const nextLevel = DOM_SILY_LEVELS.find(l => l.rank === (currentRank || 0) + 1);
+  if (!nextLevel) return null;
+  const standards = nextLevel[gender] || nextLevel.men;
+  const gaps = Object.entries(standards).map(([pillar, s]) => {
+    let passed = false;
+    try { passed = s.fn(user, bodyweight); } catch {}
+    return { pillar, label: s.label, passed };
+  });
+  return { level: nextLevel, gaps };
+}
+
+// ─── LEVEL CARD COMPONENT ──────────────────────────────────────────────────────
+function LevelCard({ level, isCurrentLevel, compact = false }) {
+  if (!level) return null;
+  const iconSize = compact ? 28 : 48;
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, ${level.color}22 0%, ${level.color}08 100%)`,
+      border: `2px solid ${isCurrentLevel ? level.color : level.color + "44"}`,
+      borderRadius: 8, padding: compact ? "10px 14px" : "20px 16px",
+      textAlign: "center", position: "relative",
+    }}>
+      <div style={{ fontSize: iconSize, marginBottom: compact ? 4 : 10 }}>{level.icon}</div>
+      <div style={{ fontFamily: "'Cinzel', serif", fontSize: compact ? 14 : 22, fontWeight: 900,
+        color: level.color, letterSpacing: "0.15em" }}>{level.name}</div>
+      {!compact && (
+        <>
+          <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4, letterSpacing: "0.1em" }}>
+            {level.subtitle}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 10, lineHeight: 1.5, fontStyle: "italic" }}>
+            "{level.description}"
+          </div>
+        </>
+      )}
+      {isCurrentLevel && (
+        <div style={{ position: "absolute", top: 8, right: 8, fontSize: 9,
+          background: level.color, color: "#fff", padding: "2px 8px",
+          borderRadius: 3, fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
+          YOU ARE HERE
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── DOM SIŁY PATH SCREEN ──────────────────────────────────────────────────────
+function DomSilyPathScreen({ user, authUser }) {
+  const [gender, setGender] = useState(user?.gender || "men");
+  const [bodyweight, setBodyweight] = useState(user?.bodyweight || 80);
+  const [showAllLevels, setShowAllLevels] = useState(false);
+  const [showClaim, setShowClaim] = useState(false);
+
+  const currentLevel = getDomSilyLevel(user, bodyweight, gender);
+  const currentRank = currentLevel ? currentLevel.rank : 0;
+  const nextGaps = getNextLevelGaps(user, bodyweight, currentRank, gender);
+  const progressPct = currentRank > 0
+    ? Math.round((currentRank / 6) * 100)
+    : nextGaps
+      ? Math.round((nextGaps.gaps.filter(g => g.passed).length / nextGaps.gaps.length) * 50)
+      : 0;
+
+  return (
+    <div style={s.screen}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: "0.3em",
+          color: "var(--accent)", marginBottom: 8 }}>DOM SIŁY</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28,
+          fontWeight: 900, letterSpacing: "0.05em" }}>YOUR PATH</div>
+        <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 4 }}>
+          FERRUM · SANGUIS · GLORIA
+        </div>
+      </div>
+
+      {/* Gender + BW selector */}
+      <div style={{ ...s.card, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          {["men", "women"].map(g => (
+            <button key={g} onClick={() => setGender(g)} style={{
+              flex: 1, ...s.btnGhost, fontSize: 12, padding: "8px",
+              borderColor: gender === g ? "var(--accent)" : "var(--border)",
+              color: gender === g ? "var(--accent)" : "var(--gray)",
+              background: gender === g ? "rgba(232,213,160,0.08)" : "transparent",
+            }}>{g === "men" ? "MEN" : "WOMEN"}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11, color: "var(--gray)", letterSpacing: "0.1em", flexShrink: 0 }}>BODYWEIGHT</span>
+          <input type="number" value={bodyweight}
+            onChange={e => setBodyweight(Number(e.target.value))}
+            style={{ ...s.input, width: 80, textAlign: "center", padding: "8px" }} />
+          <span style={{ fontSize: 11, color: "var(--gray2)" }}>kg</span>
+        </div>
+      </div>
+
+      {/* Current Level Card */}
+      {currentLevel ? (
+        <LevelCard level={currentLevel} isCurrentLevel={true} />
+      ) : (
+        <div style={{ ...s.card, textAlign: "center", padding: "24px 16px",
+          borderColor: DOM_SILY_LEVELS[0].color + "44" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🔰</div>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 900,
+            color: "var(--gray)", letterSpacing: "0.1em" }}>NOT YET RANKED</div>
+          <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 8 }}>
+            Complete the tests below to earn your first rank
+          </div>
+        </div>
+      )}
+
+      {/* Progress bar */}
+      <div style={{ margin: "16px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em" }}>ADEPT</span>
+          <span style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em" }}>GLADIATOR</span>
+        </div>
+        <div style={{ height: 6, background: "var(--bg3)", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${progressPct}%`,
+            background: `linear-gradient(90deg, ${currentLevel?.color || "#6B7280"}, var(--accent))`,
+            borderRadius: 3, transition: "width 0.5s ease" }} />
+        </div>
+        {/* Level markers */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+          {DOM_SILY_LEVELS.map((l, i) => (
+            <div key={l.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%",
+                background: currentRank >= l.rank ? l.color : "var(--bg3)",
+                border: `1px solid ${l.color}` }} />
+              <div style={{ fontSize: 7, color: currentRank >= l.rank ? l.color : "var(--gray2)",
+                fontFamily: "'Cinzel', serif", letterSpacing: "0.05em" }}>
+                {l.name.slice(0,3)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Next Level Requirements */}
+      {nextGaps && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={s.sectionLabel}>
+            NEXT LEVEL — {nextGaps.level.name}
+          </div>
+          <div style={{ ...s.card, borderColor: nextGaps.level.color + "44",
+            background: nextGaps.level.color + "08" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 28 }}>{nextGaps.level.icon}</span>
+              <div>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 16, fontWeight: 900,
+                  color: nextGaps.level.color }}>{nextGaps.level.name}</div>
+                <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>{nextGaps.level.subtitle}</div>
+              </div>
+            </div>
+            {nextGaps.gaps.map(({ pillar, label, passed }) => (
+              <div key={pillar} style={{ display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                <div style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, marginTop: 1,
+                  background: passed ? "var(--red)" : "var(--bg3)",
+                  border: `1px solid ${passed ? "var(--red)" : "var(--border)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, color: "#fff" }}>
+                  {passed ? "✓" : ""}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em",
+                    textTransform: "uppercase", marginBottom: 2 }}>{pillar}</div>
+                  <div style={{ fontSize: 13, color: passed ? "var(--gray2)" : "var(--text)",
+                    textDecoration: passed ? "line-through" : "none", lineHeight: 1.3 }}>{label}</div>
+                </div>
+              </div>
+            ))}
+            {nextGaps.level.engineOptions && (
+              <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--bg3)",
+                borderRadius: 4, borderLeft: "2px solid var(--accent)" }}>
+                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.12em",
+                  marginBottom: 8, fontFamily: "'Cinzel', serif" }}>ENGINE — CHOOSE ONE</div>
+                {nextGaps.level.engineOptions.map((opt, i) => (
+                  <div key={i} style={{ fontSize: 12, color: "var(--gray)", marginBottom: 4 }}>
+                    {i + 1}. {opt}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Full Path */}
+      <button onClick={() => setShowAllLevels(v => !v)}
+        style={{ ...s.btnGhost, fontSize: 12, marginBottom: 12 }}>
+        {showAllLevels ? "▲ HIDE FULL PATH" : "▼ VIEW FULL PATH — ADEPT TO GLADIATOR"}
+      </button>
+
+      {showAllLevels && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {[...DOM_SILY_LEVELS].reverse().map(level => (
+            <div key={level.id}>
+              <LevelCard level={level} isCurrentLevel={level.rank === currentRank} compact={level.rank !== currentRank} />
+              {level.rank > 1 && (
+                <div style={{ textAlign: "center", color: "var(--gray2)", fontSize: 16, margin: "2px 0" }}>↑</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* CLAIM LEVEL button */}
+      {nextGaps && (
+        <button onClick={() => setShowClaim(true)}
+          style={{ ...s.btn, background: nextGaps.level.color, marginBottom: 16,
+            fontFamily: "'Cinzel', serif", letterSpacing: "0.15em" }}>
+          {nextGaps.level.icon} CLAIM {nextGaps.level.name}
+        </button>
+      )}
+      {currentRank === 6 && (
+        <div style={{ ...s.card, textAlign: "center", padding: 20,
+          borderColor: "#4A0000", background: "rgba(74,0,0,0.1)" }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🏛️</div>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 16, color: "#C0392B" }}>
+            GLADIATOR — ELITE OF THE HOUSE OF STRENGTH
+          </div>
+        </div>
+      )}
+
+      {/* COMMUNITY FEED */}
+      <div style={s.sectionLabel}>HALL OF STRENGTH</div>
+      <div style={s.card}>
+        <CommunityFeed authUser={authUser} compact={true} />
+      </div>
+
+      <div style={{ textAlign: "center", padding: "20px 0", borderTop: "1px solid var(--border)" }}>
+        <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.2em",
+          fontFamily: "'Cinzel', serif" }}>FERRUM · SANGUIS · GLORIA</div>
+        <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 6 }}>
+          Inspired by strength standards from the tradition of Dan John & Pavel Tsatsouline
+        </div>
+      </div>
+
+      {showClaim && nextGaps && (
+        <ClaimLevelModal
+          level={nextGaps.level}
+          authUser={authUser}
+          onClose={() => setShowClaim(false)}
+          onSuccess={() => { setShowClaim(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
+
+// ─── COMMUNITY FEED ───────────────────────────────────────────────────────────
+function CommunityFeed({ authUser, compact = false }) {
+  const [achievements, setAchievements] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from("level_achievements")
+          .select("*, profiles:user_id(name)")
+          .eq("status", "approved")
+          .order("approved_at", { ascending: false })
+          .limit(compact ? 5 : 30);
+        setAchievements(data || []);
+      } catch(e) {}
+      setLoading(false);
+    };
+    load();
+
+    // Realtime subscription
+    const sub = supabase
+      .channel("achievements_feed")
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "level_achievements",
+        filter: "status=eq.approved"
+      }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [compact]);
+
+  const levelMeta = (id) => DOM_SILY_LEVELS.find(l => l.id === id);
+  const timeAgo = (ts) => {
+    const d = Math.floor((Date.now() - new Date(ts)) / 1000);
+    if (d < 60) return "just now";
+    if (d < 3600) return `${Math.floor(d/60)}m ago`;
+    if (d < 86400) return `${Math.floor(d/3600)}h ago`;
+    return `${Math.floor(d/86400)}d ago`;
+  };
+
+  if (loading) return (
+    <div style={{ textAlign: "center", padding: 20, color: "var(--gray2)", fontSize: 13 }}>
+      Loading...
+    </div>
+  );
+  if (!achievements.length) return (
+    <div style={{ ...s?.card, textAlign: "center", padding: 24 }}>
+      <div style={{ fontSize: 28, marginBottom: 8 }}>🏛️</div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900 }}>
+        NO ACHIEVEMENTS YET
+      </div>
+      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 6 }}>
+        Be the first to claim your rank
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {achievements.map(a => {
+        const lv = levelMeta(a.level_id);
+        if (!lv) return null;
+        const isOwn = a.user_id === authUser?.id;
+        return (
+          <div key={a.id} style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 0", borderBottom: "1px solid var(--border)"
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+              background: lv.color + "22", border: `2px solid ${lv.color}`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20
+            }}>{lv.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                <span style={{ color: "var(--accent)" }}>
+                  {isOwn ? "You" : (a.profiles?.name || "Athlete")}
+                </span>
+                {" "}unlocked
+              </div>
+              <div style={{ fontFamily: "'Cinzel', serif", fontSize: 15, fontWeight: 900,
+                color: lv.color, letterSpacing: "0.1em" }}>{lv.name}</div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{lv.subtitle}</div>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--gray2)", flexShrink: 0 }}>
+              {timeAgo(a.approved_at)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── CLAIM LEVEL MODAL ────────────────────────────────────────────────────────
+function ClaimLevelModal({ level, authUser, onClose, onSuccess }) {
+  const [videoUrl, setVideoUrl] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("level_achievements").insert({
+        user_id: authUser.id,
+        level_id: level.id,
+        level_rank: level.rank,
+        status: "pending",
+        video_url: videoUrl || null,
+        note: note || null,
+      });
+      if (!error) {
+        // Notify coach
+        sendPushToUser(
+          "a6efb4f6-a5aa-4829-89c3-adb486cf187c",
+          `🏆 Level claim: ${level.name}`,
+          `An athlete is claiming ${level.name} — review in Coach panel`,
+          "achievement", "/"
+        );
+        setSubmitted(true);
+        setTimeout(() => { onSuccess(); onClose(); }, 1800);
+      }
+    } catch(e) {}
+    setSubmitting(false);
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
+      zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center"
+    }} onClick={onClose}>
+      <div style={{
+        background: "var(--bg2)", borderRadius: "12px 12px 0 0", padding: 24,
+        width: "100%", maxWidth: 480
+      }} onClick={e => e.stopPropagation()}>
+        {submitted ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 18, color: "var(--accent)" }}>
+              CLAIM SUBMITTED
+            </div>
+            <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 8 }}>
+              Coach will review and approve your {level.name} rank
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div style={{ fontSize: 36 }}>{level.icon}</div>
+              <div>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 18, fontWeight: 900,
+                  color: level.color }}>CLAIM {level.name}</div>
+                <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 2 }}>{level.subtitle}</div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 16, lineHeight: 1.5,
+              background: "var(--bg3)", padding: "10px 12px", borderRadius: 6,
+              borderLeft: "2px solid var(--accent)" }}>
+              Submit a video link or confirm you completed all tests in the presence of Coach Karlito.
+              Your claim will be reviewed before the rank is officially awarded.
+            </div>
+
+            <label style={s?.label}>VIDEO LINK (YouTube / Google Drive / optional)</label>
+            <input
+              value={videoUrl}
+              onChange={e => setVideoUrl(e.target.value)}
+              placeholder="https://..."
+              style={{ ...s?.input, marginBottom: 12 }}
+            />
+
+            <label style={s?.label}>NOTE (optional)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="e.g. Done in person at training on 10 March..."
+              rows={2}
+              style={{ ...s?.input, resize: "none", marginBottom: 16 }}
+            />
+
+            <button onClick={submit} disabled={submitting}
+              style={{ ...s?.btn, opacity: submitting ? 0.6 : 1, marginBottom: 10,
+                background: level.color }}>
+              {submitting ? "SUBMITTING..." : `CLAIM ${level.name} →`}
+            </button>
+            <button onClick={onClose} style={{ ...s?.btnGhost, fontSize: 13 }}>CANCEL</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ─── RANKS COACH VIEW ─────────────────────────────────────────────────────────
+function RanksCoachView({ athletes }) {
+  const [pending, setPending] = useState([]);
+  const [approved, setApproved] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("level_achievements")
+        .select("*, profiles:user_id(name, email)")
+        .order("created_at", { ascending: false });
+      setPending((data||[]).filter(a => a.status === "pending"));
+      setApproved((data||[]).filter(a => a.status === "approved").slice(0, 20));
+    } catch(e) {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const decide = async (id, userId, levelId, levelRank, approve) => {
+    setProcessing(id);
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      await supabase.from("level_achievements").update({
+        status: approve ? "approved" : "rejected",
+        approved_by: au.id,
+        approved_at: approve ? new Date().toISOString() : null,
+      }).eq("id", id);
+
+      if (approve) {
+        const lv = DOM_SILY_LEVELS.find(l => l.id === levelId);
+        const { data: profile } = await supabase.from("profiles").select("name").eq("id", userId).single();
+        const name = profile?.name || "An athlete";
+        // Push to the athlete
+        sendPushToUser(userId, `🏆 Rank approved: ${lv?.name}!`,
+          `Coach Karlito confirmed your ${lv?.name} rank. Keep going!`, "achievement", "/");
+        // Push to everyone else
+        sendPushToAllUsers(
+          `🏛️ ${name} reached ${lv?.name}!`,
+          `${name} just earned the ${lv?.name} rank at House of Strength`,
+          "achievement", "/"
+        );
+      }
+      await load();
+    } catch(e) {}
+    setProcessing(null);
+  };
+
+  const levelMeta = (id) => DOM_SILY_LEVELS.find(l => l.id === id);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 30, color: "var(--gray2)" }}>Loading...</div>;
+
+  return (
+    <div>
+      {/* Pending claims */}
+      <div style={s.sectionLabel}>PENDING CLAIMS ({pending.length})</div>
+      {pending.length === 0 ? (
+        <div style={{ ...s.card, textAlign: "center", padding: 24 }}>
+          <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+          <div style={{ fontSize: 13, color: "var(--gray2)" }}>No pending claims</div>
+        </div>
+      ) : pending.map(a => {
+        const lv = levelMeta(a.level_id);
+        if (!lv) return null;
+        return (
+          <div key={a.id} style={{ ...s.card, borderColor: lv.color + "44",
+            background: lv.color + "08", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 28 }}>{lv.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>
+                  {a.profiles?.name || a.profiles?.email?.split("@")[0] || "Athlete"}
+                </div>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: lv.color,
+                  letterSpacing: "0.1em" }}>{lv.name}</div>
+                <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 2 }}>
+                  {new Date(a.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </div>
+
+            {a.video_url && (
+              <a href={a.video_url} target="_blank" rel="noreferrer"
+                style={{ display: "block", fontSize: 12, color: "var(--accent)",
+                  marginBottom: 8, textDecoration: "underline" }}>
+                🎥 View video
+              </a>
+            )}
+            {a.note && (
+              <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 10,
+                background: "var(--bg3)", padding: "8px 10px", borderRadius: 4,
+                borderLeft: "2px solid var(--accent)" }}>
+                "{a.note}"
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, true)}
+                disabled={processing === a.id}
+                style={{ ...s.btn, flex: 1, background: lv.color, fontSize: 13,
+                  opacity: processing === a.id ? 0.6 : 1 }}>
+                ✓ APPROVE
+              </button>
+              <button
+                onClick={() => decide(a.id, a.user_id, a.level_id, a.level_rank, false)}
+                disabled={processing === a.id}
+                style={{ ...s.btnGhost, flex: 1, fontSize: 13,
+                  color: "var(--red-dim)", borderColor: "var(--red-dim)" }}>
+                ✗ REJECT
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Recent approved */}
+      <div style={{ ...s.sectionLabel, marginTop: 20 }}>RECENTLY APPROVED</div>
+      {approved.length === 0 ? (
+        <div style={{ fontSize: 12, color: "var(--gray2)", textAlign: "center", padding: 16 }}>None yet</div>
+      ) : (
+        <div style={s.card}>
+          <CommunityFeed authUser={null} compact={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 const s = {
   app: { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
@@ -1633,7 +2401,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
 
       {/* Intensity today - only for free users */}
       {!hasCoach && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-        {[["INTENSITY", `${Math.round(pct * 100)}%`, "of 1RM"], ["KB", `${user.kgKB}kg`, "kettlebell"], ["LEVEL", user.level.toUpperCase().slice(0,3), user.level]].map(([label, val, sub]) => (
+        {[["INTENSITY", `${Math.round(pct * 100)}%`, "of 1RM"], ["KB", `${user.kgKB}kg`, "kettlebell"], ["LEVEL", (user?.level || 'beginner').toUpperCase().slice(0,3), user.level]].map(([label, val, sub]) => (
           <div key={label} style={{ ...s.card, textAlign: "center", padding: 12 }}>
             <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", marginBottom: 4 }}>{label}</div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{val}</div>
@@ -1643,6 +2411,46 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
       </div>}
 
       {/* This week's sessions */}
+      {/* HALL OF STRENGTH mini feed */}
+      {(() => {
+        const [recentAch, setRecentAch] = React.useState([]);
+        React.useEffect(() => {
+          supabase.from("level_achievements")
+            .select("*, profiles:user_id(name)")
+            .eq("status", "approved")
+            .order("approved_at", { ascending: false })
+            .limit(3)
+            .then(({ data }) => setRecentAch(data || []));
+        }, []);
+        if (!recentAch.length) return null;
+        const lv = (id) => DOM_SILY_LEVELS.find(l => l.id === id);
+        return (
+          <div style={{ ...s.card, marginBottom: 16, borderColor: "rgba(184,134,11,0.3)",
+            background: "rgba(184,134,11,0.04)" }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)",
+              letterSpacing: "0.2em", marginBottom: 10 }}>HALL OF STRENGTH</div>
+            {recentAch.map(a => {
+              const level = lv(a.level_id);
+              if (!level) return null;
+              return (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8,
+                  paddingBottom: 6, marginBottom: 6, borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ fontSize: 16 }}>{level.icon}</span>
+                  <div style={{ flex: 1, fontSize: 12 }}>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>
+                      {a.profiles?.name || "Athlete"}
+                    </span>
+                    {" → "}
+                    <span style={{ fontFamily: "'Cinzel', serif", color: level.color,
+                      fontSize: 11 }}>{level.name}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* TODAY BANNER */}
       <div style={{ ...s.card, borderColor: "rgba(192,57,43,0.5)", background: "linear-gradient(135deg, rgba(192,57,43,0.1) 0%, rgba(192,57,43,0.03) 100%)", marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2171,7 +2979,7 @@ const saveCoachComment = async () => {
           {/* View toggle */}
       {/* View toggle */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[["dashboard", "📊"], ["sessions", "📋"], ["templates", "📁"], ["diet", "🥗"]].map(([v, icon]) => (
+        {[["dashboard", "📊"], ["sessions", "📋"], ["templates", "📁"], ["diet", "🥗"], ["ranks", "🏆"]].map(([v, icon]) => (
           <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); setEditingDay(null); }}
             style={{ ...s.pill(view === v && !selectedClient), padding: "8px 0", flex: 1, textAlign: "center", fontSize: 18 }}>
             {icon}
@@ -2679,6 +3487,11 @@ const saveCoachComment = async () => {
         </div>
       )}
 
+      {/* ── RANKS VIEW ── */}
+      {view === "ranks" && !selectedClient && (
+        <RanksCoachView athletes={athletes} authUser={{ id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" }} />
+      )}
+
       {/* ── DIET VIEW ── */}
       {view === "diet" && !selectedClient && (
         <div>
@@ -2955,9 +3768,15 @@ function DietFilesSection({ authUser }) {
 }
 
 function ProfileScreen({ user, authUser }) {
+  const [profileTab, setProfileTab] = useState("profile"); // profile | path
   const [goals, setGoals] = useState({ main_goal: "", competition_date: "", notes: "" });
   const [savingGoals, setSavingGoals] = useState(false);
   const [goalsSaved, setGoalsSaved] = useState(false);
+
+  // Compute current level for badge in profile header
+  const bw = user?.bodyweight || 80;
+  const gender = user?.gender || "men";
+  const currentLevel = getDomSilyLevel(user, bw, gender);
 
   useEffect(() => {
     const loadGoals = async () => {
@@ -3020,18 +3839,51 @@ function ProfileScreen({ user, authUser }) {
   };
   return (
     <div style={s.screen}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--bg3)", border: "2px solid var(--red)", margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>🏋️</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900 }}>ATHLETE PROFILE</div>
-        <div style={{ fontSize: 13, color: "var(--gray)" }}>{user.level.toUpperCase()}</div>
+      {/* Header with level badge */}
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ width: 80, height: 80, borderRadius: "50%",
+          background: currentLevel ? currentLevel.color + "22" : "var(--bg3)",
+          border: `2px solid ${currentLevel ? currentLevel.color : "var(--red)"}`,
+          margin: "0 auto 10px", display: "flex", alignItems: "center",
+          justifyContent: "center", fontSize: 36 }}>
+          {currentLevel ? currentLevel.icon : "🏋️"}
+        </div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900 }}>
+          {user.name || "ATHLETE"}
+        </div>
+        {currentLevel ? (
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: currentLevel.color,
+            letterSpacing: "0.2em", marginTop: 4 }}>
+            {currentLevel.name}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 4 }}>Unranked — take the test</div>
+        )}
       </div>
 
+      {/* Tab switcher */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[["profile", "📋 PROFILE"], ["path", "⚔️ MY PATH"]].map(([t, label]) => (
+          <button key={t} onClick={() => setProfileTab(t)} style={{
+            flex: 1, ...s.btnGhost, fontSize: 12, padding: "10px",
+            borderColor: profileTab === t ? "var(--accent)" : "var(--border)",
+            color: profileTab === t ? "var(--accent)" : "var(--gray)",
+            background: profileTab === t ? "rgba(232,213,160,0.08)" : "transparent",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {profileTab === "path" && (
+        <DomSilyPathScreen user={user} authUser={authUser} />
+      )}
+
+      {profileTab === "profile" && (<>
       <div style={s.sectionLabel}>1RM DATA</div>
       <div style={s.card}>
-        {[["Squat", user.oneRM.squat], ["Bench Press", user.oneRM.bench], ["Deadlift", user.oneRM.deadlift]].map(([k, v]) => (
+        {[["Squat", user.oneRM?.squat], ["Bench Press", user.oneRM?.bench], ["Deadlift", user.oneRM?.deadlift]].map(([k, v]) => (
           <div key={k} style={{ ...s.exerciseRow, alignItems: "center" }}>
             <div style={{ flex: 1, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 600 }}>{k}</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900 }}>{v}<span style={{ fontSize: 14, color: "var(--gray)", marginLeft: 4 }}>kg</span></div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900 }}>{v || "—"}<span style={{ fontSize: 14, color: "var(--gray)", marginLeft: 4 }}>{v ? "kg" : ""}</span></div>
           </div>
         ))}
         <div style={{ ...s.exerciseRow, borderBottom: "none", alignItems: "center" }}>
@@ -3129,6 +3981,7 @@ function ProfileScreen({ user, authUser }) {
           SIGN OUT
         </button>
       </div>
+      </>)}
     </div>
   );
 }

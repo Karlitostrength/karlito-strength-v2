@@ -1407,7 +1407,7 @@ function OnboardingScreen({ onComplete }) {
           BUILD YOUR<br />STRENGTH.
         </div>
         <div style={{ color: "var(--gray)", fontSize: 15, lineHeight: 1.6 }}>
-          12-week periodised program. SBD. Kettlebell. Calisthenics. Built on science, tested on the platform.
+          8-week periodised program. SBD. Kettlebell. Calisthenics. Built on science, tested on the platform.
         </div>
       </div>
       <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)" }}>
@@ -1528,7 +1528,7 @@ function OnboardingScreen({ onComplete }) {
       <div style={{ ...s.card, borderColor: "var(--red-dim)" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 6 }}>PROGRAM OVERVIEW</div>
         <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.8 }}>
-          3 days / week · 12 weeks total<br />
+          3 days / week · 8 weeks total<br />
           Wks 1–4: Accumulation<br />
           Wks 5–8: Transmutation<br />
           Wks 9–11: Intensification<br />
@@ -2292,13 +2292,13 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
       <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 20 }}>
         {allDays.length > 0
           ? `${Object.keys(completedDays).length} sessions completed · ${allDays.length - Object.keys(completedDays).length} remaining`
-          : hasCoach ? "No program assigned yet" : "Free 12-week program"}
+          : hasCoach ? "No program assigned yet" : "Free 8-week program"}
       </div>
 
       {allDays.length === 0 && !hasCoach && (
         <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 16 }}>
           <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>⚡ FREE PROGRAM</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 8 }}>12-WEEK AUTO PROGRAM</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 8 }}>8-WEEK AUTO PROGRAM</div>
           <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
             Your program is auto-generated week by week. Go to HOME to start each session.
           </div>
@@ -2488,7 +2488,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         <div style={{ background: "rgba(74,127,165,0.08)", border: "1px solid var(--steel-dim)", borderRadius: 8, padding: "8px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18, color: "var(--steel)" }}>ᛒ</span>
           <div>
-            <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 13, fontWeight: 700, color: "var(--steel)" }}>FREE 12-WEEK PROGRAM</div>
+            <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 13, fontWeight: 700, color: "var(--steel)" }}>FREE 8-WEEK PROGRAM</div>
             <div style={{ fontSize: 11, color: "var(--gray)" }}>SBD + Kettlebell periodization</div>
           </div>
         </div>
@@ -2634,7 +2634,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
           </div>
         )
       ) : (
-        // FREE USER - show default 12-week program
+        // FREE USER - show default 8-week program
         days.map(day => {
           const dayName = day === "A" ? "SQUAT DOMINANT" : day === "B" ? "DEADLIFT DOMINANT" : "BENCH DOMINANT";
           const sqVar = day !== "B" ? getSquatVariation(week, user.injuries) : null;
@@ -4553,7 +4553,7 @@ function LandingScreen({ onSignUp }) {
             </button>
             <button onClick={onSignUp}
               style={{ background: "transparent", color: "var(--gray)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: "0.08em", cursor: "pointer" }}>
-              Try Free 12-Week Program
+              Try Free 8-Week Program
             </button>
           </div>
           <div style={{ ...fade(400), fontSize: 11, color: "var(--gray2)", marginTop: 14, textAlign: "center", letterSpacing: "0.05em" }}>
@@ -4568,7 +4568,7 @@ function LandingScreen({ onSignUp }) {
       {/* ── SOCIAL PROOF ── */}
       <div style={{ padding: "36px 24px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 36 }}>
-          {[["5+", "Years coaching"], ["12", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
+          {[["5+", "Years coaching"], ["8", "Week program"], ["SBD+KB", "Methodology"]].map(([n, l]) => (
             <div key={l} style={{ textAlign: "center", padding: "16px 8px", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
               <div style={{ fontFamily: "'Cinzel', serif", fontSize: 24, fontWeight: 900, color: "var(--accent)", lineHeight: 1 }}>{n}</div>
               <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 4, letterSpacing: "0.06em" }}>{l.toUpperCase()}</div>
@@ -4587,9 +4587,19 @@ function LandingScreen({ onSignUp }) {
             This is not a fitness app. This is a school of strength — built on the model of a dojo, where training is a tool for human development. Physically and mentally.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-            {[["⚔️", "IRON", "Barbell strength"], ["🔔", "BELL", "Kettlebell skill"], ["🔥", "ENGINE", "Endurance"]].map(([icon, name, desc]) => (
+            {[
+              { icon: "⚔️", name: "IRON", desc: "Barbell", isEmoji: true },
+              { icon: "KB", name: "KETTLEBELL", desc: "Kettlebell skill", isEmoji: false },
+              { icon: "🔥", name: "ENGINE", desc: "Endurance", isEmoji: true },
+            ].map(({ icon, name, desc, isEmoji }) => (
               <div key={name} style={{ textAlign: "center", padding: "14px 8px", background: "var(--bg3)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
+                {isEmoji ? (
+                  <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
+                ) : (
+                  <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 6, fontFamily: "'Barlow Condensed', sans-serif",
+                    color: "#111", background: "var(--accent)", borderRadius: 4,
+                    padding: "2px 6px", display: "inline-block", letterSpacing: "0.05em" }}>{icon}</div>
+                )}
                 <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.1em" }}>{name}</div>
                 <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 3 }}>{desc}</div>
               </div>
@@ -4682,9 +4692,9 @@ function LandingScreen({ onSignUp }) {
         {/* ── FREE PROGRAM ── */}
         <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 16, padding: "24px", marginBottom: 32 }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 12 }}>FREE OPTION</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 8 }}>12-WEEK AUTO PROGRAM</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 8 }}>8-WEEK AUTO PROGRAM</div>
           <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7, marginBottom: 20 }}>
-            No coach, no payment. Get a full periodised SBD + kettlebell program that auto-generates based on your 1RM. Track your sessions, access the exercise library.
+            No coach, no payment. Get a full periodised 8-week SBD + kettlebell program that auto-generates based on your 1RM. Track your sessions, access the exercise library.
           </div>
           <button onClick={onSignUp}
             style={{ background: "var(--bg3)", color: "var(--white)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.06em", cursor: "pointer", width: "100%" }}>

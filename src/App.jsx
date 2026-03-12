@@ -169,35 +169,37 @@ document.head.appendChild(style);
 
 // ─── ENGINE ───────────────────────────────────────────────────────────────────
 
+// DOM SIŁY — 8-week phases
 const PHASES = {
-  1: { name: "ACCUMULATION", color: "#4a9eff", weeks: [1,4] },
-  2: { name: "TRANSMUTATION", color: "#f0a020", weeks: [5,8] },
-  3: { name: "INTENSIFICATION", color: "#c41e1e", weeks: [9,11] },
-  4: { name: "PEAK", color: "#e8d5a0", weeks: [12,12] },
+  1: { name: "FUNDAMENT",  color: "#4a9eff", weeks: [1,2], scheme: "5×8 paused" },
+  2: { name: "BUDOWANIE",  color: "#f0a020", weeks: [3,4], scheme: "6×6" },
+  3: { name: "SIŁA",       color: "#c41e1e", weeks: [5,6], scheme: "5×5" },
+  4: { name: "SZCZYT",     color: "#a78bfa", weeks: [7,8], scheme: "5×3" },
 };
 
 function getPhase(week) {
-  if (week <= 4) return 1;
-  if (week <= 8) return 2;
-  if (week <= 11) return 3;
+  if (week <= 2) return 1;
+  if (week <= 4) return 2;
+  if (week <= 6) return 3;
   return 4;
 }
 
 function getPct(week, level) {
-  const base = { beginner: [0.65, 0.70, 0.78, 0.85], intermediate: [0.70, 0.77, 0.83, 0.90], advanced: [0.72, 0.80, 0.87, 0.93] };
-  const arr = base[level];
-  const phase = getPhase(week);
-  return arr[phase - 1];
+  // Intensity by phase: FUNDAMENT 70%, BUDOWANIE 75%, SIŁA 80%, SZCZYT 87%
+  const base = {
+    beginner:     [0.68, 0.73, 0.78, 0.85],
+    intermediate: [0.70, 0.75, 0.80, 0.87],
+    advanced:     [0.72, 0.77, 0.83, 0.90],
+  };
+  const arr = base[level] || base.intermediate;
+  return arr[getPhase(week) - 1];
 }
 
 function getSetsReps(week) {
-  if (week <= 2) return { sets: 4, reps: 6 };
-  if (week <= 4) return { sets: 5, reps: 5 };
-  if (week <= 6) return { sets: 4, reps: 4 };
-  if (week <= 8) return { sets: 5, reps: 3 };
-  if (week <= 10) return { sets: 3, reps: 3 };
-  if (week === 11) return { sets: 3, reps: 2 };
-  return { sets: 1, reps: 1 };
+  if (week <= 2) return { sets: 5, reps: 8 };  // FUNDAMENT
+  if (week <= 4) return { sets: 6, reps: 6 };  // BUDOWANIE
+  if (week <= 6) return { sets: 5, reps: 5 };  // SIŁA
+  return { sets: 5, reps: 3 };                  // SZCZYT
 }
 
 function getSquatVariation(week, injuries) {
@@ -557,29 +559,70 @@ function getNextLevelGaps(user, bodyweight, currentRank, gender = "men") {
 }
 
 // ─── LEVEL CARD COMPONENT ──────────────────────────────────────────────────────
-function LevelCard({ level, isCurrentLevel, compact = false }) {
+function LevelCard({ level, isCurrentLevel, compact = false, showStandards = false, gender = "men" }) {
   if (!level) return null;
   const iconSize = compact ? 28 : 48;
+  const standards = level[gender] || level.men;
+  const PILLAR_LABELS = { push:"Push", pull:"Pull", hinge:"Hinge", squat:"Squat", carry:"Carry", engine:"Engine" };
   return (
     <div style={{
       background: `linear-gradient(135deg, ${level.color}22 0%, ${level.color}08 100%)`,
       border: `2px solid ${isCurrentLevel ? level.color : level.color + "44"}`,
       borderRadius: 8, padding: compact ? "10px 14px" : "20px 16px",
-      textAlign: "center", position: "relative",
+      position: "relative",
     }}>
-      <div style={{ fontSize: iconSize, marginBottom: compact ? 4 : 10 }}>{level.icon}</div>
-      <div style={{ fontFamily: "'Cinzel', serif", fontSize: compact ? 14 : 22, fontWeight: 900,
-        color: level.color, letterSpacing: "0.15em" }}>{level.name}</div>
-      {!compact && (
-        <>
-          <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4, letterSpacing: "0.1em" }}>
-            {level.subtitle}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 10, lineHeight: 1.5, fontStyle: "italic" }}>
-            "{level.description}"
-          </div>
-        </>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: compact ? "left" : "center",
+        flexDirection: compact ? "row" : "column" }}>
+        <div style={{ fontSize: iconSize, flexShrink: 0 }}>{level.icon}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: compact ? 14 : 22, fontWeight: 900,
+            color: level.color, letterSpacing: "0.15em" }}>{level.name}</div>
+          {!compact && (
+            <>
+              <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4, letterSpacing: "0.1em" }}>
+                {level.subtitle}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 8, lineHeight: 1.5, fontStyle: "italic" }}>
+                "{level.description}"
+              </div>
+            </>
+          )}
+          {compact && (
+            <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 2 }}>{level.subtitle}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Standards — shown when showStandards=true */}
+      {showStandards && standards && (
+        <div style={{ marginTop: 14, borderTop: `1px solid ${level.color}33`, paddingTop: 12 }}>
+          <div style={{ fontSize: 9, color: level.color, letterSpacing: "0.2em",
+            fontFamily: "'Cinzel', serif", marginBottom: 8 }}>STANDARDS</div>
+          {Object.entries(standards).map(([pillar, s]) => (
+            <div key={pillar} style={{ display: "flex", gap: 8, marginBottom: 6,
+              paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
+              <div style={{ width: 42, fontSize: 9, color: level.color, fontFamily: "'Cinzel', serif",
+                letterSpacing: "0.08em", flexShrink: 0, paddingTop: 2 }}>
+                {PILLAR_LABELS[pillar] || pillar}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.4 }}>{s.label}</div>
+            </div>
+          ))}
+          {level.engineOptions && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg3)",
+              borderRadius: 4, borderLeft: `2px solid ${level.color}` }}>
+              <div style={{ fontSize: 9, color: level.color, letterSpacing: "0.15em",
+                fontFamily: "'Cinzel', serif", marginBottom: 6 }}>ENGINE — CHOOSE ONE</div>
+              {level.engineOptions.map((opt, i) => (
+                <div key={i} style={{ fontSize: 11, color: "var(--gray)", marginBottom: 3 }}>
+                  {i + 1}. {opt}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
+
       {isCurrentLevel && (
         <div style={{ position: "absolute", top: 8, right: 8, fontSize: 9,
           background: level.color, color: "#fff", padding: "2px 8px",
@@ -597,15 +640,88 @@ function DomSilyPathScreen({ user, authUser }) {
   const [bodyweight, setBodyweight] = useState(user?.bodyweight || 80);
   const [showAllLevels, setShowAllLevels] = useState(false);
   const [showClaim, setShowClaim] = useState(false);
+  const [showTests, setShowTests] = useState(false);
+  const [testVals, setTestVals] = useState({
+    pushups:         user?.pushups || 0,
+    inverted_rows:   user?.inverted_rows || 0,
+    kb_swing_test:   user?.kb_swing_test || 0,
+    goblet_test:     user?.goblet_test || 0,
+    farmers_carry:   user?.farmers_carry || 0,
+    tgu_test:        user?.tgu_test || 0,
+    kb_press_test:   user?.kb_press_test || 0,
+    swing_100_test:  user?.swing_100_test || 0,
+    snatch_test_kg:  user?.snatch_test_kg || 0,
+    front_squat:     user?.oneRM?.front_squat || 0,
+    ohs:             user?.oneRM?.ohs || 0,
+    weighted_pullup_kg: user?.weighted_pullup_kg || 0,
+    dbl_kb_press_test:  user?.dbl_kb_press_test || 0,
+    gladiator_engine:   user?.gladiator_engine || false,
+  });
+  const [savingTests, setSavingTests] = useState(false);
+  const [testsSaved, setTestsSaved] = useState(false);
+  const [testError, setTestError] = useState("");
 
-  const currentLevel = getDomSilyLevel(user, bodyweight, gender);
+  // Merge testVals back into user-like object for level computation
+  const computedUser = {
+    ...user,
+    ...testVals,
+    oneRM: { ...(user?.oneRM || {}), front_squat: testVals.front_squat, ohs: testVals.ohs },
+  };
+
+  const saveTests = async () => {
+    setSavingTests(true); setTestError(""); setTestsSaved(false);
+    try {
+      const updates = {
+        pullups:            testVals.pushups,   // Note: pushups stored separately
+        inverted_rows:      testVals.inverted_rows,
+        kb_swing_test:      testVals.kb_swing_test,
+        goblet_test:        testVals.goblet_test,
+        farmers_carry:      testVals.farmers_carry,
+        tgu_test:           testVals.tgu_test,
+        kb_press_test:      testVals.kb_press_test,
+        swing_100_test:     testVals.swing_100_test,
+        snatch_test_kg:     testVals.snatch_test_kg,
+        front_squat_test:   testVals.front_squat,
+        ohs_test:           testVals.ohs,
+        weighted_pullup_kg: testVals.weighted_pullup_kg,
+        dbl_kb_press_test:  testVals.dbl_kb_press_test,
+        gladiator_engine:   testVals.gladiator_engine,
+        bodyweight:         bodyweight,
+        gender:             gender,
+      };
+      const { error } = await supabase.from("profiles").update(updates).eq("id", authUser.id);
+      if (error) throw error;
+      setTestsSaved(true);
+      setTimeout(() => setTestsSaved(false), 2000);
+    } catch(e) { setTestError(e.message || "Save failed"); }
+    setSavingTests(false);
+  };
+
+  const currentLevel = getDomSilyLevel(computedUser, bodyweight, gender);
   const currentRank = currentLevel ? currentLevel.rank : 0;
-  const nextGaps = getNextLevelGaps(user, bodyweight, currentRank, gender);
+  const nextGaps = getNextLevelGaps(computedUser, bodyweight, currentRank, gender);
   const progressPct = currentRank > 0
     ? Math.round((currentRank / 6) * 100)
     : nextGaps
       ? Math.round((nextGaps.gaps.filter(g => g.passed).length / nextGaps.gaps.length) * 50)
       : 0;
+
+  // Test fields definition for the form
+  const testFields = [
+    { key: "pushups",          label: "Push Ups (max reps)",            unit: "reps", type: "number" },
+    { key: "inverted_rows",    label: "Inverted Rows (max reps)",       unit: "reps", type: "number" },
+    { key: "kb_swing_test",    label: "KB Swing — heaviest bell used",  unit: "kg",   type: "number" },
+    { key: "goblet_test",      label: "Goblet Squat — heaviest bell",   unit: "kg",   type: "number" },
+    { key: "farmers_carry",    label: "Farmer Walk — per hand",         unit: "kg",   type: "number" },
+    { key: "tgu_test",         label: "TGU — heaviest bell (quality)",  unit: "kg",   type: "number" },
+    { key: "kb_press_test",    label: "KB Press — heaviest bell / side",unit: "kg",   type: "number" },
+    { key: "swing_100_test",   label: "100 One-Hand Swings — bell",     unit: "kg",   type: "number" },
+    { key: "snatch_test_kg",   label: "Snatch Test (100 reps / 5min) — bell", unit: "kg", type: "number" },
+    { key: "front_squat",      label: "Front Squat 1RM",                unit: "kg",   type: "number" },
+    { key: "weighted_pullup_kg",label:"Weighted Pull Up — added weight", unit: "kg",   type: "number" },
+    { key: "dbl_kb_press_test",label: "Double KB Press — combined weight", unit: "kg", type: "number" },
+    { key: "gladiator_engine", label: "Gladiator Engine test completed", unit: "",    type: "bool" },
+  ];
 
   return (
     <div style={s.screen}>
@@ -743,12 +859,71 @@ function DomSilyPathScreen({ user, authUser }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
           {[...DOM_SILY_LEVELS].reverse().map(level => (
             <div key={level.id}>
-              <LevelCard level={level} isCurrentLevel={level.rank === currentRank} compact={level.rank !== currentRank} />
+              <LevelCard
+                level={level}
+                isCurrentLevel={level.rank === currentRank}
+                compact={false}
+                showStandards={true}
+                gender={gender}
+              />
               {level.rank > 1 && (
                 <div style={{ textAlign: "center", color: "var(--gray2)", fontSize: 16, margin: "2px 0" }}>↑</div>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* UPDATE TEST RESULTS */}
+      <button onClick={() => setShowTests(v => !v)}
+        style={{ ...s.btnGhost, marginBottom: 10, fontSize: 12,
+          borderColor: showTests ? "var(--accent)" : "var(--border)",
+          color: showTests ? "var(--accent)" : "var(--gray)" }}>
+        {showTests ? "▲ HIDE" : "📊 UPDATE MY TEST RESULTS"}
+      </button>
+
+      {showTests && (
+        <div style={{ ...s.card, borderColor: "rgba(232,213,160,0.3)", marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)",
+            letterSpacing: "0.2em", marginBottom: 14 }}>MY TEST RESULTS</div>
+          <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 14, lineHeight: 1.5 }}>
+            Enter your best results. The checklist above updates automatically.
+            Enter the heaviest weight you've actually completed the standard with.
+          </div>
+          {testFields.map(({ key, label, unit, type }) => (
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10,
+              paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
+              <div style={{ flex: 1, fontSize: 12, color: "var(--gray)", lineHeight: 1.3 }}>{label}</div>
+              {type === "bool" ? (
+                <div onClick={() => setTestVals(v => ({ ...v, [key]: !v[key] }))}
+                  style={{ width: 32, height: 32, borderRadius: 6, flexShrink: 0, cursor: "pointer",
+                    background: testVals[key] ? "var(--red)" : "var(--bg3)",
+                    border: `1px solid ${testVals[key] ? "var(--red)" : "var(--border)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 16, color: "#fff" }}>
+                  {testVals[key] ? "✓" : ""}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" min="0" value={testVals[key] || ""}
+                    onChange={e => setTestVals(v => ({ ...v, [key]: Number(e.target.value) }))}
+                    style={{ ...s.input, width: 64, textAlign: "center", padding: "8px 4px",
+                      marginBottom: 0, fontSize: 15, fontWeight: 700 }} />
+                  {unit && <span style={{ fontSize: 11, color: "var(--gray2)", flexShrink: 0 }}>{unit}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+          {testError && (
+            <div style={{ fontSize: 11, color: "var(--red-dim)", marginBottom: 8,
+              background: "rgba(196,30,30,0.1)", padding: "6px 10px", borderRadius: 4 }}>
+              ⚠ {testError}
+            </div>
+          )}
+          <button onClick={saveTests} disabled={savingTests}
+            style={{ ...s.btn, opacity: savingTests ? 0.6 : 1 }}>
+            {testsSaved ? "✓ SAVED" : savingTests ? "SAVING..." : "SAVE TEST RESULTS"}
+          </button>
         </div>
       )}
 
@@ -1098,18 +1273,22 @@ function RanksCoachView({ athletes }) {
     setProcessing(null);
   };
 
+  const [awardError, setAwardError] = useState("");
+
   const manualAward = async (userId, userName, levelId, levelRank, revoke) => {
-    setAwardingLevel(levelId);
+    setAwardingLevel(levelId); setAwardError("");
     try {
       if (revoke) {
-        await supabase.from("level_achievements")
+        const { error } = await supabase.from("level_achievements")
           .delete().eq("user_id", userId).eq("level_id", levelId).eq("status", "approved");
+        if (error) throw error;
       } else {
-        await supabase.from("level_achievements").insert({
+        const { error } = await supabase.from("level_achievements").insert({
           user_id: userId, level_id: levelId, level_rank: levelRank,
           status: "approved", approved_by: COACH_ID,
           approved_at: new Date().toISOString(), note: "Awarded by coach",
         });
+        if (error) throw error;
         const lv = DOM_SILY_LEVELS.find(l => l.id === levelId);
         sendPushToUser(userId, `🏆 ${lv?.name} awarded by Coach Karlito!`,
           `Your ${lv?.name} rank has been officially confirmed.`, "achievement", "/");
@@ -1119,7 +1298,9 @@ function RanksCoachView({ athletes }) {
         }
       }
       await loadPersonAchievements(userId);
-    } catch(e) {}
+    } catch(e) {
+      setAwardError(e.message || "Error — check if level_achievements table exists in Supabase");
+    }
     setAwardingLevel(null);
   };
 
@@ -1223,12 +1404,19 @@ function RanksCoachView({ athletes }) {
           ) : (
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <button onClick={() => setSelectedPerson(null)}
+                <button onClick={() => { setSelectedPerson(null); setAwardError(""); }}
                   style={{ ...s.btnGhost, width: "auto", padding: "6px 14px", fontSize: 12 }}>← BACK</button>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>
                   {selectedPerson.name}
                 </div>
               </div>
+              {awardError && (
+                <div style={{ fontSize: 12, color: "var(--red-dim)", marginBottom: 12,
+                  background: "rgba(196,30,30,0.1)", padding: "10px 12px", borderRadius: 6,
+                  borderLeft: "2px solid var(--red-dim)" }}>
+                  ❌ {awardError}
+                </div>
+              )}
               <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 14, padding: "8px 12px",
                 background: "var(--bg3)", borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
                 Tap a rank to AWARD or REVOKE it. Push notification sent on award.
@@ -2388,8 +2576,8 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
 function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
   const phase = getPhase(week);
   const phaseData = PHASES[phase];
-  const weekInPhase = phase === 1 ? week : phase === 2 ? week - 4 : phase === 3 ? week - 8 : 1;
-  const totalInPhase = phase === 1 ? 4 : phase === 2 ? 4 : phase === 3 ? 3 : 1;
+  const weekInPhase = phase === 1 ? week : phase === 2 ? week - 2 : phase === 3 ? week - 4 : week - 6;
+  const totalInPhase = 2; // all phases are 2 weeks in 8-week program
   const pct = getPct(week, user.level);
   const days = ["A", "B", "C"];
 
@@ -2531,7 +2719,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
           <div>
             <div style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 4 }}>CURRENT PHASE</div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 30, fontWeight: 900, color: phaseData.color, lineHeight: 1 }}>{phaseData.name}</div>
-            <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 4 }}>Week {week} of 12 · {weekInPhase}/{totalInPhase} in phase</div>
+            <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 4 }}>Week {week} of 8 · {weekInPhase}/{totalInPhase} in phase · {phaseData.scheme}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{week}</div>
@@ -2540,9 +2728,9 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         </div>
         <div style={{ marginTop: 16 }}>
           <div style={{ height: 4, background: "var(--border)", borderRadius: 2 }}>
-            <div style={{ ...s.progressBar((week / 12) * 100, phaseData.color) }} />
+            <div style={{ ...s.progressBar((week / 8) * 100, phaseData.color) }} />
           </div>
-          <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>{Math.round((week / 12) * 100)}% complete</div>
+          <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>{Math.round((week / 8) * 100)}% complete</div>
        </div>
       </div>}
 
@@ -2663,7 +2851,7 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
       {/* Week navigation */}
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
         <button style={{ ...s.btnGhost, flex: 1, width: "auto" }} onClick={() => setWeek(w => Math.max(1, w - 1))}>← PREV WEEK</button>
-        <button style={{ ...s.btnGhost, flex: 1, width: "auto" }} onClick={() => setWeek(w => Math.min(12, w + 1))}>NEXT WEEK →</button>
+        <button style={{ ...s.btnGhost, flex: 1, width: "auto" }} onClick={() => setWeek(w => Math.min(8, w + 1))}>NEXT WEEK →</button>
       </div>
 
       {week === 12 && (
@@ -2746,7 +2934,7 @@ function ProgressScreen({ user, week }) {
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: done ? phData.color : current ? phData.color : "var(--border)", opacity: current ? 1 : done ? 0.6 : 0.3 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, color: current ? phData.color : done ? "var(--gray)" : "var(--gray2)" }}>
-                  {phData.name} (Wk {phData.weeks[0]}–{phData.weeks[1]})
+                  {phData.name} — {phData.scheme} (Wk {phData.weeks[0]}–{phData.weeks[1]})
                 </div>
               </div>
               {done && <div style={{ fontSize: 12, color: "var(--gray)" }}>✓</div>}
@@ -2758,12 +2946,12 @@ function ProgressScreen({ user, week }) {
 
       <div style={s.sectionLabel}>SWING PROGRESSION</div>
       <div style={s.card}>
-        {Array.from({ length: 12 }, (_, i) => i + 1).map(w => {
+        {Array.from({ length: 8 }, (_, i) => i + 1).map(w => {
           const sw = getSwingProtocol(w);
           const isPast = w < week;
           const isCurrent = w === week;
           return (
-            <div key={w} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: w < 12 ? "1px solid var(--border)" : "none", opacity: isPast ? 0.45 : 1 }}>
+            <div key={w} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: w < 8 ? "1px solid var(--border)" : "none", opacity: isPast ? 0.45 : 1 }}>
               <div style={{ fontSize: 13, color: isCurrent ? "var(--white)" : "var(--gray)" }}>
                 {isCurrent && <span style={{ color: "var(--red)", marginRight: 6 }}>●</span>}Wk {w}
               </div>
@@ -2884,6 +3072,69 @@ function CoachScreen() {
       setTplAssignClients([]);
       await loadData();
     } catch(e) { console.log("Assign template error:", e); }
+    setSavingTpl(false);
+  };
+
+  // ── Built-in DOM SIŁY 8-week program data ──────────────────────────────────
+  const DOM_SILY_8WK = [
+    // FUNDAMENT — Wk 1–2 — 5×8 paused
+    { week: 1, day: "A", title: "FUNDAMENT — Squat",    exercises: [{ name:"Squat (paused 2s)", sets:5, reps:8, weight:0 },{ name:"Reverse Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Plank (short lever)", sets:3, reps:0, weight:20 },{ name:"KB Swing", sets:3, reps:8, weight:0 }] },
+    { week: 1, day: "B", title: "FUNDAMENT — Deadlift", exercises: [{ name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0 },{ name:"KB Clean", sets:5, reps:5, weight:0 },{ name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },{ name:"KB Press", sets:5, reps:5, weight:0 }] },
+    { week: 1, day: "C", title: "FUNDAMENT — Bench",    exercises: [{ name:"Bench Press (paused)", sets:5, reps:8, weight:0 },{ name:"Push Up + Gorilla Row", sets:5, reps:8, weight:0 },{ name:"Ab Wheel", sets:3, reps:8, weight:0 }] },
+    { week: 2, day: "A", title: "FUNDAMENT — Squat",    exercises: [{ name:"Squat (paused 2s)", sets:5, reps:8, weight:0 },{ name:"Reverse Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Plank (short lever)", sets:3, reps:0, weight:25 },{ name:"KB Swing", sets:3, reps:12, weight:0 }] },
+    { week: 2, day: "B", title: "FUNDAMENT — Deadlift", exercises: [{ name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0 },{ name:"KB Clean", sets:5, reps:5, weight:0 },{ name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },{ name:"KB Press", sets:5, reps:5, weight:0 }] },
+    { week: 2, day: "C", title: "FUNDAMENT — Bench",    exercises: [{ name:"Bench Press (paused)", sets:5, reps:8, weight:0 },{ name:"Push Up + Gorilla Row", sets:5, reps:10, weight:0 },{ name:"Ab Wheel", sets:3, reps:10, weight:0 }] },
+    // BUDOWANIE — Wk 3–4 — 6×6
+    { week: 3, day: "A", title: "BUDOWANIE — Squat",    exercises: [{ name:"Squat (short pause)", sets:6, reps:6, weight:0 },{ name:"Reverse Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Plank (long lever)", sets:3, reps:0, weight:30 },{ name:"Single Arm KB Swing", sets:4, reps:7, weight:0 }] },
+    { week: 3, day: "B", title: "BUDOWANIE — Deadlift", exercises: [{ name:"Deadlift (paused)", sets:4, reps:4, weight:0 },{ name:"KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Suitcase Carry 15m", sets:3, reps:1, weight:0 },{ name:"Hollow Hold", sets:3, reps:0, weight:30 }] },
+    { week: 3, day: "C", title: "BUDOWANIE — Bench",    exercises: [{ name:"Bench Press (paused)", sets:6, reps:6, weight:0 },{ name:"Dips (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Ab Wheel", sets:3, reps:12, weight:0 }] },
+    { week: 4, day: "A", title: "BUDOWANIE — Squat",    exercises: [{ name:"Squat (short pause)", sets:6, reps:6, weight:0 },{ name:"Reverse Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Plank (long lever)", sets:3, reps:0, weight:35 },{ name:"Single Arm KB Swing", sets:4, reps:10, weight:0 }] },
+    { week: 4, day: "B", title: "BUDOWANIE — Deadlift", exercises: [{ name:"Deadlift (paused)", sets:4, reps:4, weight:0 },{ name:"KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Suitcase Carry 15m", sets:4, reps:1, weight:0 },{ name:"Hollow Hold", sets:3, reps:0, weight:30 }] },
+    { week: 4, day: "C", title: "BUDOWANIE — Bench",    exercises: [{ name:"Bench Press (paused)", sets:6, reps:6, weight:0 },{ name:"Dips (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Ab Wheel", sets:3, reps:15, weight:0 }] },
+    // SIŁA — Wk 5–6 — 5×5
+    { week: 5, day: "A", title: "SIŁA — Squat",         exercises: [{ name:"Squat (no pause)", sets:5, reps:5, weight:0 },{ name:"KB Front Rack Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:30 },{ name:"KB Snatch", sets:4, reps:10, weight:0 }] },
+    { week: 5, day: "B", title: "SIŁA — Deadlift",      exercises: [{ name:"Deadlift (no pause)", sets:5, reps:3, weight:0 },{ name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Front Rack Carry 30m", sets:3, reps:1, weight:0 },{ name:"Pull Ups / Rows", sets:3, reps:8, weight:0 }] },
+    { week: 5, day: "C", title: "SIŁA — Bench",         exercises: [{ name:"Bench Press (no pause)", sets:5, reps:5, weight:0 },{ name:"Dips (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Push Up Ladder 15-1", sets:1, reps:1, weight:0 }] },
+    { week: 6, day: "A", title: "SIŁA — Squat",         exercises: [{ name:"Squat (no pause)", sets:5, reps:5, weight:0 },{ name:"KB Front Rack Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:35 },{ name:"KB Snatch", sets:4, reps:12, weight:0 }] },
+    { week: 6, day: "B", title: "SIŁA — Deadlift",      exercises: [{ name:"Deadlift (no pause)", sets:5, reps:3, weight:0 },{ name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Front Rack Carry 30m", sets:4, reps:1, weight:0 },{ name:"Pull Ups / Rows", sets:3, reps:10, weight:0 }] },
+    { week: 6, day: "C", title: "SIŁA — Bench",         exercises: [{ name:"Bench Press (no pause)", sets:5, reps:5, weight:0 },{ name:"Dips (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Push Up Ladder 20-1", sets:1, reps:1, weight:0 }] },
+    // SZCZYT — Wk 7–8 — 5×3
+    { week: 7, day: "A", title: "SZCZYT — Squat",       exercises: [{ name:"Squat (full speed)", sets:5, reps:3, weight:0 },{ name:"KB Snatch EMOM", sets:10, reps:10, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:40 }] },
+    { week: 7, day: "B", title: "SZCZYT — Deadlift",    exercises: [{ name:"Deadlift (heavy)", sets:3, reps:3, weight:0 },{ name:"Speed Deadlift 60%", sets:5, reps:3, weight:0 },{ name:"Sandbag Carry 30m", sets:4, reps:1, weight:0 }] },
+    { week: 7, day: "C", title: "SZCZYT — Bench",       exercises: [{ name:"Bench Press (full speed)", sets:5, reps:3, weight:0 },{ name:"Weighted Dips", sets:5, reps:5, weight:0 },{ name:"Weighted Pull Ups", sets:5, reps:5, weight:0 },{ name:"Push Up Ladder 25-1", sets:1, reps:1, weight:0 }] },
+    { week: 8, day: "A", title: "SZCZYT — Squat",       exercises: [{ name:"Squat (full speed)", sets:5, reps:3, weight:0 },{ name:"KB Snatch EMOM", sets:10, reps:12, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:45 }] },
+    { week: 8, day: "B", title: "SZCZYT — Deadlift",    exercises: [{ name:"Deadlift (max effort)", sets:3, reps:3, weight:0 },{ name:"Speed Deadlift 65%", sets:5, reps:3, weight:0 },{ name:"Sandbag Carry 30m", sets:5, reps:1, weight:0 }] },
+    { week: 8, day: "C", title: "SZCZYT — Bench",       exercises: [{ name:"Bench Press (max effort)", sets:5, reps:3, weight:0 },{ name:"Weighted Dips", sets:5, reps:5, weight:0 },{ name:"Weighted Pull Ups", sets:5, reps:5, weight:0 },{ name:"Push Up Ladder 25-1", sets:1, reps:1, weight:0 }] },
+  ];
+
+  const [assign8wkClients, setAssign8wkClients] = useState([]);
+
+  const assign8WeekProgram = async () => {
+    if (assign8wkClients.length === 0) return;
+    setSavingTpl(true);
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      for (const clientId of assign8wkClients) {
+        for (const d of DOM_SILY_8WK) {
+          await supabase.from("program_days").insert({
+            coach_id: au.id, athlete_id: clientId,
+            week: d.week, day: d.day, title: d.title, notes: "",
+          });
+          for (const ex of d.exercises) {
+            await supabase.from("custom_exercises").insert({
+              coach_id: au.id, athlete_id: clientId,
+              name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
+              day: d.day, week: d.week,
+            });
+          }
+        }
+        sendPushToUser(clientId, "💪 DOM SIŁY 8-Week Program assigned!", "Your full 8-week program is ready — start Week 1", "program", "/");
+      }
+      setTplMode("list");
+      setAssign8wkClients([]);
+      await loadData();
+      alert(`✅ 8-week program assigned to ${assign8wkClients.length} athlete(s)!`);
+    } catch(e) { console.log("8wk assign error:", e); alert("Error: " + e.message); }
     setSavingTpl(false);
   };
 
@@ -3369,12 +3620,12 @@ const saveCoachComment = async () => {
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>FROM WEEK</div>
-                  <input type="number" min={1} max={12} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
+                  <input type="number" min={1} max={8} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
                 </div>
                 <div style={{ fontSize: 18, color: "var(--gray2)", paddingTop: 16 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>TO WEEK</div>
-                  <input type="number" min={1} max={12} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
+                  <input type="number" min={1} max={8} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
                 </div>
               </div>
               <button onClick={copyWeek} disabled={copyingWeek || copyWeekFrom === copyWeekTo} style={{ ...s.btn, fontSize: 13, opacity: (copyingWeek || copyWeekFrom === copyWeekTo) ? 0.5 : 1 }}>
@@ -3457,7 +3708,7 @@ const saveCoachComment = async () => {
         <div style={{ ...s.card, marginBottom: 16 }}>
           <div style={{ fontFamily: "\'Barlow Condensed\', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>{editingDay ? "✏️ EDIT PROGRAM DAY" : "BUILD PROGRAM DAY"}</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="8" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
             <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={buildDay} onChange={e => setBuildDay(e.target.value)} style={s.input}>{["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
           </div>
           <label style={s.label}>TITLE</label>
@@ -3499,6 +3750,25 @@ const saveCoachComment = async () => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div style={s.sectionLabel}>PROGRAM TEMPLATES</div>
                 <button onClick={() => setTplMode("create")} style={{ ...s.btn, width: "auto", padding: "8px 16px", fontSize: 12 }}>+ NEW</button>
+              </div>
+
+              {/* ── BUILT-IN 8-WEEK DOM SIŁY PROGRAM ── */}
+              <div style={{ ...s.card, borderColor: "rgba(184,134,11,0.5)", background: "rgba(184,134,11,0.06)", marginBottom: 16 }}>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", marginBottom: 8 }}>BUILT-IN PROGRAM</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>DOM SIŁY — 8 WEEKS</div>
+                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>3 days/week · SBD + Kettlebell · 4 phases</div>
+                  </div>
+                  <button onClick={() => setTplMode("assign8wk")} style={{ ...s.btn, width: "auto", padding: "8px 14px", fontSize: 11, background: "var(--accent)", color: "#111" }}>ASSIGN →</button>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[["Wk 1–2", "FUNDAMENT 5×8", "#4a9eff"],["Wk 3–4","BUDOWANIE 6×6","#f0a020"],["Wk 5–6","SIŁA 5×5","var(--red)"],["Wk 7–8","SZCZYT 5×3","#a78bfa"]].map(([wk,ph,col])=>(
+                    <div key={wk} style={{ background:"var(--bg3)", borderRadius:6, padding:"4px 10px", borderLeft:`2px solid ${col}`, fontSize:11 }}>
+                      {wk} · {ph}
+                    </div>
+                  ))}
+                </div>
               </div>
               {templates.length === 0 ? (
                 <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
@@ -3575,6 +3845,54 @@ const saveCoachComment = async () => {
             </div>
           )}
 
+          {tplMode === "assign8wk" && (
+            <div>
+              <button onClick={() => { setTplMode("list"); setAssign8wkClients([]); }}
+                style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>
+                DOM SIŁY — 8-WEEK PROGRAM
+              </div>
+              <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 4 }}>24 training days · Weeks 1–8 · A/B/C</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                {[["Wk 1–2","FUNDAMENT 5×8","#4a9eff"],["Wk 3–4","BUDOWANIE 6×6","#f0a020"],["Wk 5–6","SIŁA 5×5","var(--red)"],["Wk 7–8","SZCZYT 5×3","#a78bfa"]].map(([wk,ph,col])=>(
+                  <div key={wk} style={{ background:"var(--bg3)", borderRadius:6, padding:"4px 10px", borderLeft:`2px solid ${col}`, fontSize:11 }}>{wk} · {ph}</div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 16, padding: "10px 12px",
+                background: "var(--bg3)", borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
+                ⚠️ This will write all 24 training days to the athlete's calendar (Weeks 1–8). Weights are left at 0 — coach adjusts individually.
+              </div>
+              <label style={s.label}>SELECT ATHLETES</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {athletes.map(a => {
+                  const selected = assign8wkClients.includes(a.id);
+                  return (
+                    <div key={a.id} onClick={() => setAssign8wkClients(p => selected ? p.filter(id => id !== a.id) : [...p, a.id])}
+                      style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center",
+                        cursor: "pointer", borderColor: selected ? "var(--accent)" : "var(--border)", padding: "12px 16px" }}>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>
+                        {a.name || a.profiles?.name || a.email}
+                      </div>
+                      <div style={{ width: 24, height: 24, borderRadius: 5,
+                        background: selected ? "var(--accent)" : "var(--bg3)",
+                        border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, color: "#111" }}>
+                        {selected ? "✓" : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={assign8WeekProgram}
+                disabled={savingTpl || assign8wkClients.length === 0}
+                style={{ ...s.btn, background: "var(--accent)", color: "#111",
+                  opacity: savingTpl || assign8wkClients.length === 0 ? 0.5 : 1 }}>
+                {savingTpl ? "ASSIGNING..." : `ASSIGN 8 WEEKS TO ${assign8wkClients.length || "?"} ATHLETE${assign8wkClients.length !== 1 ? "S" : ""} →`}
+              </button>
+            </div>
+          )}
+
           {tplMode === "assign" && selectedTpl && (
             <div>
               <button onClick={() => { setTplMode("list"); setSelectedTpl(null); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
@@ -3582,7 +3900,7 @@ const saveCoachComment = async () => {
               <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 16 }}>{(selectedTpl.days || []).length} days · select athletes + week</div>
 
               <label style={s.label}>START WEEK</label>
-              <input type="number" min="1" max="12" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
+              <input type="number" min="1" max="8" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
 
               <label style={s.label}>SELECT ATHLETES</label>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
@@ -3717,7 +4035,7 @@ const saveCoachComment = async () => {
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={newEx.day} onChange={e => setNewEx({...newEx,day:e.target.value})} style={s.input}>{["A","B","C","D"].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={newEx.week} onChange={e => setNewEx({...newEx,week:+e.target.value})} style={s.input} /></div>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="8" value={newEx.week} onChange={e => setNewEx({...newEx,week:+e.target.value})} style={s.input} /></div>
           </div>
           <label style={s.label}>NOTES</label>
           <input value={newEx.notes} onChange={e => setNewEx({...newEx,notes:e.target.value})} placeholder="Cues..." style={{ ...s.input, marginBottom: 10 }} />

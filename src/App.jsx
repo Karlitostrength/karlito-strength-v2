@@ -2947,9 +2947,9 @@ function DashboardScreen({ user, week, setWeek, onStartWorkout, hasCoach }) {
         days.map(day => {
           const dayName = day === "A" ? "SQUAT DOMINANT" : day === "B" ? "DEADLIFT DOMINANT" : "BENCH DOMINANT";
           const sqName = getSquatExercise(week, user.injuries);
-          const dlPaused = (level === "beginner" && week <= 5) || (level === "intermediate" && week <= 4);
+          const dlPaused = (user.level === "beginner" && week <= 5) || (user.level === "intermediate" && week <= 4);
           const dlName = (user.injuries?.lowerBack ? "Block Pull" : "Deadlift") + (dlPaused ? " (paused)" : "");
-          const bpPaused = level !== "advanced" && week <= 4;
+          const bpPaused = user.level !== "advanced" && week <= 4;
           const bpName = (bpPaused ? "Paused " : "") + "Bench Press";
           return (
             <div key={day} style={{ ...s.card, marginBottom: 10, cursor: "pointer", transition: "border-color 0.2s" }}

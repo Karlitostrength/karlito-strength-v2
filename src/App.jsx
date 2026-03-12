@@ -59,11 +59,13 @@ async function registerPushSubscription(userId) {
       });
     }
 
-    const { error } = await supabase.from("push_subscriptions").upsert({
+    // Delete existing then insert fresh (avoids unique constraint issues)
+    await supabase.from("push_subscriptions").delete().eq("user_id", userId);
+    const { error } = await supabase.from("push_subscriptions").insert({
       user_id: userId,
       subscription: JSON.stringify(sub),
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    });
 
     if (error) throw new Error("DB error: " + error.message);
     return { ok: true };
@@ -171,10 +173,10 @@ document.head.appendChild(style);
 
 // DOM SIŁY — 8-week phases
 const PHASES = {
-  1: { name: "FUNDAMENT",  color: "#4a9eff", weeks: [1,2], scheme: "5×8 paused" },
-  2: { name: "BUDOWANIE",  color: "#f0a020", weeks: [3,4], scheme: "6×6" },
-  3: { name: "SIŁA",       color: "#c41e1e", weeks: [5,6], scheme: "5×5" },
-  4: { name: "SZCZYT",     color: "#a78bfa", weeks: [7,8], scheme: "5×3" },
+  1: { name: "FUNDAMENTALS", color: "#4a9eff", weeks: [1,2], scheme: "5×8 paused" },
+  2: { name: "BUILDING",     color: "#f0a020", weeks: [3,4], scheme: "6×6" },
+  3: { name: "STRENGTH",     color: "#c41e1e", weeks: [5,6], scheme: "5×5" },
+  4: { name: "PEAK",         color: "#a78bfa", weeks: [7,8], scheme: "5×3" },
 };
 
 function getPhase(week) {
@@ -309,7 +311,8 @@ const ACCESSORIES = {
   },
 };
 
-function generateWorkout(day, week, level, oneRM, injuries) {
+function generateWorkout(day, week, level, oneRM, injuries = {}) {
+  injuries = injuries || {};
   const pct = getPct(week, level);
   const { sets, reps } = getSetsReps(week);
   const swing = getSwingProtocol(week);
@@ -595,26 +598,27 @@ function LevelCard({ level, isCurrentLevel, compact = false, showStandards = fal
 
       {/* Standards — shown when showStandards=true */}
       {showStandards && standards && (
-        <div style={{ marginTop: 14, borderTop: `1px solid ${level.color}33`, paddingTop: 12 }}>
-          <div style={{ fontSize: 9, color: level.color, letterSpacing: "0.2em",
-            fontFamily: "'Cinzel', serif", marginBottom: 8 }}>STANDARDS</div>
+        <div style={{ marginTop: 14, borderTop: `1px solid ${level.color}55`, paddingTop: 12 }}>
+          <div style={{ fontSize: 10, color: level.color, letterSpacing: "0.2em",
+            fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, marginBottom: 10 }}>STANDARDS</div>
           {Object.entries(standards).map(([pillar, s]) => (
-            <div key={pillar} style={{ display: "flex", gap: 8, marginBottom: 6,
-              paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
-              <div style={{ width: 42, fontSize: 9, color: level.color, fontFamily: "'Cinzel', serif",
-                letterSpacing: "0.08em", flexShrink: 0, paddingTop: 2 }}>
+            <div key={pillar} style={{ display: "flex", gap: 10, marginBottom: 8,
+              paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
+              <div style={{ width: 52, fontSize: 10, color: level.color,
+                fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
+                letterSpacing: "0.06em", flexShrink: 0, paddingTop: 2, textTransform: "uppercase" }}>
                 {PILLAR_LABELS[pillar] || pillar}
               </div>
-              <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.4 }}>{s.label}</div>
+              <div style={{ fontSize: 13, color: "var(--white)", lineHeight: 1.5, fontWeight: 500 }}>{s.label}</div>
             </div>
           ))}
           {level.engineOptions && (
-            <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg3)",
-              borderRadius: 4, borderLeft: `2px solid ${level.color}` }}>
-              <div style={{ fontSize: 9, color: level.color, letterSpacing: "0.15em",
-                fontFamily: "'Cinzel', serif", marginBottom: 6 }}>ENGINE — CHOOSE ONE</div>
+            <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--bg3)",
+              borderRadius: 6, borderLeft: `3px solid ${level.color}` }}>
+              <div style={{ fontSize: 10, color: level.color, letterSpacing: "0.15em",
+                fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, marginBottom: 8 }}>ENGINE — CHOOSE ONE</div>
               {level.engineOptions.map((opt, i) => (
-                <div key={i} style={{ fontSize: 11, color: "var(--gray)", marginBottom: 3 }}>
+                <div key={i} style={{ fontSize: 13, color: "var(--white)", marginBottom: 5, lineHeight: 1.4 }}>
                   {i + 1}. {opt}
                 </div>
               ))}
@@ -672,7 +676,7 @@ function DomSilyPathScreen({ user, authUser }) {
     setSavingTests(true); setTestError(""); setTestsSaved(false);
     try {
       const updates = {
-        pullups:            testVals.pushups,   // Note: pushups stored separately
+        pushups:            testVals.pushups,
         inverted_rows:      testVals.inverted_rows,
         kb_swing_test:      testVals.kb_swing_test,
         goblet_test:        testVals.goblet_test,
@@ -978,12 +982,21 @@ function HallOfStrengthWidget() {
   const [recentAch, setRecentAch] = useState([]);
 
   useEffect(() => {
-    supabase.from("level_achievements")
-      .select("*, profiles:user_id(name)")
-      .eq("status", "approved")
-      .order("approved_at", { ascending: false })
-      .limit(3)
-      .then(({ data }) => setRecentAch(data || []));
+    const load = async () => {
+      try {
+        const { data: achs } = await supabase
+          .from("level_achievements").select("*")
+          .eq("status", "approved")
+          .order("approved_at", { ascending: false }).limit(3);
+        if (!achs || !achs.length) return;
+        const ids = [...new Set(achs.map(a => a.user_id))];
+        const { data: profs } = await supabase.from("profiles").select("id, name").in("id", ids);
+        const nameMap = {};
+        (profs || []).forEach(p => { nameMap[p.id] = p.name; });
+        setRecentAch(achs.map(a => ({ ...a, profiles: { name: nameMap[a.user_id] || null } })));
+      } catch(e) {}
+    };
+    load();
   }, []);
 
   if (!recentAch.length) return null;
@@ -1024,13 +1037,20 @@ function CommunityFeed({ authUser, compact = false }) {
     const load = async () => {
       setLoading(true);
       try {
-        const { data } = await supabase
-          .from("level_achievements")
-          .select("*, profiles:user_id(name)")
+        const { data: achs } = await supabase
+          .from("level_achievements").select("*")
           .eq("status", "approved")
           .order("approved_at", { ascending: false })
           .limit(compact ? 5 : 30);
-        setAchievements(data || []);
+        if (achs && achs.length) {
+          const ids = [...new Set(achs.map(a => a.user_id))];
+          const { data: profs } = await supabase.from("profiles").select("id, name").in("id", ids);
+          const nameMap = {};
+          (profs || []).forEach(p => { nameMap[p.id] = p.name; });
+          setAchievements(achs.map(a => ({ ...a, profiles: { name: nameMap[a.user_id] || null } })));
+        } else {
+          setAchievements([]);
+        }
       } catch(e) {}
       setLoading(false);
     };
@@ -1226,12 +1246,19 @@ function RanksCoachView({ athletes }) {
   const loadPending = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("level_achievements")
-        .select("*, profiles:user_id(name, email)")
+      const { data: achs } = await supabase
+        .from("level_achievements").select("*")
         .eq("status", "pending")
         .order("created_at", { ascending: false });
-      setPending(data || []);
+      if (achs && achs.length) {
+        const ids = [...new Set(achs.map(a => a.user_id))];
+        const { data: profs } = await supabase.from("profiles").select("id, name, email").in("id", ids);
+        const profMap = {};
+        (profs || []).forEach(p => { profMap[p.id] = p; });
+        setPending(achs.map(a => ({ ...a, profiles: profMap[a.user_id] || null })));
+      } else {
+        setPending([]);
+      }
     } catch(e) {}
     setLoading(false);
   };
@@ -2127,8 +2154,14 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
                   {ex.name}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 2, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                  {ex.sets} × {ex.reps} @ {ex.weight ? `${ex.weight}kg` : "—"}
+                  {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.reps}
+                  {ex.rpe ? ` · RPE ${ex.rpe}` : ex.weight ? ` @ ${ex.weight}kg` : ""}
                 </div>
+                {ex.notes ? (
+                  <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2, fontStyle: "italic" }}>
+                    {ex.notes}
+                  </div>
+                ) : null}
               </div>
               <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
                 style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
@@ -2978,7 +3011,7 @@ function CoachScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedClient, setSelectedClient] = useState(null);
   const [view, setView] = useState("dashboard"); // dashboard | profile | sessions | addExercise
-  const [newEx, setNewEx] = useState({ name: "", sets: 3, reps: 10, weight: 0, notes: "", day: "A", week: 1 });
+  const [newEx, setNewEx] = useState({ name: "", sets: 3, reps: 10, weight: 0, rpe: 0, unit: "kg", notes: "", day: "A", week: 1 });
   const [saving, setSaving] = useState(false);
   const [exercises, setExercises] = useState([]);
   const [programDays, setProgramDays] = useState([]);
@@ -3077,34 +3110,180 @@ function CoachScreen() {
 
   // ── Built-in DOM SIŁY 8-week program data ──────────────────────────────────
   const DOM_SILY_8WK = [
-    // FUNDAMENT — Wk 1–2 — 5×8 paused
-    { week: 1, day: "A", title: "FUNDAMENT — Squat",    exercises: [{ name:"Squat (paused 2s)", sets:5, reps:8, weight:0 },{ name:"Reverse Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Plank (short lever)", sets:3, reps:0, weight:20 },{ name:"KB Swing", sets:3, reps:8, weight:0 }] },
-    { week: 1, day: "B", title: "FUNDAMENT — Deadlift", exercises: [{ name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0 },{ name:"KB Clean", sets:5, reps:5, weight:0 },{ name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },{ name:"KB Press", sets:5, reps:5, weight:0 }] },
-    { week: 1, day: "C", title: "FUNDAMENT — Bench",    exercises: [{ name:"Bench Press (paused)", sets:5, reps:8, weight:0 },{ name:"Push Up + Gorilla Row", sets:5, reps:8, weight:0 },{ name:"Ab Wheel", sets:3, reps:8, weight:0 }] },
-    { week: 2, day: "A", title: "FUNDAMENT — Squat",    exercises: [{ name:"Squat (paused 2s)", sets:5, reps:8, weight:0 },{ name:"Reverse Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Plank (short lever)", sets:3, reps:0, weight:25 },{ name:"KB Swing", sets:3, reps:12, weight:0 }] },
-    { week: 2, day: "B", title: "FUNDAMENT — Deadlift", exercises: [{ name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0 },{ name:"KB Clean", sets:5, reps:5, weight:0 },{ name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },{ name:"KB Press", sets:5, reps:5, weight:0 }] },
-    { week: 2, day: "C", title: "FUNDAMENT — Bench",    exercises: [{ name:"Bench Press (paused)", sets:5, reps:8, weight:0 },{ name:"Push Up + Gorilla Row", sets:5, reps:10, weight:0 },{ name:"Ab Wheel", sets:3, reps:10, weight:0 }] },
-    // BUDOWANIE — Wk 3–4 — 6×6
-    { week: 3, day: "A", title: "BUDOWANIE — Squat",    exercises: [{ name:"Squat (short pause)", sets:6, reps:6, weight:0 },{ name:"Reverse Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Plank (long lever)", sets:3, reps:0, weight:30 },{ name:"Single Arm KB Swing", sets:4, reps:7, weight:0 }] },
-    { week: 3, day: "B", title: "BUDOWANIE — Deadlift", exercises: [{ name:"Deadlift (paused)", sets:4, reps:4, weight:0 },{ name:"KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Suitcase Carry 15m", sets:3, reps:1, weight:0 },{ name:"Hollow Hold", sets:3, reps:0, weight:30 }] },
-    { week: 3, day: "C", title: "BUDOWANIE — Bench",    exercises: [{ name:"Bench Press (paused)", sets:6, reps:6, weight:0 },{ name:"Dips (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Ab Wheel", sets:3, reps:12, weight:0 }] },
-    { week: 4, day: "A", title: "BUDOWANIE — Squat",    exercises: [{ name:"Squat (short pause)", sets:6, reps:6, weight:0 },{ name:"Reverse Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Plank (long lever)", sets:3, reps:0, weight:35 },{ name:"Single Arm KB Swing", sets:4, reps:10, weight:0 }] },
-    { week: 4, day: "B", title: "BUDOWANIE — Deadlift", exercises: [{ name:"Deadlift (paused)", sets:4, reps:4, weight:0 },{ name:"KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Suitcase Carry 15m", sets:4, reps:1, weight:0 },{ name:"Hollow Hold", sets:3, reps:0, weight:30 }] },
-    { week: 4, day: "C", title: "BUDOWANIE — Bench",    exercises: [{ name:"Bench Press (paused)", sets:6, reps:6, weight:0 },{ name:"Dips (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps total)", sets:1, reps:50, weight:0 },{ name:"Ab Wheel", sets:3, reps:15, weight:0 }] },
-    // SIŁA — Wk 5–6 — 5×5
-    { week: 5, day: "A", title: "SIŁA — Squat",         exercises: [{ name:"Squat (no pause)", sets:5, reps:5, weight:0 },{ name:"KB Front Rack Lunge", sets:3, reps:8, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:30 },{ name:"KB Snatch", sets:4, reps:10, weight:0 }] },
-    { week: 5, day: "B", title: "SIŁA — Deadlift",      exercises: [{ name:"Deadlift (no pause)", sets:5, reps:3, weight:0 },{ name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Front Rack Carry 30m", sets:3, reps:1, weight:0 },{ name:"Pull Ups / Rows", sets:3, reps:8, weight:0 }] },
-    { week: 5, day: "C", title: "SIŁA — Bench",         exercises: [{ name:"Bench Press (no pause)", sets:5, reps:5, weight:0 },{ name:"Dips (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Push Up Ladder 15-1", sets:1, reps:1, weight:0 }] },
-    { week: 6, day: "A", title: "SIŁA — Squat",         exercises: [{ name:"Squat (no pause)", sets:5, reps:5, weight:0 },{ name:"KB Front Rack Lunge", sets:3, reps:10, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:35 },{ name:"KB Snatch", sets:4, reps:12, weight:0 }] },
-    { week: 6, day: "B", title: "SIŁA — Deadlift",      exercises: [{ name:"Deadlift (no pause)", sets:5, reps:3, weight:0 },{ name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },{ name:"Front Rack Carry 30m", sets:4, reps:1, weight:0 },{ name:"Pull Ups / Rows", sets:3, reps:10, weight:0 }] },
-    { week: 6, day: "C", title: "SIŁA — Bench",         exercises: [{ name:"Bench Press (no pause)", sets:5, reps:5, weight:0 },{ name:"Dips (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Pull Ups (50 reps for time)", sets:1, reps:50, weight:0 },{ name:"Push Up Ladder 20-1", sets:1, reps:1, weight:0 }] },
-    // SZCZYT — Wk 7–8 — 5×3
-    { week: 7, day: "A", title: "SZCZYT — Squat",       exercises: [{ name:"Squat (full speed)", sets:5, reps:3, weight:0 },{ name:"KB Snatch EMOM", sets:10, reps:10, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:40 }] },
-    { week: 7, day: "B", title: "SZCZYT — Deadlift",    exercises: [{ name:"Deadlift (heavy)", sets:3, reps:3, weight:0 },{ name:"Speed Deadlift 60%", sets:5, reps:3, weight:0 },{ name:"Sandbag Carry 30m", sets:4, reps:1, weight:0 }] },
-    { week: 7, day: "C", title: "SZCZYT — Bench",       exercises: [{ name:"Bench Press (full speed)", sets:5, reps:3, weight:0 },{ name:"Weighted Dips", sets:5, reps:5, weight:0 },{ name:"Weighted Pull Ups", sets:5, reps:5, weight:0 },{ name:"Push Up Ladder 25-1", sets:1, reps:1, weight:0 }] },
-    { week: 8, day: "A", title: "SZCZYT — Squat",       exercises: [{ name:"Squat (full speed)", sets:5, reps:3, weight:0 },{ name:"KB Snatch EMOM", sets:10, reps:12, weight:0 },{ name:"Copenhagen Side Plank", sets:3, reps:0, weight:45 }] },
-    { week: 8, day: "B", title: "SZCZYT — Deadlift",    exercises: [{ name:"Deadlift (max effort)", sets:3, reps:3, weight:0 },{ name:"Speed Deadlift 65%", sets:5, reps:3, weight:0 },{ name:"Sandbag Carry 30m", sets:5, reps:1, weight:0 }] },
-    { week: 8, day: "C", title: "SZCZYT — Bench",       exercises: [{ name:"Bench Press (max effort)", sets:5, reps:3, weight:0 },{ name:"Weighted Dips", sets:5, reps:5, weight:0 },{ name:"Weighted Pull Ups", sets:5, reps:5, weight:0 },{ name:"Push Up Ladder 25-1", sets:1, reps:1, weight:0 }] },
+    // ── FUNDAMENTALS — Wk 1–2 — 5×8 paused ──────────────────────────────────
+    { week: 1, day: "A", title: "FUNDAMENTALS — Squat",
+      exercises: [
+        { name: "Squat (paused 2s)",   sets: 5, reps: 8, weight: 0, rpe: 7 },
+        { name: "Back Lunge",           sets: 3, reps: 8, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 30, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 8, weight: 0 },
+      ]},
+    { week: 1, day: "B", title: "FUNDAMENTALS — Deadlift",
+      exercises: [
+        { name: "Deadlift (paused at knee)", sets: 5, reps: 5, weight: 0, rpe: 7 },
+        { name: "KB Clean",              sets: 5, reps: 5, weight: 0 },
+        { name: "Farmer Carry 30m",      sets: 3, reps: 1, weight: 0 },
+        { name: "KB Press",              sets: 5, reps: 5, weight: 0 },
+      ]},
+    { week: 1, day: "C", title: "FUNDAMENTALS — Bench",
+      exercises: [
+        { name: "Bench Press (paused)",  sets: 5, reps: 8, weight: 0, rpe: 7 },
+        { name: "Push Up + Gorilla Row", sets: 5, reps: 8, weight: 0 },
+        { name: "Ab Wheel",              sets: 3, reps: 8, weight: 0 },
+      ]},
+
+    { week: 2, day: "A", title: "FUNDAMENTALS — Squat",
+      exercises: [
+        { name: "Squat (paused 2s)",   sets: 5, reps: 8, weight: 0, rpe: 7 },
+        { name: "Back Lunge",           sets: 3, reps: 10, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 30, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 8, weight: 0 },
+      ]},
+    { week: 2, day: "B", title: "FUNDAMENTALS — Deadlift",
+      exercises: [
+        { name: "Deadlift (paused at knee)", sets: 5, reps: 5, weight: 0, rpe: 7 },
+        { name: "KB Clean",              sets: 5, reps: 5, weight: 0 },
+        { name: "Farmer Carry 30m",      sets: 3, reps: 1, weight: 0 },
+        { name: "KB Press",              sets: 5, reps: 5, weight: 0 },
+      ]},
+    { week: 2, day: "C", title: "FUNDAMENTALS — Bench",
+      exercises: [
+        { name: "Bench Press (paused)",  sets: 5, reps: 8, weight: 0, rpe: 7 },
+        { name: "Push Up + Gorilla Row", sets: 5, reps: 10, weight: 0 },
+        { name: "Ab Wheel",              sets: 3, reps: 10, weight: 0 },
+      ]},
+
+    // ── BUILDING — Wk 3–4 — 6×6 ─────────────────────────────────────────────
+    { week: 3, day: "A", title: "BUILDING — Squat",
+      exercises: [
+        { name: "Squat (paused)",      sets: 6, reps: 6, weight: 0, rpe: 7 },
+        { name: "Back Lunge",           sets: 3, reps: 10, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 35, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 10, weight: 0 },
+      ]},
+    { week: 3, day: "B", title: "BUILDING — Deadlift",
+      exercises: [
+        { name: "Deadlift (paused)",   sets: 6, reps: 6, weight: 0, rpe: 7 },
+        { name: "KB Clean + Press",     sets: 5, reps: 5, weight: 0 },
+        { name: "Suitcase Carry 15m",   sets: 3, reps: 1, weight: 0 },
+        { name: "Hollow Hold",          sets: 3, reps: 30, unit: "sec" },
+      ]},
+    { week: 3, day: "C", title: "BUILDING — Bench",
+      exercises: [
+        { name: "Bench Press (paused)", sets: 6, reps: 6, weight: 0, rpe: 7 },
+        { name: "Dips (50 reps total)", sets: 1, reps: 50, weight: 0 },
+        { name: "Pull Ups (50 reps total)", sets: 1, reps: 50, weight: 0 },
+        { name: "Ab Wheel",             sets: 3, reps: 12, weight: 0 },
+      ]},
+
+    { week: 4, day: "A", title: "BUILDING — Squat",
+      exercises: [
+        { name: "Squat (paused)",      sets: 6, reps: 6, weight: 0, rpe: 8 },
+        { name: "Back Lunge",           sets: 3, reps: 12, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 35, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 12, weight: 0 },
+      ]},
+    { week: 4, day: "B", title: "BUILDING — Deadlift",
+      exercises: [
+        { name: "Deadlift (paused)",   sets: 6, reps: 6, weight: 0, rpe: 8 },
+        { name: "KB Clean + Press",     sets: 5, reps: 5, weight: 0 },
+        { name: "Suitcase Carry 15m",   sets: 4, reps: 1, weight: 0 },
+        { name: "Hollow Hold",          sets: 3, reps: 35, unit: "sec" },
+      ]},
+    { week: 4, day: "C", title: "BUILDING — Bench",
+      exercises: [
+        { name: "Bench Press (paused)", sets: 6, reps: 6, weight: 0, rpe: 8 },
+        { name: "Dips (50 reps total)", sets: 1, reps: 50, weight: 0 },
+        { name: "Pull Ups (50 reps total)", sets: 1, reps: 50, weight: 0 },
+        { name: "Ab Wheel",             sets: 3, reps: 15, weight: 0 },
+      ]},
+
+    // ── STRENGTH — Wk 5–6 — 5×5 ─────────────────────────────────────────────
+    { week: 5, day: "A", title: "STRENGTH — Squat",
+      exercises: [
+        { name: "Squat",               sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Back Lunge",           sets: 3, reps: 12, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 40, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 12, weight: 0 },
+      ]},
+    { week: 5, day: "B", title: "STRENGTH — Deadlift",
+      exercises: [
+        { name: "Deadlift",            sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Double KB Clean + Press", sets: 5, reps: 5, weight: 0 },
+        { name: "Front Rack Carry 30m", sets: 3, reps: 1, weight: 0 },
+        { name: "Pull Ups / Rows",      sets: 3, reps: 8, weight: 0 },
+      ]},
+    { week: 5, day: "C", title: "STRENGTH — Bench",
+      exercises: [
+        { name: "Bench Press",         sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Dips (50 reps for time)", sets: 1, reps: 50, weight: 0 },
+        { name: "Pull Ups (50 reps for time)", sets: 1, reps: 50, weight: 0 },
+        { name: "Push Up Ladder 15-1", sets: 1, reps: 1, weight: 0 },
+      ]},
+
+    { week: 6, day: "A", title: "STRENGTH — Squat",
+      exercises: [
+        { name: "Squat",               sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Back Lunge",           sets: 3, reps: 8, weight: 0, notes: "add weight" },
+        { name: "Copenhagen Plank",     sets: 3, reps: 40, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 8, weight: 0, notes: "grab a bigger bell" },
+      ]},
+    { week: 6, day: "B", title: "STRENGTH — Deadlift",
+      exercises: [
+        { name: "Deadlift",            sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Double KB Clean + Press", sets: 5, reps: 5, weight: 0 },
+        { name: "Front Rack Carry 30m", sets: 4, reps: 1, weight: 0 },
+        { name: "Pull Ups / Rows",      sets: 3, reps: 10, weight: 0 },
+      ]},
+    { week: 6, day: "C", title: "STRENGTH — Bench",
+      exercises: [
+        { name: "Bench Press",         sets: 5, reps: 5, weight: 0, rpe: 8 },
+        { name: "Dips (50 reps for time)", sets: 1, reps: 50, weight: 0 },
+        { name: "Pull Ups (50 reps for time)", sets: 1, reps: 50, weight: 0 },
+        { name: "Push Up Ladder 20-1", sets: 1, reps: 1, weight: 0 },
+      ]},
+
+    // ── PEAK — Wk 7–8 — 5×3 ─────────────────────────────────────────────────
+    { week: 7, day: "A", title: "PEAK — Squat",
+      exercises: [
+        { name: "Squat",               sets: 5, reps: 3, weight: 0, rpe: 9 },
+        { name: "Back Lunge",           sets: 3, reps: 6, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 3, reps: 40, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 3, reps: 8, weight: 0 },
+      ]},
+    { week: 7, day: "B", title: "PEAK — Deadlift",
+      exercises: [
+        { name: "Deadlift",            sets: 5, reps: 3, weight: 0, rpe: 9 },
+        { name: "KB Clean + Press",     sets: 4, reps: 4, weight: 0 },
+        { name: "Farmer Carry 30m",     sets: 3, reps: 1, weight: 0 },
+        { name: "Pull Ups / Rows",      sets: 3, reps: 6, weight: 0 },
+      ]},
+    { week: 7, day: "C", title: "PEAK — Bench",
+      exercises: [
+        { name: "Bench Press",         sets: 5, reps: 3, weight: 0, rpe: 9 },
+        { name: "Weighted Dips",        sets: 4, reps: 5, weight: 0 },
+        { name: "Weighted Pull Ups",    sets: 4, reps: 5, weight: 0 },
+      ]},
+
+    { week: 8, day: "A", title: "PEAK — Squat",
+      exercises: [
+        { name: "Squat",               sets: 5, reps: 2, weight: 0, rpe: 9 },
+        { name: "Back Lunge",           sets: 3, reps: 5, weight: 0 },
+        { name: "Copenhagen Plank",     sets: 2, reps: 30, unit: "sec" },
+        { name: "KB Swing 2H",          sets: 2, reps: 6, weight: 0 },
+      ]},
+    { week: 8, day: "B", title: "PEAK — Deadlift",
+      exercises: [
+        { name: "Deadlift",            sets: 5, reps: 2, weight: 0, rpe: 9 },
+        { name: "KB Clean + Press",     sets: 3, reps: 3, weight: 0 },
+        { name: "Farmer Carry 30m",     sets: 2, reps: 1, weight: 0 },
+      ]},
+    { week: 8, day: "C", title: "PEAK — Bench",
+      exercises: [
+        { name: "Bench Press",         sets: 5, reps: 2, weight: 0, rpe: 9 },
+        { name: "Weighted Dips",        sets: 3, reps: 5, weight: 0 },
+        { name: "Weighted Pull Ups",    sets: 3, reps: 5, weight: 0 },
+      ]},
   ];
 
   const [assign8wkClients, setAssign8wkClients] = useState([]);
@@ -3123,7 +3302,11 @@ function CoachScreen() {
           for (const ex of d.exercises) {
             await supabase.from("custom_exercises").insert({
               coach_id: au.id, athlete_id: clientId,
-              name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
+              name: ex.name, sets: ex.sets, reps: ex.reps,
+              weight: ex.weight || 0,
+              rpe: ex.rpe || 0,
+              unit: ex.unit || "kg",
+              notes: ex.notes || "",
               day: d.day, week: d.week,
             });
           }
@@ -3232,7 +3415,7 @@ function CoachScreen() {
         athlete_id: selectedClient,
         ...newEx,
       });
-      setNewEx({ name: "", sets: 3, reps: 10, weight: 0, notes: "", day: "A", week: 1 });
+      setNewEx({ name: "", sets: 3, reps: 10, weight: 0, rpe: 0, unit: "kg", notes: "", day: "A", week: 1 });
       await loadData();
       setView("profile");
     } catch(e) { console.log("Save exercise error:", e); }
@@ -4029,10 +4212,17 @@ const saveCoachComment = async () => {
           <label style={s.label}>EXERCISE NAME</label>
           <input value={newEx.name} onChange={e => setNewEx({...newEx,name:e.target.value})} placeholder="e.g. DB Row" style={{ ...s.input, marginBottom: 10 }} />
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            {[["SETS","sets",1],["REPS","reps",1],["KG","weight",0]].map(([lbl,key,min]) => (
+            {[["SETS","sets",1],["REPS","reps",1],["KG","weight",0],["RPE","rpe",0]].map(([lbl,key,min]) => (
               <div key={key} style={{ flex: 1 }}><label style={s.label}>{lbl}</label><input type="number" min={min} value={newEx[key]} onChange={e => setNewEx({...newEx,[key]:+e.target.value})} style={s.input} /></div>
             ))}
           </div>
+          <label style={s.label}>UNIT</label>
+          <select value={newEx.unit} onChange={e => setNewEx({...newEx, unit: e.target.value})} style={{ ...s.input, marginBottom: 10 }}>
+            <option value="kg">kg (weight)</option>
+            <option value="sec">sec (time hold)</option>
+            <option value="m">m (distance)</option>
+            <option value="reps">reps only</option>
+          </select>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={newEx.day} onChange={e => setNewEx({...newEx,day:e.target.value})} style={s.input}>{["A","B","C","D"].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
             <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="8" value={newEx.week} onChange={e => setNewEx({...newEx,week:+e.target.value})} style={s.input} /></div>

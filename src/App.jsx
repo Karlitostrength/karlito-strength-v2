@@ -2077,12 +2077,15 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
       if (!authUser) { setLoadingProgram(false); return; }
       // Load coach program — own try/catch so library errors don't block workout
       try {
+        console.log("[DEBUG] Loading program_days — athlete:", authUser.id, "week:", week, "day:", dayKey);
         const { data: day, error: dayErr } = await supabase.from("program_days").select("*")
           .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey).maybeSingle();
+        console.log("[DEBUG] program_days result:", { day, dayErr });
         if (dayErr) console.error("program_days error:", dayErr);
         if (day) {
-          const { data: exs } = await supabase.from("custom_exercises").select("*")
+          const { data: exs, error: exErr } = await supabase.from("custom_exercises").select("*")
             .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
+          console.log("[DEBUG] custom_exercises result:", { exs, exErr });
           setCoachProgram({ ...day, exercises: exs || [] });
         }
       } catch(e) { console.error("WorkoutScreen load error:", e); }

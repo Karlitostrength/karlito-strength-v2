@@ -2078,7 +2078,7 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
       try {
         // Load coach program
         const { data: day } = await supabase.from("program_days").select("*")
-          .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey).single();
+          .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey).maybeSingle();
         if (day) {
           const { data: exs } = await supabase.from("custom_exercises").select("*")
             .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
@@ -4575,7 +4575,7 @@ function ProfileScreen({ user, authUser }) {
   useEffect(() => {
     // Check if actually subscribed in DB
     const check = async () => {
-      const { data } = await supabase.from("push_subscriptions").select("id").eq("user_id", authUser.id).single();
+      const { data } = await supabase.from("push_subscriptions").select("id").eq("user_id", authUser.id).maybeSingle();
       setPushEnabled(!!data);
     };
     check();

@@ -782,7 +782,19 @@ function DomSilyPathScreen({ user, authUser }) {
         gender:             gender,
       };
       const { error } = await supabase.from("profiles").update(updates).eq("id", authUser.id);
-      if (error) throw error;
+      if (error) {
+        // Jeśli brakuje kolumn w tabeli profiles — zapisz co się da, pomiń brakujące
+        if (error.message?.includes("column") || error.code === "42703") {
+          const safeUpdates = { bodyweight: updates.bodyweight, gender: updates.gender };
+          await supabase.from("profiles").update(safeUpdates).eq("id", authUser.id);
+          setTestError("⚠ Niektóre kolumny testów nie istnieją w bazie. Uruchom SQL migration — szczegóły w README.");
+          setTestsSaved(true);
+          setTimeout(() => setTestsSaved(false), 4000);
+          setSavingTests(false);
+          return;
+        }
+        throw error;
+      }
       setTestsSaved(true);
       setTimeout(() => setTestsSaved(false), 2000);
     } catch(e) { setTestError(e.message || "Save failed"); }
@@ -2055,7 +2067,7 @@ function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDon
 }
 // ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 
-function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
+function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
   const [coachProgram, setCoachProgram]   = useState(null);
   const [loadingProgram, setLoadingProgram] = useState(true);
   const [exResults, setExResults]         = useState({}); // { idx: { result: string, done: bool } }
@@ -2111,13 +2123,22 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   }, [coachProgram]);
 
   const defaultWorkout = generateWorkout(dayKey, week, user?.level, user?.oneRM, user?.injuries);
+  // Zbierz ćwiczenia z pierwszej sekcji siłowej defaultWorkout (fallback)
+  const defaultStrengthExercises = defaultWorkout?.sections
+    ?.find(s => s.title?.startsWith("SIŁA") || s.title === "STRENGTH")?.exercises || [];
+
   const workout = coachProgram ? {
     title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
-    exercises: coachProgram.exercises || [],
-    notes: coachProgram.notes || "",
-  } : (authUser ? null : {
+    // Jeśli coachProgram istnieje ale nie ma ćwiczeń → użyj auto-generated jako fallback
+    exercises: (coachProgram.exercises && coachProgram.exercises.length > 0)
+      ? coachProgram.exercises
+      : defaultStrengthExercises,
+    notes: coachProgram.notes || (coachProgram.exercises?.length === 0
+      ? "⚠ Brak ćwiczeń w bazie dla tego dnia — wyświetlam program automatyczny."
+      : ""),
+  } : (authUser && hasCoach ? null : {
     title: defaultWorkout?.title || `DAY ${dayKey}`,
-    exercises: defaultWorkout?.sections?.find(s => s.title === "STRENGTH")?.exercises || [],
+    exercises: defaultStrengthExercises,
     notes: "",
   });
 
@@ -3383,14 +3404,19 @@ function CoachScreen() {
     setSavingTpl(true);
     try {
       const { data: { user: au } } = await supabase.auth.getUser();
+      let exInsertErrors = 0;
       for (const clientId of assign8wkClients) {
+        // Usuń stary program jeśli istnieje (unikamy duplikatów)
+        await supabase.from("custom_exercises").delete().eq("athlete_id", clientId);
+        await supabase.from("program_days").delete().eq("athlete_id", clientId);
         for (const d of DOM_SILY_8WK) {
-          await supabase.from("program_days").insert({
+          const { error: dayErr } = await supabase.from("program_days").insert({
             coach_id: au.id, athlete_id: clientId,
             week: d.week, day: d.day, title: d.title, notes: "",
           });
+          if (dayErr) { console.error("program_days insert error:", dayErr); continue; }
           for (const ex of d.exercises) {
-            await supabase.from("custom_exercises").insert({
+            const { error: exErr } = await supabase.from("custom_exercises").insert({
               coach_id: au.id, athlete_id: clientId,
               name: ex.name, sets: ex.sets, reps: ex.reps,
               weight: ex.weight || 0,
@@ -3399,10 +3425,12 @@ function CoachScreen() {
               notes: ex.notes || "",
               day: d.day, week: d.week,
             });
+            if (exErr) { console.error("custom_exercises insert error:", exErr); exInsertErrors++; }
           }
         }
         sendPushToUser(clientId, "💪 DOM SIŁY 8-Week Program assigned!", "Your full 8-week program is ready — start Week 1", "program", "/");
       }
+      if (exInsertErrors > 0) { alert(`⚠️ Program assigned but ${exInsertErrors} exercises failed to save. Check console for details.`); return; }
       setTplMode("list");
       setAssign8wkClients([]);
       await loadData();
@@ -5964,7 +5992,7 @@ const [hasCoach, setHasCoach] = useState(false);
       <div className="fade-in" key={tab + activeDay}>
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "workout" && !activeDay && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
-        {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
+        {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} hasCoach={hasCoach} />}
         {tab === "schedule" && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("workout"); }} />}
         {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}

@@ -3678,9 +3678,7 @@ function CoachScreen() {
         { name:"Weighted Pull Ups",               sets:2, reps:5, weight:0 },
       ]},
     ],
-  }
-
-  ];
+  };
 
   const [assign8wkClients, setAssign8wkClients] = useState([]);
   const [assign8wkLevel, setAssign8wkLevel] = useState("beginner");

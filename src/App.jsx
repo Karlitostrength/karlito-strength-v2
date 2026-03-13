@@ -2075,23 +2075,28 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
   useEffect(() => {
     const load = async () => {
       if (!authUser) { setLoadingProgram(false); return; }
+      // Load coach program — own try/catch so library errors don't block workout
       try {
-        // Load coach program
-        const { data: day } = await supabase.from("program_days").select("*")
+        const { data: day, error: dayErr } = await supabase.from("program_days").select("*")
           .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey).maybeSingle();
+        if (dayErr) console.error("program_days error:", dayErr);
         if (day) {
           const { data: exs } = await supabase.from("custom_exercises").select("*")
             .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
           setCoachProgram({ ...day, exercises: exs || [] });
         }
+      } catch(e) { console.error("WorkoutScreen load error:", e); }
 
-        // Load previous workouts same day (last 4)
+      // Previous workouts — non-critical
+      try {
         const { data: prev } = await supabase.from("workouts").select("*")
           .eq("user_id", authUser.id).eq("day", dayKey)
           .order("created_at", { ascending: false }).limit(4);
         setPrevWorkouts(prev || []);
+      } catch(e) {}
 
-        // Load library video links
+      // Exercise library — non-critical
+      try {
         const { data: lib } = await supabase.from("exercise_library").select("name, youtube_url");
         const map = {};
         (lib || []).forEach(e => { map[e.name] = e.youtube_url; });
@@ -2126,11 +2131,11 @@ function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
     notes: coachProgram.notes || (coachProgram.exercises?.length === 0
       ? "⚠ Brak ćwiczeń w bazie dla tego dnia — wyświetlam program automatyczny."
       : ""),
-  } : (authUser && hasCoach ? null : {
+  } : {
     title: defaultWorkout?.title || `DAY ${dayKey}`,
     exercises: defaultStrengthExercises,
-    notes: "",
-  });
+    notes: (authUser && hasCoach) ? "⚠ No program assigned for this day — showing default workout." : "",
+  };
 
   if (loadingProgram) return (
     <div style={s.screen}>

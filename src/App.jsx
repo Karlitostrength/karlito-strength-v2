@@ -264,21 +264,21 @@ function calcWeight(oneRM, pct) {
 const ACCESSORIES = {
   // DAY A — SQUAT DAY (spec: Lunge + Copenhagen + KB conditioning per poziom)
   A: {
-    beginner:     ["Reverse Lunge 3×8", "Copenhagen Plank (krótka dźwignia) 3×20s"],
-    intermediate: ["Goblet Hold Reverse Lunge 3×8", "Copenhagen Plank (długa dźwignia) 3×20s"],
+    beginner:     ["Reverse Lunge 3×8", "Copenhagen Plank (short lever) 3×20s"],
+    intermediate: ["Goblet Hold Reverse Lunge 3×8", "Copenhagen Plank (long lever) 3×20s"],
     advanced:     ["Double KB Front Rack Reverse Lunge 3×6", "Copenhagen Side Plank 3×20s"],
   },
   // DAY B — DEADLIFT DAY (spec: KB EMOM per poziom)
   B: {
-    beginner:     ["EMOM 5 min × 3 rundy: 1) KB Clean ×5 | 2) Farmers Carry 30m | 3) KB Press ×5/stronę | 4) Aussie Pull Up | 5) Odpoczynek"],
-    intermediate: ["EMOM 4 min × 3 rundy: 1) KB Clean 5/5 | 2) Suitcase Carry 15m/stronę | 3) Hollow Hold 30s | 4) Odpoczynek"],
+    beginner:     ["EMOM 5 min × 3 rounds: 1) KB Clean ×5 | 2) Farmers Carry 30m | 3) KB Press ×5/side | 4) Inverted Row | 5) Rest"],
+    intermediate: ["EMOM 4 min × 3 rounds: 1) KB Clean 5/5 | 2) Suitcase Carry 15m/side | 3) Hollow Hold 30s | 4) Rest"],
     advanced:     ["15 min work block: 2×KB Clean & Press ×5 | Pull Ups ×5 (lub Rows ×10) | Sandbag Carry 30m"],
   },
   // DAY C — BENCH DAY (spec: TGU + Push/Pull per poziom)
   C: {
-    beginner:     ["Turkish Get Up 3–5×1 EMOM (jakość)", "Superseria: Push Up + Gorilla Row", "15 min AMRAP: 8 KB Swing / 8 Skull Crusher / 8 Ab Wheel"],
-    intermediate: ["Turkish Get Up 3–5×1 EMOM (jakość)", "15 min AMRAP: Push Up ×10 / Pull Up ×5 / KB Swing ×10"],
-    advanced:     ["Turkish Get Up 3–5×1 EMOM (jakość)", "Dips + Pull Ups — 50+50 total (postępuj do 70+70)", "KB Snatch finisher: 15/15 × 3 serie"],
+    beginner:     ["Turkish Get Up 3–5×1 EMOM (quality)", "Superset: Push Up + Gorilla Row", "15 min AMRAP: 8 KB Swing / 8 Skull Crusher / 8 Ab Wheel"],
+    intermediate: ["Turkish Get Up 3–5×1 EMOM (quality)", "15 min AMRAP: Push Up ×10 / Pull Up ×5 / KB Swing ×10"],
+    advanced:     ["Turkish Get Up 3–5×1 EMOM (quality)", "Dips + Pull Ups — 50+50 total (progress to 70+70)", "KB Snatch finisher: 15/15 × 3 sets"],
   },
 };
 
@@ -390,8 +390,8 @@ function generateWorkout(day, week, level, oneRM, injuries = {}) {
         ]},
         { title: "AKCESORIA", exercises: acc.map(e => ({ name: e })) },
         level === "beginner"
-          ? { title: "KONDYCJA — KB SWING (EMOM)", swing: true, swingData: kbA }
-          : { title: "KONDYCJA — KB " + (level === "advanced" ? "SNATCH" : "SINGLE ARM SWING"),
+          ? { title: "CONDITIONING — KB SWING (EMOM)", swing: true, swingData: kbA }
+          : { title: "CONDITIONING — KB " + (level === "advanced" ? "SNATCH" : "SINGLE ARM SWING"),
               snatchMax: true, snatchMaxData: kbA },
       ]
     };
@@ -1720,7 +1720,7 @@ function OnboardingScreen({ onComplete }) {
           BUILD YOUR<br />STRENGTH.
         </div>
         <div style={{ color: "var(--gray)", fontSize: 15, lineHeight: 1.6 }}>
-          8-week periodised program. SBD. Kettlebell. Calisthenics. Built on science, tested on the platform.
+          8-week periodised program. Strength Training & Kettlebells. Built on science, tested in the gym.
         </div>
       </div>
       <div style={{ ...s.card, borderColor: "var(--red-dim)", background: "rgba(196,30,30,0.05)" }}>
@@ -5708,7 +5708,7 @@ function LandingScreen({ onSignUp }) {
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.4em", color: "var(--gray2)", marginBottom: 12 }}>FREE OPTION</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 900, marginBottom: 8 }}>8-WEEK AUTO PROGRAM</div>
           <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.7, marginBottom: 20 }}>
-            No coach, no payment. Get a full periodised 8-week SBD + kettlebell program that auto-generates based on your 1RM. Track your sessions, access the exercise library.
+            No coach, no payment. Get a full periodised 8-week Strength & Kettlebell program that auto-generates based on your 1RM. Track your sessions, access the exercise library.
           </div>
           <button onClick={onSignUp}
             style={{ background: "var(--bg3)", color: "var(--white)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.06em", cursor: "pointer", width: "100%" }}>

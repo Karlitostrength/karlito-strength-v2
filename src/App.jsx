@@ -3706,12 +3706,10 @@ function CoachScreen() {
               coach_id: au.id, athlete_id: clientId,
               name: ex.name, sets: ex.sets, reps: ex.reps,
               weight: ex.weight || 0,
-              rpe: ex.rpe || 0,
-              unit: ex.unit || "kg",
               notes: ex.notes || "",
               day: d.day, week: d.week,
             });
-            if (exErr) { console.error("custom_exercises insert error:", exErr); exInsertErrors++; }
+            if (exErr) { console.error("custom_exercises insert error:", JSON.stringify(exErr), "data:", {name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, day: d.day, week: d.week}); exInsertErrors++; }
           }
         }
         sendPushToUser(clientId, "💪 DOM SIŁY 8-Week Program assigned!", "Your full 8-week program is ready — start Week 1", "program", "/");

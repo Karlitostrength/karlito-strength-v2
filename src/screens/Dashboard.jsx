@@ -1,3 +1,4 @@
+import { s } from "../lib/styles";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { PHASES } from "../constants/phases";

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 import { DOM_SILY_LEVELS } from "../constants/levels";
-
+import { s } from "../lib/styles";
 
 export function LevelCard({ level, isCurrentLevel, compact = false, showStandards = false, gender = "men" }) {
   if (!level) return null;

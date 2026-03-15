@@ -2,7 +2,8 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { s } from "../lib/styles";
 import { DOM_SILY_LEVELS, getDomSilyLevel, getNextLevelGaps } from "../constants/levels";
-import { LevelCard } from "../components/RankComponents";
+import { LevelCard, ClaimLevelModal } from "../components/RankComponents";
+import { sendPushToUser } from "../lib/push";
 
 export function DomSilyPathScreen({ user, authUser }) {
   const [gender, setGender] = useState(user?.gender || "men");

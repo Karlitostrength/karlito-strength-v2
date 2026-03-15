@@ -697,10 +697,22 @@ export function CoachScreen() {
         }
         setEditingDay(null);
       } else {
-        await supabase.from("program_days").insert({
-          coach_id: user.id, athlete_id: selectedClient,
-          week: buildWeek, day: buildDay, title: buildTitle, notes: buildNotes,
-        }).select().single();
+        // Sprawdź czy dzień już istnieje
+const { data: existing } = await supabase.from("program_days").select("id")
+  .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay).single();
+
+if (existing) {
+  // Aktualizuj istniejący
+  await supabase.from("custom_exercises").delete()
+    .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
+  await supabase.from("program_days").update({ title: buildTitle, notes: buildNotes }).eq("id", existing.id);
+} else {
+  // Wstaw nowy
+  await supabase.from("program_days").insert({
+    coach_id: user.id, athlete_id: selectedClient,
+    week: buildWeek, day: buildDay, title: buildTitle, notes: buildNotes,
+  });
+}
         for (const ex of validExercises) {
           await supabase.from("custom_exercises").insert({
             coach_id: user.id, athlete_id: selectedClient,

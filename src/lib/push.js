@@ -21,11 +21,14 @@ export async function sendPushToAllUsers(title, message, tag = "ks", url = "/") 
 
 export async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
   try {
-    await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, title, message, tag, url }),
-    });
+ await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy'}`,
+  },
+  body: JSON.stringify({ user_id: userId, title, message, tag, url }),
+});
   } catch(e) { console.log("Push failed (non-critical):", e); }
 }
 

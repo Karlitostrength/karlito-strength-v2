@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { sendPushToUser } from "./lib/push";
-import "./lib/styles";
+import { s } from "./lib/styles";
 import { PHASES } from "./constants/phases";
 import { getPhase } from "./engine/workout";
 import { LandingScreen } from "./screens/Landing";
 import { AuthScreen, OnboardingScreen } from "./screens/Auth";
 import { DashboardScreen } from "./screens/Dashboard";
-import { WorkoutScreen } from "./screens/Workout";
-import { ScheduleScreen, ProgressScreen } from "./screens/Progress";
+import { WorkoutScreen, ScheduleScreen } from "./screens/Workout";
+import { ProgressScreen } from "./screens/Progress";
 import { CoachScreen } from "./screens/Coach";
 import { ProfileScreen } from "./screens/Profile";
 import { ChatScreen } from "./screens/Chat";

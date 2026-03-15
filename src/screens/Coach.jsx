@@ -1166,10 +1166,16 @@ const saveCoachComment = async () => {
           {buildExercises.map((ex, i) => (
             <div key={i} style={{ background: "var(--bg3)", borderRadius: 6, padding: 10, marginBottom: 8 }}>
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <div onClick={() => { setLibraryPicker(i); loadLibraryList(); }} style={{ ...s.input, flex: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: ex.name ? "var(--text)" : "var(--gray2)" }}>
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14 }}>{ex.name || `Pick exercise ${i+1}...`}</span>
-                  <span style={{ fontSize: 11, color: "var(--accent)" }}>📚</span>
-                </div>
+               <input
+  value={ex.name}
+  onChange={e => { const a=[...buildExercises]; a[i].name=e.target.value; setBuildExercises(a); }}
+  placeholder={`Exercise name...`}
+  style={{ ...s.input, flex: 2, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, marginBottom: 0 }}
+/>
+<div onClick={() => { setLibraryPicker(i); loadLibraryList(); }}
+  style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 10px", cursor: "pointer", flexShrink: 0 }}>
+  <span style={{ fontSize: 14 }}>📚</span>
+</div>
                 <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{ color: "var(--red-dim)", cursor: "pointer", padding: "0 6px", alignSelf: "center", fontSize: 16 }}>✕</div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>

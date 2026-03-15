@@ -53,7 +53,6 @@ export default function HistoryScreen() {
     <div style={s.screen}>
       <div style={s.sectionLabel}>WORKOUT HISTORY</div>
 
-      {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
         {[
           ["SESSIONS", totalSessions, "total"],
@@ -68,7 +67,6 @@ export default function HistoryScreen() {
         ))}
       </div>
 
-      {/* Entries */}
       {logs.map((log, idx) => {
         const vol = volKg(log.exercises);
         const rpe = maxRPE(log.exercises);
@@ -106,11 +104,9 @@ export default function HistoryScreen() {
               </div>
             </div>
 
-            {/* Expanded */}
             {isOpen && (
               <div style={{ marginTop: 14, animation: "fadeIn 0.2s ease" }}>
                 <div style={{ height: 1, background: "var(--border)", marginBottom: 12 }} />
-
                 {log.exercises?.map((ex, ei) => {
                   const hasOldSets = (ex.sets || []).filter(st => st.done && st.weight).length > 0;
                   const hasNewResult = ex.result;
@@ -145,7 +141,6 @@ export default function HistoryScreen() {
                     </div>
                   );
                 })}
-
                 {log.comment && (
                   <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: `2px solid ${col}` }}>
                     💬 {log.comment}
@@ -157,7 +152,6 @@ export default function HistoryScreen() {
                     {log.coach_comment}
                   </div>
                 )}
-
                 <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 10, textAlign: "right", letterSpacing: "0.08em" }}>
                   CLICK TO COLLAPSE ↑
                 </div>

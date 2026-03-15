@@ -1,114 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-        const rpe = maxRPE(log.exercises);
-        const isOpen = expanded === idx;
-        const col = dayCol[log.day] || "var(--red)";
-        const doneSets = log.exercises?.reduce((s, ex) => s + ((ex.sets||[]).filter(st=>st.done).length || (ex.done ? 1 : 0)), 0) || 0;
-        const allSets = log.exercises?.reduce((s, ex) => s + Math.max((ex.sets||[]).length, 1), 0) || 0;
-
-        return (
-          <div key={idx} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}`, cursor: "pointer" }}
-            onClick={() => setExpanded(isOpen ? null : idx)}>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {log.day}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {log.week}</div>
-                </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 2 }}>
-                  {log.workout?.replace(/DAY [ABC] — /, "")}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(log.date)}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                {vol > 0 && (
-                  <>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{Math.round(vol)}</div>
-                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em" }}>KG VOL</div>
-                  </>
-                )}
-                <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{doneSets}/{allSets} sets</div>
-                {rpe != null && (
-                  <div style={{ ...s.badge(rpe >= 9 ? "var(--red)" : "var(--gray2)"), fontSize: 9, marginTop: 4, display: "inline-block" }}>RPE {rpe}</div>
-                )}
-              </div>
-            </div>
-
-            {/* Expanded */}
-            {isOpen && (
-              <div style={{ marginTop: 14, animation: "fadeIn 0.2s ease" }}>
-                <div style={{ height: 1, background: "var(--border)", marginBottom: 12 }} />
-
-                {log.exercises?.map((ex, ei) => {
-                  const hasOldSets = (ex.sets || []).filter(st => st.done && st.weight).length > 0;
-                  const hasNewResult = ex.result;
-                  if (!hasOldSets && !hasNewResult && !ex.done) return null;
-                  return (
-                    <div key={ei} style={{ marginBottom: 10 }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, color: col, marginBottom: 4, letterSpacing: "0.06em", display: "flex", justifyContent: "space-between" }}>
-                        <span>{ex.name}</span>
-                        {ex.planned && <span style={{ fontSize: 11, color: "var(--gray2)", fontWeight: 400 }}>Plan: {ex.planned.sets}×{ex.planned.reps}@{ex.planned.weight}kg</span>}
-                      </div>
-                      {hasNewResult ? (
-                        <div style={{ fontSize: 13, color: "var(--text)", background: "var(--bg3)", borderRadius: 5, padding: "6px 10px", lineHeight: 1.5 }}>
-                          {ex.result}
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {ex.sets?.map((set, si) => !set.done ? null : (
-                            <div key={si} style={{
-                              background: "var(--bg3)",
-                              border: `1px solid ${set.rpe >= 9 ? "rgba(196,30,30,0.5)" : "var(--border)"}`,
-                              borderRadius: 5, padding: "4px 8px",
-                              fontFamily: "'Barlow Condensed', sans-serif",
-                            }}>
-                              <span style={{ fontSize: 14, fontWeight: 700 }}>{set.weight}kg</span>
-                              <span style={{ fontSize: 12, color: "var(--gray2)" }}>×</span>
-                              <span style={{ fontSize: 14, fontWeight: 700 }}>{set.reps}</span>
-                              <span style={{ fontSize: 10, color: "var(--gray2)", marginLeft: 2 }}>@{set.rpe}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {log.comment && (
-                  <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: `2px solid ${col}` }}>
-                    💬 {log.comment}
-                  </div>
-                )}
-                {log.coach_comment && (
-                  <div style={{ fontSize: 12, color: "var(--text)", background: "rgba(196,30,30,0.07)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: "2px solid var(--red)" }}>
-                    <span style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em", display: "block", marginBottom: 3 }}>🎯 COACH FEEDBACK</span>
-                    {log.coach_comment}
-                  </div>
-                )}
-
-                <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 10, textAlign: "right", letterSpacing: "0.08em" }}>
-                  CLICK TO COLLAPSE ↑
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-const LIBRARY_CATEGORIES = ["All", "Squat", "Hinge", "Press", "Pull", "KB", "Accessories"];
-
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
-  let videoId = "";
-  if (url.includes("youtu.be/")) videoId = url.split("youtu.be/")[1]?.split("?")[0];
-  else if (url.includes("v=")) videoId = url.split("v=")[1]?.split("&")[0];
-  else if (url.includes("shorts/")) videoId = url.split("shorts/")[1]?.split("?")[0];
-  return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]+)/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : url;
 }
 
 export function LibraryScreen({ authUser, isCoach }) {
@@ -357,19 +253,3 @@ export function LibraryScreen({ authUser, isCoach }) {
     </div>
   );
 }
-
-const NAV_ATHLETE = [
-  { id: "dashboard", icon: "⚡", label: "HOME" },
-  { id: "workout", icon: "🏋️", label: "TRAIN" },
-  { id: "schedule", icon: "📅", label: "PLAN" },
-  { id: "chat", icon: "💬", label: "CHAT" },
-  { id: "profile", icon: "👤", label: "ME" },
-];
-
-const NAV_COACH = [
-  { id: "dashboard", icon: "⚡", label: "HOME" },
-  { id: "library", icon: "📚", label: "LIBRARY" },
-  { id: "chat", icon: "💬", label: "CHAT" },
-  { id: "coach", icon: "🎯", label: "COACH" },
-  { id: "profile", icon: "👤", label: "ME" },
-];

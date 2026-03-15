@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { PHASES } from "../constants/phases";
 import { getPct, getPhase, getSquatExercise } from "../engine/workout";
-import { getPhase, getSquatExercise } from "../engine/workout";
 import { HallOfStrengthWidget } from "../components/RankComponents";
 import { ReadinessWidget } from "../components/SmallComponents";
 

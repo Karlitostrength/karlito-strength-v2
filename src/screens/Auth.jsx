@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { s } from "../lib/styles";
 import { supabase } from "../lib/supabase";
+import { s } from "../lib/styles";
+import { Row } from "../components/SmallComponents";
 
 
 export function AuthScreen({ onAuth }) {

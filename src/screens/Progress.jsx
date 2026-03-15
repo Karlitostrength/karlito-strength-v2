@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-
+import { s } from "../lib/styles";
+import { PHASES, getPhase, getSwingProtocol } from "../engine/workout";
 
 export function ProgressScreen({ user, week }) {
   const milestones = [

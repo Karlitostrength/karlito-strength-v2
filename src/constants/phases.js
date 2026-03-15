@@ -1,336 +1,343 @@
-export const PHASES = {
-  1: { name: "FUNDAMENTALS", color: "#4a9eff", weeks: [1,2], scheme: "5×8 paused" },
-  2: { name: "BUILDING",     color: "#f0a020", weeks: [3,4], scheme: "6×6" },
-  3: { name: "STRENGTH",     color: "#c41e1e", weeks: [5,6], scheme: "5×5" },
-  4: { name: "PEAK",         color: "#a78bfa", weeks: [7,8], scheme: "5×3" },
-};
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "../lib/supabase";
+import { s } from "../lib/styles";
 
-export const ACCESSORIES = {
-  // DAY A — SQUAT DAY (spec: Lunge + Copenhagen + KB conditioning per poziom)
-  A: {
-    beginner:     ["Reverse Lunge 3×8", "Copenhagen Plank (short lever) 3×20s"],
-    intermediate: ["Goblet Hold Reverse Lunge 3×8", "Copenhagen Plank (long lever) 3×20s"],
-    advanced:     ["Double KB Front Rack Reverse Lunge 3×6", "Copenhagen Side Plank 3×20s"],
-  },
-  // DAY B — DEADLIFT DAY (spec: KB EMOM per poziom)
-  B: {
-    beginner:     ["EMOM 5 min × 3 rounds: 1) KB Clean ×5 | 2) Farmers Carry 30m | 3) KB Press ×5/side | 4) Inverted Row | 5) Rest"],
-    intermediate: ["EMOM 4 min × 3 rounds: 1) KB Clean 5/5 | 2) Suitcase Carry 15m/side | 3) Hollow Hold 30s | 4) Rest"],
-    advanced:     ["15 min work block: 2×KB Clean & Press ×5 | Pull Ups ×5 (lub Rows ×10) | Sandbag Carry 30m"],
-  },
-  // DAY C — BENCH DAY (spec: TGU + Push/Pull per poziom)
-  C: {
-    beginner:     ["Turkish Get Up 3–5×1 EMOM (quality)", "Superset: Push Up + Gorilla Row", "15 min AMRAP: 8 KB Swing / 8 Skull Crusher / 8 Ab Wheel"],
-    intermediate: ["Turkish Get Up 3–5×1 EMOM (quality)", "15 min AMRAP: Push Up ×10 / Pull Up ×5 / KB Swing ×10"],
-    advanced:     ["Turkish Get Up 3–5×1 EMOM (quality)", "Dips + Pull Ups — 50+50 total (progress to 70+70)", "KB Snatch finisher: 15/15 × 3 sets"],
-  },
-};
+const READINESS_KEY = "ks_readiness_";
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
+function getReadinessColor(score) {
+  if (score >= 8) return "#4caf50";
+  if (score >= 6) return "var(--gold)";
+  if (score >= 4) return "#f06400";
+  return "var(--red)";
+}
+function getReadinessLabel(score) {
+  if (score >= 8) return "BATTLE READY";
+  if (score >= 6) return "STEADY";
+  if (score >= 4) return "TAKE CARE";
+  return "REST DAY";
+}
+function getReadinessRune(score) {
+  if (score >= 8) return "ᚠ";
+  if (score >= 6) return "ᚢ";
+  if (score >= 4) return "ᚾ";
+  return "ᛁ";
+}
 
-// Bench progression per level (spec: Beginner/Intermediate week-by-week RPE, Advanced: single + back-off)
-function getBenchScheme(week, level, oneRM) {
-  if (level === "advanced") {
-    if (week <= 4) {
-      // 6×6 @70% + weight each session
-      const advPct = 0.70 + (week - 1) * 0.02;
-      return [{ name: "Paused Bench Press", sets: 6, reps: 6, weight: calcWeight(oneRM.bench, advPct), pct: advPct, note: `@${Math.round(advPct*100)}% — dodaj ciężar każdą sesję`, isMain: true }];
+export function Row({ label, val }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ fontSize: 13, color: "var(--gray)" }}>{label}</span>
+      <span style={{ fontSize: 13, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, letterSpacing: "0.05em" }}>{val}</span>
+    </div>
+  );
+}
+
+export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
+  const [running, setRunning] = useState(false);
+  const [seconds, setSeconds] = useState(60);
+  const [currentMinute, setCurrentMinute] = useState(1);
+  const [repsLog, setRepsLog] = useState([]);
+  const [done, setDone] = useState(false);
+  const [rpeVal, setRpeVal] = useState(7);
+  const intRef = useRef(null);
+
+  useEffect(() => {
+    if (running) {
+      intRef.current = setInterval(() => {
+        setSeconds(sec => {
+          if (sec <= 1) {
+            setCurrentMinute(m => {
+              if (m >= minutes) {
+                clearInterval(intRef.current);
+                setRunning(false);
+                setDone(true);
+              }
+              return m + 1;
+            });
+            setRepsLog(prev => [...prev, targetReps]);
+            return 60;
+          }
+          return sec - 1;
+        });
+      }, 1000);
     }
-    const advMap = {
-      5: { topRPE: 8, workSets: 4, workReps: 4, drop: 0.20 },
-      6: { topRPE: 8, workSets: 4, workReps: 4, drop: 0.15, lastRPE: 9 },
-      7: { topRPE: 9, workSets: 3, workReps: 3, drop: 0.15 },
-      8: { topRPE: 9, workSets: 4, workReps: 2, drop: 0.15 },
-    };
-    const d = advMap[week] || advMap[8];
-    const topNote = week === 6 ? `1×1 RPE${d.topRPE} — ostatnia seria RPE9` : `1×1 RPE${d.topRPE}`;
-    return [
-      { name: "Bench Press", sets: 1, reps: 1, rpe: d.topRPE, note: topNote, isMain: true },
-      { name: "Bench Press (back-off)", sets: d.workSets, reps: d.workReps, note: `−${d.drop*100}% od topu → ${d.workSets}×${d.workReps}` },
-    ];
-  }
-  // Beginner & Intermediate — identyczny schemat tygodniowy
-  const scheme = [
-    { week: 1, sets: 4, reps: 10, rpe: 6, paused: true },
-    { week: 2, sets: 4, reps: 10, rpe: 7, paused: true },
-    { week: 3, sets: 4, reps: 8,  rpe: 7, paused: true },
-    { week: 4, sets: 4, reps: 8,  rpe: 8, paused: true },
-    { week: 5, sets: 5, reps: 6,  rpe: null, paused: false },
-    { week: 6, sets: 5, reps: 5,  rpe: null, paused: false },
-    { week: 7, sets: 4, reps: 4,  rpe: null, paused: false },
-    { week: 8, sets: 5, reps: 3,  rpe: 9,   paused: false },
-  ];
-  const s = scheme[Math.min(week, 8) - 1];
-  const exName = s.paused ? "Paused Bench Press" : "Bench Press";
-  const exNote = s.rpe ? `RPE ${s.rpe}` : "";
-  return [{ name: exName, sets: s.sets, reps: s.reps, rpe: s.rpe, note: exNote, isMain: true }];
+    return () => clearInterval(intRef.current);
+  }, [running]);
+
+  const pct = ((60 - seconds) / 60) * 100;
+
+  return (
+    <div style={s.screen}>
+      <div style={s.sectionLabel}>SWING EMOM TIMER</div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 20 }}>
+        {minutes} min × {targetReps} reps @ {kgKB}kg
+      </div>
+
+      {!done ? (
+        <>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{ position: "relative", width: 180, height: 180, margin: "0 auto 16px" }}>
+              <svg viewBox="0 0 180 180" style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: "rotate(-90deg)" }}>
+                <circle cx="90" cy="90" r="80" fill="none" stroke="var(--border)" strokeWidth="8" />
+                <circle cx="90" cy="90" r="80" fill="none" stroke="var(--red)" strokeWidth="8"
+                  strokeDasharray={`${2 * Math.PI * 80}`}
+                  strokeDashoffset={`${2 * Math.PI * 80 * (1 - pct / 100)}`}
+                  style={{ transition: "stroke-dashoffset 1s linear" }}
+                />
+              </svg>
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
+                <div style={s.bigNum}>{seconds}</div>
+                <div style={{ fontSize: 12, color: "var(--gray)", letterSpacing: "0.1em" }}>SEC</div>
+              </div>
+            </div>
+
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, marginBottom: 4 }}>
+              Round {Math.min(currentMinute, minutes)} / {minutes}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--gray)" }}>
+              Do {targetReps} reps NOW — rest the remainder
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <button style={{ ...s.btn, flex: 1 }} onClick={() => setRunning(r => !r)}>
+              {running ? "⏸ PAUSE" : currentMinute === 1 && seconds === 60 ? "▶ START" : "▶ RESUME"}
+            </button>
+            <button style={{ ...s.btnGhost, flex: 1, width: "auto" }} onClick={() => {
+              setRunning(false);
+              clearInterval(intRef.current);
+              setSeconds(60);
+              setCurrentMinute(1);
+              setRepsLog([]);
+            }}>RESET</button>
+          </div>
+
+          {repsLog.length > 0 && (
+            <div style={s.card}>
+              <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>ROUNDS COMPLETED</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {repsLog.map((r, i) => (
+                  <div key={i} style={{ ...s.badge("var(--red-dim)"), fontSize: 13 }}>R{i + 1}: {r}✓</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ textAlign: "center", animation: "fadeIn 0.4s ease" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔥</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, marginBottom: 4 }}>SESSION COMPLETE</div>
+          <div style={{ fontSize: 14, color: "var(--gray)", marginBottom: 20 }}>{repsLog.length} rounds · {repsLog.reduce((a, b) => a + b, 0)} total reps</div>
+
+          <div style={s.card}>
+            <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 10 }}>How hard was that? RPE {rpeVal}</div>
+            <input type="range" min={5} max={10} step={0.5} value={rpeVal} onChange={e => setRpeVal(parseFloat(e.target.value))} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--gray2)", marginTop: 4 }}>
+              <span>Easy</span><span>Max Effort</span>
+            </div>
+          </div>
+
+          <button style={s.btn} onClick={() => onDone(rpeVal)}>LOG & CONTINUE</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
-// Deadlift progression per level (spec: Beginner/Intermediate paused→non-paused, Advanced: Bolton wave)
-function getDeadliftScheme(week, level, oneRM, injuries) {
-  injuries = injuries || {};
-  const baseEx = injuries.lowerBack ? "Block Pull" : "Deadlift";
-
-  if (level === "advanced") {
-    // Andy Bolton wave
-    const bolton = [
-      { heavy: { pct: 0.75, sets: 1, reps: 2 }, speed: { pct: 0.60, sets: 5, reps: 3 } },
-      { heavy: { pct: 0.80, sets: 1, reps: 2 }, speed: { pct: 0.65, sets: 5, reps: 3 } },
-      { heavy: { pct: 0.85, sets: 1, reps: 2 }, speed: { pct: 0.70, sets: 5, reps: 3 } },
-      { heavy: { pct: 0.90, sets: 1, reps: 2 }, speed: { pct: 0.75, sets: 5, reps: 3 } },
-      { heavy: { pct: 0.80, sets: 3, reps: 3 }, speed: { pct: 0.65, sets: 3, reps: 3 } },
-      { heavy: { pct: 0.85, sets: 1, reps: 2 }, speed: { pct: 0.70, sets: 3, reps: 3 } },
-      { heavy: { pct: 0.90, sets: 1, reps: 2 }, speed: { pct: 0.75, sets: 3, reps: 3 } },
-      { heavy: { pct: 0.95, sets: 1, reps: 2 }, speed: { pct: 0.70, sets: 3, reps: 3 } },
-    ];
-    const b = bolton[Math.min(week, 8) - 1];
-    return [
-      { name: baseEx, sets: b.heavy.sets, reps: b.heavy.reps, weight: calcWeight(oneRM.deadlift, b.heavy.pct), pct: b.heavy.pct, note: `HEAVY: ${b.heavy.sets}×${b.heavy.reps} @${Math.round(b.heavy.pct*100)}%`, isMain: true },
-      { name: `${baseEx} (speed)`, sets: b.speed.sets, reps: b.speed.reps, weight: calcWeight(oneRM.deadlift, b.speed.pct), pct: b.speed.pct, note: `SPEED: ${b.speed.sets}×${b.speed.reps} @${Math.round(b.speed.pct*100)}% — eksplozywnie` },
-    ];
-  }
-  if (level === "beginner") {
-    if (week <= 3) return [{ name: `Paused ${baseEx}`, sets: 5, reps: 5, weight: calcWeight(oneRM.deadlift, 0.70), pct: 0.70, note: "5×5 — paused 2s nad podłogą", isMain: true }];
-    if (week <= 5) return [{ name: `Paused ${baseEx}`, sets: 4, reps: 4, weight: calcWeight(oneRM.deadlift, 0.76), pct: 0.76, note: "4×4 — paused 2s", isMain: true }];
-    return [{ name: baseEx, sets: 5, reps: 3, weight: calcWeight(oneRM.deadlift, 0.83), pct: 0.83, note: "5×3", isMain: true }];
-  }
-  // Intermediate
-  if (week <= 2) return [{ name: `Paused ${baseEx}`, sets: 5, reps: 5, weight: calcWeight(oneRM.deadlift, 0.72), pct: 0.72, note: "5×5 — paused", isMain: true }];
-  if (week <= 4) return [{ name: `Paused ${baseEx}`, sets: 4, reps: 4, weight: calcWeight(oneRM.deadlift, 0.78), pct: 0.78, note: "4×4 — paused", isMain: true }];
-  if (week <= 6) return [{ name: baseEx, sets: 5, reps: 3, weight: calcWeight(oneRM.deadlift, 0.83), pct: 0.83, note: "5×3", isMain: true }];
-  return [{ name: baseEx, sets: 3, reps: 3, weight: calcWeight(oneRM.deadlift, 0.87), pct: 0.87, note: "3×3", isMain: true }];
+export function initSetLogs(exercises) {
+  const logs = {};
+  exercises.forEach((ex, ei) => {
+    if (!ex.sets) return;
+    logs[ei] = Array.from({ length: ex.sets }, () => ({
+      weight: ex.weight ? String(ex.weight) : "",
+      reps: String(ex.reps || ""),
+      rpe: 8,
+      done: false,
+    }));
+  });
+  return logs;
 }
 
-// Squat: wszystkie poziomy ten sam schemat (5×8→6×6→5×5→5×3), paused tygodnie 1–4
-function getSquatExercise(week, injuries) {
-  injuries = injuries || {};
-  const base = injuries.knee ? "Box Squat" : "Back Squat";
-  return week <= 4 ? `Paused ${base}` : base;
-}
-
-function generateWorkout(day, week, level, oneRM, injuries = {}) {
-  injuries = injuries || {};
-  const { sets, reps } = getSetsReps(week);
-  const acc = ACCESSORIES[day]?.[level] || [];
-
-  // ── DAY A — SQUAT ──────────────────────────────────────────────────────────
-  // Spec: główny squat (paused tygodnie 1-4), brak back-off setów,
-  //       akcesoria (Lunge + Copenhagen), KB conditioning per poziom
-  if (day === "A") {
-    const sqName = getSquatExercise(week, injuries);
-    const pct = getPct(week, level);
-    const sqWeight = calcWeight(oneRM.squat, pct);
-    // KB conditioning: beginner = Swing, intermediate = Single Arm Swing, advanced = Snatch
-    const kbA = level === "beginner"
-      ? getSwingProtocol(week)
-      : level === "intermediate"
-        ? getSnatchMaxProtocol(week, "intermediate")   // single arm swing 7/7→12/12
-        : getSnatchMaxProtocol(week, "advanced");      // hardstyle snatch 10/10→20/20
-    return {
-      title: "DAY A — SQUAT",
-      sections: [
-        { title: "SIŁA — SQUAT", exercises: [
-          { name: sqName, sets, reps, weight: sqWeight, pct, isMain: true,
-            note: week <= 4 ? "Pauza w dole — kontrola techniki" : "" },
-        ]},
-        { title: "AKCESORIA", exercises: acc.map(e => ({ name: e })) },
-        level === "beginner"
-          ? { title: "CONDITIONING — KB SWING (EMOM)", swing: true, swingData: kbA }
-          : { title: "CONDITIONING — KB " + (level === "advanced" ? "SNATCH" : "SINGLE ARM SWING"),
-              snatchMax: true, snatchMaxData: kbA },
-      ]
-    };
-  }
-
-  // ── DAY B — DEADLIFT ───────────────────────────────────────────────────────
-  // Spec: progresja per poziom (Beginner/Int paused→heavy, Advanced: Bolton wave),
-  //       brak back-off setów, akcesoria KB EMOM per poziom
-  if (day === "B") {
-    const dlExercises = getDeadliftScheme(week, level, oneRM, injuries);
-    return {
-      title: "DAY B — DEADLIFT",
-      sections: [
-        { title: level === "advanced" ? "SIŁA — DEADLIFT (Bolton Wave)" : "SIŁA — DEADLIFT",
-          exercises: dlExercises },
-        { title: "AKCESORIA KB", exercises: acc.map(e => ({ name: e })) },
-      ]
-    };
-  }
-
-  // ── DAY C — BENCH ──────────────────────────────────────────────────────────
-  // Spec: progresja tygodniowa per poziom, TGU practice, akcesoria Push/Pull per poziom,
-  //       back-off TYLKO advanced tygodnie 5-8 (wbudowany w getBenchScheme)
-  const benchExercises = getBenchScheme(week, level, oneRM);
-  return {
-    title: "DAY C — BENCH",
-    sections: [
-      { title: level === "advanced" ? "SIŁA — BENCH (Advanced)" : "SIŁA — BENCH",
-        exercises: benchExercises },
-      { title: "AKCESORIA", exercises: acc.map(e => ({ name: e })) },
-    ]
+export function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onToggleDone, suggestedWeight }) {
+  const inputStyle = {
+    background: "var(--bg3)", border: `1px solid ${log.done ? "var(--gold-dim)" : "var(--border)"}`,
+    borderRadius: 4, padding: "6px 4px", color: "var(--white)",
+    fontSize: 15, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
+    textAlign: "center", outline: "none", WebkitAppearance: "none",
   };
+  const rpeColors = { 7: "#4caf50", 8: "var(--gold)", 9: "#f06400", 10: "var(--red)" };
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 5, padding: "10px 0",
+      borderBottom: "1px solid var(--border)",
+      background: log.done ? "rgba(201,168,76,0.04)" : "transparent",
+    }}>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: log.done ? "var(--gold)" : "var(--gray2)", width: 24, flexShrink: 0, fontWeight: 700 }}>
+        S{setIdx + 1}
+      </div>
+      <div style={{ position: "relative" }}>
+        <input type="number" inputMode="decimal" value={log.weight} onChange={e => onUpdate("weight", e.target.value)}
+          placeholder={suggestedWeight || plannedWeight} style={{ ...inputStyle, width: 54 }} />
+        {suggestedWeight && !log.weight && (
+          <div style={{ position: "absolute", top: -8, right: -4, fontSize: 8, background: "var(--gold)", color: "#0a0f15", borderRadius: 3, padding: "1px 4px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, whiteSpace: "nowrap" }}>
+            ↑{suggestedWeight}
+          </div>
+        )}
+      </div>
+      <span style={{ fontSize: 10, color: "var(--gray2)", flexShrink: 0 }}>kg</span>
+      <input type="number" inputMode="numeric" value={log.reps} onChange={e => onUpdate("reps", e.target.value)}
+        placeholder={plannedReps} style={{ ...inputStyle, width: 42 }} />
+      <span style={{ fontSize: 10, color: "var(--gray2)", flexShrink: 0 }}>rep</span>
+      <div style={{ display: "flex", gap: 3, flex: 1, justifyContent: "flex-end" }}>
+        {[7, 8, 9, 10].map(r => (
+          <div key={r} onClick={() => onUpdate("rpe", r)} style={{
+            width: 24, height: 24, borderRadius: 4, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center",
+            background: log.rpe === r ? rpeColors[r] : "var(--bg3)",
+            border: `1px solid ${log.rpe === r ? rpeColors[r] : "var(--border)"}`,
+            color: log.rpe === r ? "var(--white)" : "var(--gray2)",
+            cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, flexShrink: 0,
+          }}>{r}</div>
+        ))}
+      </div>
+      <div onClick={onToggleDone} style={{
+        width: 34, height: 34, borderRadius: 6, flexShrink: 0,
+        background: log.done ? "var(--red)" : "var(--bg3)",
+        border: `1px solid ${log.done ? "var(--red)" : "var(--border)"}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", fontSize: 16, transition: "all 0.2s",
+      }}>
+        {log.done ? "✓" : "○"}
+      </div>
+    </div>
+  );
 }
 
+export function ReadinessWidget({ authUser }) {
+  const key = READINESS_KEY + todayKey();
+  const [checked, setChecked] = useState(false);
+  const [sleep, setSleep] = useState(3);
+  const [stress, setStress] = useState(3);
+  const [fatigue, setFatigue] = useState(3);
+  const [saved, setSaved] = useState(null);
+  const [open, setOpen] = useState(false);
 
-// ─── DOM SIŁY — LEVEL SYSTEM ──────────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) { setSaved(JSON.parse(stored)); setChecked(true); }
+    } catch (e) {}
+  }, []);
 
-const DOM_SILY_LEVELS = [
-  {
-    id: "adept",
-    rank: 1,
-    name: "ADEPT",
-    subtitle: "Movement Literacy",
-    color: "#6B7280",
-    icon: "🔰",
-    description: "Learn the movements. Build the foundation.",
-    men: {
-      push:   { label: "Push Ups × 10", fn: u => (u.pushups || 0) >= 10 },
-      pull:   { label: "Inverted Rows × 10", fn: u => (u.inverted_rows || 0) >= 10 },
-      hinge:  { label: "KB Swing 16kg × 20", fn: u => (u.kb_swing_test || 0) >= 16 },
-      squat:  { label: "Goblet Squat 16kg × 10", fn: u => (u.goblet_test || 0) >= 16 },
-      carry:  { label: "Farmer Walk 16kg / hand", fn: u => (u.farmers_carry || 0) >= 16 },
-      engine: { label: "TGU 12kg (quality)", fn: u => (u.tgu_test || 0) >= 12 },
-    },
-    women: {
-      push:   { label: "Push Ups × 5", fn: u => (u.pushups || 0) >= 5 },
-      pull:   { label: "Inverted Rows × 8", fn: u => (u.inverted_rows || 0) >= 8 },
-      hinge:  { label: "KB Swing 12kg × 20", fn: u => (u.kb_swing_test || 0) >= 12 },
-      squat:  { label: "Goblet Squat 12kg × 10", fn: u => (u.goblet_test || 0) >= 12 },
-      carry:  { label: "Farmer Walk 12kg / hand", fn: u => (u.farmers_carry || 0) >= 12 },
-      engine: { label: "TGU 8kg (quality)", fn: u => (u.tgu_test || 0) >= 8 },
-    },
-  },
-  {
-    id: "apprentice",
-    rank: 2,
-    name: "APPRENTICE",
-    subtitle: "First Real Strength",
-    color: "#B8860B",
-    icon: "⚒️",
-    description: "Basic strength developed. You are becoming a lifter.",
-    men: {
-      push:   { label: "KB Press 24kg × 5 / side", fn: u => (u.kb_press_test || 0) >= 24 },
-      pull:   { label: "3 Pull Ups", fn: u => (u.pullups || 0) >= 3 },
-      hinge:  { label: "Deadlift = Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw },
-      squat:  { label: "Goblet Squat 24kg × 10", fn: u => (u.goblet_test || 0) >= 24 },
-      carry:  { label: "Farmer Walk 24kg / hand", fn: u => (u.farmers_carry || 0) >= 24 },
-      engine: { label: "TGU 24kg (quality)", fn: u => (u.tgu_test || 0) >= 24 },
-    },
-    women: {
-      push:   { label: "KB Press 12kg × 5 / side", fn: u => (u.kb_press_test || 0) >= 12 },
-      pull:   { label: "1 Pull Up / 5 Chin Ups (band)", fn: u => (u.pullups || 0) >= 1 },
-      hinge:  { label: "Deadlift 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 0.75 },
-      squat:  { label: "Goblet Squat 16kg × 10", fn: u => (u.goblet_test || 0) >= 16 },
-      carry:  { label: "Farmer Walk 16kg / hand", fn: u => (u.farmers_carry || 0) >= 16 },
-      engine: { label: "TGU 16kg (quality)", fn: u => (u.tgu_test || 0) >= 16 },
-    },
-  },
-  {
-    id: "lifter",
-    rank: 3,
-    name: "LIFTER",
-    subtitle: "True Strength Foundation",
-    color: "#C0392B",
-    icon: "🏋️",
-    description: "This is where real strength begins. Most people never get here.",
-    men: {
-      push:   { label: "Bench Press = Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw },
-      pull:   { label: "5 Pull Ups", fn: u => (u.pullups || 0) >= 5 },
-      hinge:  { label: "Deadlift 1.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.5 },
-      squat:  { label: "Back Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.squat || 0) >= bw },
-      carry:  { label: "Farmer Walk = Bodyweight total", fn: (u, bw) => (u.farmers_carry || 0) >= bw / 2 },
-      engine: { label: "100 One-Hand Swings 24kg", fn: u => (u.swing_100_test || 0) >= 24 },
-    },
-    women: {
-      push:   { label: "Bench Press 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw * 0.75 },
-      pull:   { label: "3 Pull Ups", fn: u => (u.pullups || 0) >= 3 },
-      hinge:  { label: "Deadlift 1.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.25 },
-      squat:  { label: "Back Squat 0.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.squat || 0) >= bw * 0.75 },
-      carry:  { label: "Farmer Walk 0.75 BW total", fn: (u, bw) => (u.farmers_carry || 0) >= bw * 0.375 },
-      engine: { label: "100 Swings 16kg", fn: u => (u.swing_100_test || 0) >= 16 },
-    },
-  },
-  {
-    id: "warrior",
-    rank: 4,
-    name: "WARRIOR",
-    subtitle: "Strong Human Performance",
-    color: "#7B3F00",
-    icon: "⚔️",
-    description: "A strong human by any measure. Top 20% of people who train.",
-    men: {
-      push:   { label: "Strict Press 0.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.press || 0) >= bw * 0.5 },
-      pull:   { label: "10 Pull Ups", fn: u => (u.pullups || 0) >= 10 },
-      hinge:  { label: "Deadlift 2 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2 },
-      squat:  { label: "Back Squat = Bodyweight × 15", fn: (u, bw) => (u.squat_15_test || 0) >= bw },
-      carry:  { label: "Farmer Walk 32kg / hand", fn: u => (u.farmers_carry || 0) >= 32 },
-      engine: { label: "Snatch Test: 100 reps / 5 min / 24kg", fn: u => (u.snatch_test_kg || 0) >= 24 },
-    },
-    women: {
-      push:   { label: "Strict Press 0.35 × Bodyweight", fn: (u, bw) => (u.oneRM?.press || 0) >= bw * 0.35 },
-      pull:   { label: "5 Pull Ups", fn: u => (u.pullups || 0) >= 5 },
-      hinge:  { label: "Deadlift 1.75 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 1.75 },
-      squat:  { label: "Back Squat = Bodyweight × 15", fn: (u, bw) => (u.squat_15_test || 0) >= bw },
-      carry:  { label: "Farmer Walk 24kg / hand", fn: u => (u.farmers_carry || 0) >= 24 },
-      engine: { label: "Snatch Test: 100 reps / 5 min / 16kg", fn: u => (u.snatch_test_kg || 0) >= 16 },
-    },
-  },
-  {
-    id: "titan",
-    rank: 5,
-    name: "TITAN",
-    subtitle: "Rare Strength",
-    color: "#1A237E",
-    icon: "🔱",
-    description: "Rarely seen. Earned through years of consistent, intelligent training.",
-    men: {
-      push:   { label: "Bench Press = Bodyweight × 15", fn: (u, bw) => (u.bench_15_test || 0) >= bw },
-      pull:   { label: "15 Pull Ups", fn: u => (u.pullups || 0) >= 15 },
-      hinge:  { label: "Deadlift 2.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.25 },
-      squat:  { label: "Front Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.front_squat || 0) >= bw },
-      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
-      engine: { label: "Snatch Test: 100 reps / 5 min / 28kg", fn: u => (u.snatch_test_kg || 0) >= 28 },
-    },
-    women: {
-      push:   { label: "Bench Press = Bodyweight", fn: (u, bw) => (u.oneRM?.bench || 0) >= bw },
-      pull:   { label: "8 Pull Ups", fn: u => (u.pullups || 0) >= 8 },
-      hinge:  { label: "Deadlift 2 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2 },
-      squat:  { label: "Front Squat 0.85 × Bodyweight", fn: (u, bw) => (u.oneRM?.front_squat || 0) >= bw * 0.85 },
-      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
-      engine: { label: "Snatch Test: 100 reps / 5 min / 20kg", fn: u => (u.snatch_test_kg || 0) >= 20 },
-    },
-  },
-  {
-    id: "gladiator",
-    rank: 6,
-    name: "GLADIATOR",
-    subtitle: "Elite of the House of Strength",
-    color: "#4A0000",
-    icon: "🏛️",
-    description: "The horizon. Few reach it. Fewer stay there.",
-    men: {
-      push:   { label: "Double KB Press = Bodyweight", fn: (u, bw) => (u.dbl_kb_press_test || 0) >= bw },
-      pull:   { label: "Weighted Pull Up +48kg", fn: u => (u.weighted_pullup_kg || 0) >= 48 },
-      hinge:  { label: "Deadlift 2.5 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.5 },
-      squat:  { label: "Overhead Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.ohs || 0) >= bw },
-      carry:  { label: "Farmer Walk = Bodyweight / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw },
-      engine: { label: "Engine: one of 3 tests (see below)", fn: u => !!(u.gladiator_engine) },
-    },
-    women: {
-      push:   { label: "Double KB Press 0.75 × Bodyweight", fn: (u, bw) => (u.dbl_kb_press_test || 0) >= bw * 0.75 },
-      pull:   { label: "Weighted Pull Up +24kg", fn: u => (u.weighted_pullup_kg || 0) >= 24 },
-      hinge:  { label: "Deadlift 2.25 × Bodyweight", fn: (u, bw) => (u.oneRM?.deadlift || 0) >= bw * 2.25 },
-      squat:  { label: "Overhead Squat = Bodyweight", fn: (u, bw) => (u.oneRM?.ohs || 0) >= bw },
-      carry:  { label: "Farmer Walk 0.75 BW / hand", fn: (u, bw) => (u.farmers_carry || 0) >= bw * 0.75 },
-      engine: { label: "Engine: one of 3 tests (see below)", fn: u => !!(u.gladiator_engine) },
-    },
-    engineOptions: [
-      "Long Cycle 40kg — 5 min set",
-      "Long Cycle 32kg — 10 min / 100 reps",
-      "200 Snatch 24kg — 10 min",
-    ],
-  },
-];
+  const readinessScore = Math.round(((sleep + (6 - stress) + (6 - fatigue)) / 15) * 10);
 
-// Determine user's current level based on 1RM data and test results
+  const handleSave = () => {
+    const data = { sleep, stress, fatigue, score: readinessScore, date: todayKey() };
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
+    setSaved(data);
+    setChecked(true);
+    setOpen(false);
+    if (authUser) {
+      supabase.from("workouts").upsert({
+        user_id: authUser.id,
+        day: "READINESS",
+        week: 0,
+        exercises: [],
+        comment: `Readiness: ${readinessScore}/10 | Sleep:${sleep} Stress:${stress} Fatigue:${fatigue}`,
+        created_at: new Date().toISOString().slice(0, 10) + "T06:00:00Z",
+      }, { onConflict: "user_id,day,week" }).catch(() => {});
+    }
+  };
 
-// ───────────────────────────────────────────────────────────────────────────
+  const displayScore = saved ? saved.score : null;
+  const color = displayScore !== null ? getReadinessColor(displayScore) : "var(--gray2)";
+
+  if (!open && !checked) {
+    return (
+      <div onClick={() => setOpen(true)} style={{
+        ...s.card, cursor: "pointer", border: `1px solid var(--border)`,
+        marginBottom: 12, display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
+      }}>
+        <div style={{ fontSize: 28, fontFamily: "'Cinzel', serif", color: "var(--gray2)" }}>I</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.2em", color: "var(--gray)", marginBottom: 2 }}>DAILY READINESS</div>
+          <div style={{ fontSize: 12, color: "var(--gray2)" }}>How do you feel today? Tap to check in</div>
+        </div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gold)", letterSpacing: "0.1em" }}>CHECK IN →</div>
+      </div>
+    );
+  }
+
+  if (checked && saved && !open) {
+    return (
+      <div onClick={() => setOpen(true)} style={{
+        ...s.card, cursor: "pointer",
+        border: `1px solid ${color}33`,
+        background: `linear-gradient(135deg, var(--bg2), ${color}0a)`,
+        marginBottom: 12, display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
+      }}>
+        <div style={{ fontSize: 32, color, fontFamily: "'Barlow Condensed', sans-serif", lineHeight: 1 }}>{getReadinessRune(saved.score)}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, letterSpacing: "0.25em", color: "var(--gray2)", marginBottom: 3 }}>READINESS TODAY</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, color, lineHeight: 1 }}>
+            {saved.score}/10 <span style={{ fontSize: 13, letterSpacing: "0.1em" }}>{getReadinessLabel(saved.score)}</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: "var(--gray2)" }}>TAP TO EDIT</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...s.card, border: `1px solid var(--gold-dim)`, marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.15em", color: "var(--gold)" }}>DAILY READINESS</div>
+          <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>Rate your state before training</div>
+        </div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 36, fontWeight: 900, color: getReadinessColor(readinessScore), lineHeight: 1 }}>
+          {readinessScore}<span style={{ fontSize: 14 }}>/10</span>
+        </div>
+      </div>
+
+      {[
+        { label: "SLEEP QUALITY", val: sleep, set: setSleep, hi: "Deep rest", lo: "Restless" },
+        { label: "STRESS LEVEL", val: stress, set: setStress, hi: "Very stressed", lo: "Calm" },
+        { label: "BODY FATIGUE", val: fatigue, set: setFatigue, hi: "Very fatigued", lo: "Fresh" },
+      ].map(({ label, val, set, hi, lo }) => (
+        <div key={label} style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.2em", color: "var(--gray)" }}>{label}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[1, 2, 3, 4, 5].map(v => (
+                <div key={v} onClick={() => set(v)} style={{
+                  width: 28, height: 28, borderRadius: 4, cursor: "pointer",
+                  background: v === val ? "var(--gold)" : "var(--bg4)",
+                  border: `1px solid ${v === val ? "var(--gold)" : "var(--border)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700,
+                  color: v === val ? "#0a0f15" : "var(--gray2)", transition: "all 0.15s",
+                }}>{v}</div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: "var(--gray2)" }}>{lo}</span>
+            <span style={{ fontSize: 10, color: "var(--gray2)" }}>{hi}</span>
+          </div>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button onClick={handleSave} style={{ ...s.btn, flex: 2, padding: "12px" }}>
+          SAVE — {getReadinessLabel(readinessScore)}
+        </button>
+        {checked && (
+          <button onClick={() => setOpen(false)} style={{ ...s.btnGhost, flex: 1, padding: "12px" }}>
+            CANCEL
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

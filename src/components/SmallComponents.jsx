@@ -1,6 +1,28 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { s } from "../lib/styles";
 
+const READINESS_KEY = "ks_readiness_";
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+function getReadinessColor(score) {
+  if (score >= 8) return "#4caf50";
+  if (score >= 6) return "var(--gold)";
+  if (score >= 4) return "#f06400";
+  return "var(--red)";
+}
+function getReadinessLabel(score) {
+  if (score >= 8) return "BATTLE READY";
+  if (score >= 6) return "STEADY";
+  if (score >= 4) return "TAKE CARE";
+  return "REST DAY";
+}
+function getReadinessRune(score) {
+  if (score >= 8) return "ᚠ";
+  if (score >= 6) return "ᚢ";
+  if (score >= 4) return "ᚾ";
+  return "ᛁ";
+}
 
 export function Row({ label, val }) {
   return (
@@ -10,7 +32,6 @@ export function Row({ label, val }) {
     </div>
   );
 }
-
 
 export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
   const [running, setRunning] = useState(false);
@@ -24,8 +45,8 @@ export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
   useEffect(() => {
     if (running) {
       intRef.current = setInterval(() => {
-        setSeconds(s => {
-          if (s <= 1) {
+        setSeconds(sec => {
+          if (sec <= 1) {
             setCurrentMinute(m => {
               if (m >= minutes) {
                 clearInterval(intRef.current);
@@ -37,7 +58,7 @@ export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
             setRepsLog(prev => [...prev, targetReps]);
             return 60;
           }
-          return s - 1;
+          return sec - 1;
         });
       }, 1000);
     }
@@ -97,7 +118,7 @@ export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
               <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 8 }}>ROUNDS COMPLETED</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {repsLog.map((r, i) => (
-                  <div key={i} style={{ ...s.badge("var(--red-dim)"), fontSize: 13 }}>R{i+1}: {r}✓</div>
+                  <div key={i} style={{ ...s.badge("var(--red-dim)"), fontSize: 13 }}>R{i + 1}: {r}✓</div>
                 ))}
               </div>
             </div>
@@ -107,7 +128,7 @@ export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
         <div style={{ textAlign: "center", animation: "fadeIn 0.4s ease" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔥</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, marginBottom: 4 }}>SESSION COMPLETE</div>
-          <div style={{ fontSize: 14, color: "var(--gray)", marginBottom: 20 }}>{repsLog.length} rounds · {repsLog.reduce((a,b) => a+b, 0)} total reps</div>
+          <div style={{ fontSize: 14, color: "var(--gray)", marginBottom: 20 }}>{repsLog.length} rounds · {repsLog.reduce((a, b) => a + b, 0)} total reps</div>
 
           <div style={s.card}>
             <div style={{ fontSize: 13, color: "var(--gray)", marginBottom: 10 }}>How hard was that? RPE {rpeVal}</div>
@@ -123,7 +144,6 @@ export function EMOMTimer({ minutes, targetReps, kgKB, onDone }) {
     </div>
   );
 }
-
 
 export function initSetLogs(exercises) {
   const logs = {};
@@ -193,9 +213,6 @@ export function SetRow({ setIdx, log, plannedWeight, plannedReps, onUpdate, onTo
   );
 }
 
-
-
-
 export function ReadinessWidget({ authUser }) {
   const key = READINESS_KEY + todayKey();
   const [checked, setChecked] = useState(false);
@@ -209,20 +226,17 @@ export function ReadinessWidget({ authUser }) {
     try {
       const stored = localStorage.getItem(key);
       if (stored) { setSaved(JSON.parse(stored)); setChecked(true); }
-    } catch(e) {}
+    } catch (e) {}
   }, []);
 
-  const score = Math.round(((sleep + stress + fatigue) / 3) * 2);
-  // sleep & stress: 1=bad 5=great → fatigue inverse: 1=very fatigued 5=fresh
   const readinessScore = Math.round(((sleep + (6 - stress) + (6 - fatigue)) / 15) * 10);
 
   const handleSave = () => {
     const data = { sleep, stress, fatigue, score: readinessScore, date: todayKey() };
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
     setSaved(data);
     setChecked(true);
     setOpen(false);
-    // Optionally sync to Supabase
     if (authUser) {
       supabase.from("workouts").upsert({
         user_id: authUser.id,
@@ -230,7 +244,7 @@ export function ReadinessWidget({ authUser }) {
         week: 0,
         exercises: [],
         comment: `Readiness: ${readinessScore}/10 | Sleep:${sleep} Stress:${stress} Fatigue:${fatigue}`,
-        created_at: new Date().toISOString().slice(0,10) + "T06:00:00Z",
+        created_at: new Date().toISOString().slice(0, 10) + "T06:00:00Z",
       }, { onConflict: "user_id,day,week" }).catch(() => {});
     }
   };
@@ -241,11 +255,8 @@ export function ReadinessWidget({ authUser }) {
   if (!open && !checked) {
     return (
       <div onClick={() => setOpen(true)} style={{
-        ...s.card,
-        cursor: "pointer",
-        border: `1px solid var(--border)`,
-        marginBottom: 12,
-        display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
+        ...s.card, cursor: "pointer", border: `1px solid var(--border)`,
+        marginBottom: 12, display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
       }}>
         <div style={{ fontSize: 28, fontFamily: "'Cinzel', serif", color: "var(--gray2)" }}>I</div>
         <div style={{ flex: 1 }}>
@@ -260,12 +271,10 @@ export function ReadinessWidget({ authUser }) {
   if (checked && saved && !open) {
     return (
       <div onClick={() => setOpen(true)} style={{
-        ...s.card,
-        cursor: "pointer",
+        ...s.card, cursor: "pointer",
         border: `1px solid ${color}33`,
         background: `linear-gradient(135deg, var(--bg2), ${color}0a)`,
-        marginBottom: 12,
-        display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
+        marginBottom: 12, display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
       }}>
         <div style={{ fontSize: 32, color, fontFamily: "'Barlow Condensed', sans-serif", lineHeight: 1 }}>{getReadinessRune(saved.score)}</div>
         <div style={{ flex: 1 }}>
@@ -278,13 +287,6 @@ export function ReadinessWidget({ authUser }) {
       </div>
     );
   }
-
-  const sliderStyle = (val, max = 5) => ({
-    position: "relative",
-    margin: "8px 0 16px",
-  });
-
-  const labels5 = ["1", "2", "3", "4", "5"];
 
   return (
     <div style={{ ...s.card, border: `1px solid var(--gold-dim)`, marginBottom: 12 }}>
@@ -307,7 +309,7 @@ export function ReadinessWidget({ authUser }) {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.2em", color: "var(--gray)" }}>{label}</div>
             <div style={{ display: "flex", gap: 6 }}>
-              {[1,2,3,4,5].map(v => (
+              {[1, 2, 3, 4, 5].map(v => (
                 <div key={v} onClick={() => set(v)} style={{
                   width: 28, height: 28, borderRadius: 4, cursor: "pointer",
                   background: v === val ? "var(--gold)" : "var(--bg4)",
@@ -330,13 +332,12 @@ export function ReadinessWidget({ authUser }) {
         <button onClick={handleSave} style={{ ...s.btn, flex: 2, padding: "12px" }}>
           SAVE — {getReadinessLabel(readinessScore)}
         </button>
-        {checked && <button onClick={() => setOpen(false)} style={{ ...s.btnGhost, flex: 1, padding: "12px" }}>
-          CANCEL
-        </button>}
+        {checked && (
+          <button onClick={() => setOpen(false)} style={{ ...s.btnGhost, flex: 1, padding: "12px" }}>
+            CANCEL
+          </button>
+        )}
       </div>
     </div>
   );
 }
-
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
-// ─── SCHEDULE ────────────────────────────────────────────────────────────────

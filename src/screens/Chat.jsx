@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 
-
 export function ChatScreen({ authUser, isCoach }) {
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState("");
@@ -395,16 +394,3 @@ export function ChatScreen({ authUser, isCoach }) {
     </div>
   );
 }
-
-
-function LandingScreen({ onSignUp }) {
-  const REVOLUT_LINK = "https://revolut.me/karolz7hb";
-  const MONTHLY_PRICE = "£99";
-  const [heroVisible, setHeroVisible] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setHeroVisible(true), 80);
-    return () => clearTimeout(t);
-  }, []);
-
-  const fade = (delay = 0) => ({

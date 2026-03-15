@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function LandingScreen({ onSignUp }) {
   const REVOLUT_LINK = "https://revolut.me/karolz7hb";

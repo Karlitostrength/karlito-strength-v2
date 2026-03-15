@@ -1,29 +1,46 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { generateWorkout } from "../engine/workout";
-import { PHASES, getPhase } from "../engine/workout";
-import { EMOMTimer, SetRow, initSetLogs, ReadinessWidget } from "../components/SmallComponents";
+import { generateWorkout, PHASES, getPhase } from "../engine/workout";
+import { EMOMTimer } from "../components/SmallComponents";
+import { s } from "../lib/styles";
 
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function getYouTubeEmbedUrl(url) {
+  if (!url) return null;
+  let videoId = "";
+  if (url.includes("youtu.be/")) videoId = url.split("youtu.be/")[1]?.split("?")[0];
+  else if (url.includes("v=")) videoId = url.split("v=")[1]?.split("&")[0];
+  else if (url.includes("shorts/")) videoId = url.split("shorts/")[1]?.split("?")[0];
+  return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
+}
+
+function getSwingProtocol(week) {
+  if (week <= 4) return { minutes: 8 + (week - 1), reps: 10 + (week - 1), label: `${8 + (week - 1)} min × ${10 + (week - 1)} reps/min` };
+  if (week <= 8) return { minutes: 10, reps: 15, label: `10 min × 15 reps/min` };
+  return { minutes: 10, reps: 20, label: `10 min × 20 reps/min (Power EMOM)` };
+}
+
+// ─── WorkoutScreen ───────────────────────────────────────────────────────────
 
 export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
-  const [coachProgram, setCoachProgram]   = useState(null);
-  const [loadingProgram, setLoadingProgram] = useState(true);
-  const [exResults, setExResults]         = useState({}); // { idx: { result: string, done: bool } }
-  const [prevWorkouts, setPrevWorkouts]   = useState([]); // last 4 sessions same day
-  const [libraryMap, setLibraryMap]       = useState({}); // { name: youtube_url }
-  const [expandedHistory, setExpandedHistory] = useState({}); // { idx: bool }
-  const [athleteComment, setAthleteComment] = useState("");
-  const [videoLink, setVideoLink]         = useState("");
-  const [saving, setSaving]               = useState(false);
-  const [saved, setSaved]                 = useState(false);
-  const [showTimer, setShowTimer]         = useState(false);
-  const [condDone, setCondDone]           = useState({});
-  const [accDone, setAccDone]             = useState({});
+  const [coachProgram, setCoachProgram]       = useState(null);
+  const [loadingProgram, setLoadingProgram]   = useState(true);
+  const [exResults, setExResults]             = useState({});
+  const [prevWorkouts, setPrevWorkouts]       = useState([]);
+  const [libraryMap, setLibraryMap]           = useState({});
+  const [expandedHistory, setExpandedHistory] = useState({});
+  const [athleteComment, setAthleteComment]   = useState("");
+  const [videoLink, setVideoLink]             = useState("");
+  const [saving, setSaving]                   = useState(false);
+  const [saved, setSaved]                     = useState(false);
+  const [showTimer, setShowTimer]             = useState(false);
+  const [condDone, setCondDone]               = useState({});
+  const [accDone, setAccDone]                 = useState({});
 
   useEffect(() => {
     const load = async () => {
       if (!authUser) { setLoadingProgram(false); return; }
-      // Load coach program — own try/catch so library errors don't block workout
       try {
         const { data: days } = await supabase.from("program_days").select("*")
           .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
@@ -33,46 +50,40 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
             .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
           setCoachProgram({ ...day, exercises: exs || [] });
         }
-      } catch(e) { console.error("WorkoutScreen load error:", e); }
+      } catch (e) { console.error("WorkoutScreen load error:", e); }
 
-      // Previous workouts — non-critical
       try {
         const { data: prev } = await supabase.from("workouts").select("*")
           .eq("user_id", authUser.id).eq("day", dayKey)
           .order("created_at", { ascending: false }).limit(4);
         setPrevWorkouts(prev || []);
-      } catch(e) {}
+      } catch (e) {}
 
-      // Exercise library — non-critical
       try {
         const { data: lib } = await supabase.from("exercise_library").select("name, youtube_url");
         const map = {};
         (lib || []).forEach(e => { map[e.name] = e.youtube_url; });
         setLibraryMap(map);
-      } catch(e) {}
+      } catch (e) {}
+
       setLoadingProgram(false);
     };
     load();
   }, [authUser, week, dayKey]);
 
-  // Init exResults when coachProgram loads
   useEffect(() => {
     if (!coachProgram) return;
     const init = {};
-    (coachProgram.exercises || []).forEach((ex, i) => {
-      init[i] = { result: "", done: false };
-    });
+    (coachProgram.exercises || []).forEach((ex, i) => { init[i] = { result: "", done: false }; });
     setExResults(init);
   }, [coachProgram]);
 
   const defaultWorkout = generateWorkout(dayKey, week, user?.level, user?.oneRM, user?.injuries);
-  // Zbierz ćwiczenia z pierwszej sekcji siłowej defaultWorkout (fallback)
   const defaultStrengthExercises = defaultWorkout?.sections
-    ?.find(s => s.title?.startsWith("SIŁA") || s.title === "STRENGTH")?.exercises || [];
+    ?.find(sec => sec.title?.startsWith("SIŁA") || sec.title === "STRENGTH")?.exercises || [];
 
   const workout = coachProgram ? {
     title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
-    // Jeśli coachProgram istnieje ale nie ma ćwiczeń → użyj auto-generated jako fallback
     exercises: (coachProgram.exercises && coachProgram.exercises.length > 0)
       ? coachProgram.exercises
       : defaultStrengthExercises,
@@ -121,7 +132,7 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
           video_link: videoLink,
         });
       }
-    } catch(e) { console.log("Save error:", e); }
+    } catch (e) { console.log("Save error:", e); }
     setSaving(false);
     setSaved(true);
   };
@@ -140,7 +151,6 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
     <div style={s.screen}>
       {!coachProgram && <div style={{ ...s.phaseBar(phaseData.color) }} />}
 
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
           <div style={s.sectionLabel}>{coachProgram ? `Week ${week}` : `Week ${week} · ${phaseData.name}`}</div>
@@ -154,12 +164,10 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         </div>
       </div>
 
-      {/* Progress bar */}
       <div style={{ height: 3, background: "var(--border)", borderRadius: 2, marginBottom: 20 }}>
         <div style={{ height: "100%", width: `${totalExs > 0 ? (doneCount / totalExs) * 100 : 0}%`, background: "var(--red)", borderRadius: 2, transition: "width 0.3s ease" }} />
       </div>
 
-      {/* Coach notes */}
       {workout.notes ? (
         <div style={{ ...s.card, borderColor: "rgba(200,160,40,0.4)", background: "rgba(200,160,40,0.05)", marginBottom: 14 }}>
           <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 6 }}>📋 COACH NOTES</div>
@@ -167,13 +175,10 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         </div>
       ) : null}
 
-      {/* Exercises */}
       {workout.exercises.map((ex, ei) => {
         const res = exResults[ei] || { result: "", done: false };
         const videoUrl = libraryMap[ex.name];
         const histExpanded = expandedHistory[ei];
-
-        // Get previous results for this exercise
         const prevResults = prevWorkouts
           .map(w => {
             const found = (w.exercises || []).find(e => e.name === ex.name);
@@ -181,102 +186,80 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
           })
           .filter(Boolean)
           .slice(0, 4);
-
         const embedUrl = getYouTubeEmbedUrl(videoUrl);
+
         return (
           <div key={ei} style={{ ...s.card, borderColor: res.done ? "rgba(196,30,30,0.7)" : "var(--border)", marginBottom: 12, transition: "border-color 0.3s", padding: 0, overflow: "hidden" }}>
-
-            {/* Video embed above exercise */}
             {embedUrl && (
               <div style={{ position: "relative", width: "100%", paddingBottom: "56.25%", background: "#000" }}>
-                <iframe
-                  src={embedUrl}
+                <iframe src={embedUrl}
                   style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                  allowFullScreen />
               </div>
             )}
-
             <div style={{ padding: "12px 14px" }}>
-            {/* Exercise header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.04em" }}>
-                  {ex.name}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 2, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                  {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.reps}
-                  {ex.rpe ? ` · RPE ${ex.rpe}` : ex.weight ? ` @ ${ex.weight}kg` : ""}
-                </div>
-                {ex.notes ? (
-                  <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2, fontStyle: "italic" }}>
-                    {ex.notes}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.04em" }}>{ex.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 2, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                    {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.reps}
+                    {ex.rpe ? ` · RPE ${ex.rpe}` : ex.weight ? ` @ ${ex.weight}kg` : ""}
                   </div>
-                ) : null}
-              </div>
-              <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
-                style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
-                  border: `1px solid ${res.done ? "var(--red)" : "var(--border)"}`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s" }}>
-                {res.done ? "✓" : "○"}
-              </div>
-            </div>
-
-            {/* Result input */}
-            <textarea
-              value={res.result}
-              onChange={e => setExResults(p => ({ ...p, [ei]: { ...res, result: e.target.value } }))}
-              placeholder={`Result... e.g. 3×5 @ ${ex.weight || "?"}kg, RPE 8, felt strong`}
-              rows={2}
-              style={{ ...s.input, resize: "none", fontSize: 13, lineHeight: 1.5, marginBottom: 0 }}
-            />
-
-            {/* History toggle */}
-            {prevResults.length > 0 && (
-              <div>
-                <div onClick={() => setExpandedHistory(p => ({ ...p, [ei]: !histExpanded }))}
-                  style={{ fontSize: 11, color: "var(--gray2)", marginTop: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span>{histExpanded ? "▲" : "▼"}</span>
-                  <span>PREVIOUS {prevResults.length} SESSION{prevResults.length > 1 ? "S" : ""}</span>
+                  {ex.notes ? <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2, fontStyle: "italic" }}>{ex.notes}</div> : null}
                 </div>
-                {histExpanded && (
-                  <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-                    {prevResults.map((pr, pi) => (
-                      <div key={pi} style={{ background: "var(--bg3)", borderRadius: 6, padding: "6px 10px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                            WK {pr.week} · {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                          </div>
-                          {pr.planned && (
-                            <div style={{ fontSize: 10, color: "var(--gray2)" }}>
-                              Plan: {pr.planned.sets}×{pr.planned.reps}@{pr.planned.weight}kg
+                <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
+                  style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
+                    border: `1px solid ${res.done ? "var(--red)" : "var(--border)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s" }}>
+                  {res.done ? "✓" : "○"}
+                </div>
+              </div>
+
+              <textarea value={res.result}
+                onChange={e => setExResults(p => ({ ...p, [ei]: { ...res, result: e.target.value } }))}
+                placeholder={`Result... e.g. 3×5 @ ${ex.weight || "?"}kg, RPE 8, felt strong`}
+                rows={2} style={{ ...s.input, resize: "none", fontSize: 13, lineHeight: 1.5, marginBottom: 0 }} />
+
+              {prevResults.length > 0 && (
+                <div>
+                  <div onClick={() => setExpandedHistory(p => ({ ...p, [ei]: !histExpanded }))}
+                    style={{ fontSize: 11, color: "var(--gray2)", marginTop: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span>{histExpanded ? "▲" : "▼"}</span>
+                    <span>PREVIOUS {prevResults.length} SESSION{prevResults.length > 1 ? "S" : ""}</span>
+                  </div>
+                  {histExpanded && (
+                    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {prevResults.map((pr, pi) => (
+                        <div key={pi} style={{ background: "var(--bg3)", borderRadius: 6, padding: "6px 10px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                              WK {pr.week} · {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                             </div>
+                            {pr.planned && (
+                              <div style={{ fontSize: 10, color: "var(--gray2)" }}>
+                                Plan: {pr.planned.sets}×{pr.planned.reps}@{pr.planned.weight}kg
+                              </div>
+                            )}
+                          </div>
+                          {pr.result
+                            ? <div style={{ fontSize: 12, color: "var(--text)", marginTop: 3, lineHeight: 1.4 }}>{pr.result}</div>
+                            : <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 3, fontStyle: "italic" }}>No result logged</div>}
+                          {pr.coach_comment && (
+                            <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontStyle: "italic" }}>🎯 {pr.coach_comment}</div>
                           )}
                         </div>
-                        {pr.result ? (
-                          <div style={{ fontSize: 12, color: "var(--text)", marginTop: 3, lineHeight: 1.4 }}>{pr.result}</div>
-                        ) : (
-                          <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 3, fontStyle: "italic" }}>No result logged</div>
-                        )}
-                        {pr.coach_comment && (
-                          <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontStyle: "italic" }}>
-                            🎯 {pr.coach_comment}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            </div>{/* end padding div */}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
 
-      {/* Free program KB sections (non-coached) */}
-      {!coachProgram && defaultWorkout?.sections?.filter(s => s.title !== "STRENGTH").map((sec, si) => (
+      {!coachProgram && defaultWorkout?.sections?.filter(sec => sec.title !== "STRENGTH").map((sec, si) => (
         <div key={si} style={{ marginBottom: 20 }}>
           <div style={{ ...s.sectionLabel, marginBottom: 8 }}>{sec.title}</div>
           {sec.exercises && sec.title === "ACCESSORIES" && (
@@ -310,20 +293,16 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         </div>
       ))}
 
-      {/* Save / Finish */}
       {!saved ? (
         <div style={s.card}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 12 }}>FINISH WORKOUT</div>
-
           <label style={s.label}>YOUR COMMENT (optional)</label>
           <textarea value={athleteComment} onChange={e => setAthleteComment(e.target.value)}
             placeholder="How did it feel? Any notes for your coach..."
             rows={3} style={{ ...s.input, resize: "none", lineHeight: 1.5, marginBottom: 12 }} />
-
           <label style={s.label}>VIDEO LINK (optional)</label>
           <input type="text" value={videoLink} onChange={e => setVideoLink(e.target.value)}
             placeholder="YouTube, Google Drive..." style={{ ...s.input, marginBottom: 16 }} />
-
           <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveWorkout} disabled={saving}>
             {saving ? "SAVING..." : "💾 SAVE WORKOUT"}
           </button>
@@ -340,54 +319,26 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
   );
 }
 
-const READINESS_KEY = "ks_readiness_";
-const todayKey = () => new Date().toISOString().slice(0, 10);
+// ─── ScheduleScreen ──────────────────────────────────────────────────────────
 
-function getReadinessColor(score) {
-  if (score >= 8) return "#4caf50";
-  if (score >= 6) return "var(--gold)";
-  if (score >= 4) return "#f06400";
-  return "var(--red)";
-}
-function getReadinessLabel(score) {
-  if (score >= 8) return "BATTLE READY";
-  if (score >= 6) return "STEADY";
-  if (score >= 4) return "TAKE CARE";
-  return "REST DAY";
-}
-function getReadinessRune(score) {
-  if (score >= 8) return "ᚠ"; // Fehu — prosperity
-  if (score >= 6) return "ᚢ"; // Uruz — strength
-  if (score >= 4) return "ᚾ"; // Naudiz — need
-  return "ᛁ"; // Isa — ice/pause
-}
-
-function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
-  const [allDays, setAllDays] = useState([]);
-  const [completedDays, setCompletedDays] = useState({}); // { "wk-day": true }
-  const [loading, setLoading] = useState(true);
+export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
+  const [allDays, setAllDays]             = useState([]);
+  const [completedDays, setCompletedDays] = useState({});
+  const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
     const load = async () => {
       if (!authUser) { setLoading(false); return; }
       try {
-        // Load all program days
-        const { data: days } = await supabase
-          .from("program_days").select("*")
-          .eq("athlete_id", authUser.id)
-          .order("week", { ascending: true });
-
-        // Load completed workouts
-        const { data: logs } = await supabase
-          .from("workouts").select("week, day")
+        const { data: days } = await supabase.from("program_days").select("*")
+          .eq("athlete_id", authUser.id).order("week", { ascending: true });
+        const { data: logs } = await supabase.from("workouts").select("week, day")
           .eq("user_id", authUser.id);
-
         const done = {};
         (logs || []).forEach(l => { done[`${l.week}-${l.day}`] = true; });
-
         setAllDays(days || []);
         setCompletedDays(done);
-      } catch(e) {}
+      } catch (e) {}
       setLoading(false);
     };
     load();
@@ -399,17 +350,13 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
     </div>
   );
 
-  // Group days by week
   const byWeek = {};
   allDays.forEach(d => {
     if (!byWeek[d.week]) byWeek[d.week] = [];
     byWeek[d.week].push(d);
   });
   const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
-
   const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)", D: "#a78bfa" };
-
-  // Find current week (first incomplete week that has days)
   const currentWeek = weeks.find(w => byWeek[w].some(d => !completedDays[`${w}-${d.day}`])) || weeks[0] || week;
 
   return (
@@ -429,7 +376,7 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
             Your program is auto-generated week by week. Go to HOME to start each session.
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {["A","B","C"].map(d => (
+            {["A", "B", "C"].map(d => (
               <div key={d} style={{ flex: 1, minWidth: 80, background: "var(--bg3)", borderRadius: 8, padding: "10px 8px", textAlign: "center", borderLeft: `3px solid ${dayCol[d]}` }}>
                 <div style={{ fontSize: 10, color: dayCol[d], fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em" }}>DAY {d}</div>
                 <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4 }}>Wk {week}</div>
@@ -452,7 +399,6 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
 
         return (
           <div key={wk} style={{ marginBottom: 16 }}>
-            {/* Week header */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900, color: isCurrentWk ? "var(--red)" : "var(--gray2)", letterSpacing: "0.08em" }}>
                 WEEK {wk}
@@ -462,10 +408,8 @@ function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
                 {isPast ? "✓ DONE" : `${wkDone}/${wkDays.length}`}
               </div>
             </div>
-
-            {/* Day cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {wkDays.sort((a,b) => a.day < b.day ? -1 : 1).map(d => {
+              {wkDays.sort((a, b) => a.day < b.day ? -1 : 1).map(d => {
                 const isDone = completedDays[`${wk}-${d.day}`];
                 const col = dayCol[d.day] || "var(--red)";
                 return (

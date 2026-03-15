@@ -634,7 +634,7 @@ export function CoachScreen() {
           week: copyWeekTo, day: day.day, title: day.title, notes: day.notes
         }).select().single();
         if (newDay) {
-          const { data: exs } = await supabase.from("custom_exercises").select("*")
+        const { data: exs } = await supabase.from("custom_exercises").select("*").order("created_at", { ascending: true });
             .eq("athlete_id", selectedClient).eq("week", copyWeekFrom).eq("day", day.day);
           for (const ex of (exs || [])) {
             await supabase.from("custom_exercises").insert({
@@ -1176,8 +1176,21 @@ const saveCoachComment = async () => {
   style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 10px", cursor: "pointer", flexShrink: 0 }}>
   <span style={{ fontSize: 14 }}>📚</span>
 </div>
-                <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{ color: "var(--red-dim)", cursor: "pointer", padding: "0 6px", alignSelf: "center", fontSize: 16 }}>✕</div>
-              </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, alignSelf: "center" }}>
+  <div onClick={() => {
+    if (i === 0) return;
+    const a = [...buildExercises];
+    [a[i-1], a[i]] = [a[i], a[i-1]];
+    setBuildExercises(a);
+  }} style={{ color: i === 0 ? "var(--bg4)" : "var(--accent)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>▲</div>
+  <div onClick={() => {
+    if (i === buildExercises.length - 1) return;
+    const a = [...buildExercises];
+    [a[i], a[i+1]] = [a[i+1], a[i]];
+    setBuildExercises(a);
+  }} style={{ color: i === buildExercises.length - 1 ? "var(--bg4)" : "var(--accent)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>▼</div>
+  <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))} style={{ color: "var(--red-dim)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>✕</div>
+</div>
               <div style={{ display: "flex", gap: 6 }}>
                 {[["Sets","sets",1,8],["Reps","reps",1,30],["kg","weight",0,500]].map(([lbl,key,min,max]) => (
                   <div key={key} style={{ flex: 1 }}>

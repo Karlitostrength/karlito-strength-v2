@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { s } from "../lib/styles";
 
-export default function HistoryScreen() {
+export function HistoryScreen() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);

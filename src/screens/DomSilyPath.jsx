@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { s } from "../lib/styles";
 import { DOM_SILY_LEVELS, getDomSilyLevel, getNextLevelGaps } from "../constants/levels";
-import { LevelCard, ClaimLevelModal } from "../components/RankComponents";
+import { LevelCard, ClaimLevelModal, CommunityFeed } from "../components/RankComponents";
 import { sendPushToUser } from "../lib/push";
 
 export function DomSilyPathScreen({ user, authUser }) {

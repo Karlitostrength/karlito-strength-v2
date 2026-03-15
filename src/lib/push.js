@@ -10,7 +10,7 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-export export async function sendPushToAllUsers(title, message, tag = "ks", url = "/") {
+export async function sendPushToAllUsers(title, message, tag = "ks", url = "/") {
   try {
     const { data: subs } = await supabase.from("push_subscriptions").select("user_id");
     if (!subs) return;
@@ -19,7 +19,7 @@ export export async function sendPushToAllUsers(title, message, tag = "ks", url 
   } catch(e) { console.log("push all error:", e); }
 }
 
-export export async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
+export async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
   try {
     await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
       method: "POST",
@@ -29,7 +29,7 @@ export export async function sendPushToUser(userId, title, message, tag = "ks", 
   } catch(e) { console.log("Push failed (non-critical):", e); }
 }
 
-export export async function registerPushSubscription(userId) {
+export async function registerPushSubscription(userId) {
   try {
     if (!("serviceWorker" in navigator)) throw new Error("Service Workers not supported");
     if (!("PushManager" in window)) throw new Error("Push not supported in this browser");
@@ -58,7 +58,7 @@ export export async function registerPushSubscription(userId) {
   }
 }
 
-export export async function unregisterPushSubscription(userId) {
+export async function unregisterPushSubscription(userId) {
   try {
     if (!("serviceWorker" in navigator)) return;
     const reg = await navigator.serviceWorker.ready;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { sendPushToUser } from "../lib/push";
+import { s } from "../lib/styles";
 import { DOM_SILY_LEVELS } from "../constants/levels";
 import { RanksCoachView } from "../components/RankComponents";
 

@@ -4,7 +4,7 @@ import { registerPushSubscription, unregisterPushSubscription } from "../lib/pus
 import { getDomSilyLevel } from "../constants/levels";
 import { Row } from "../components/SmallComponents";
 import { DomSilyPathScreen } from "./DomSilyPath";
-
+import { s } from "../lib/styles";
 
 export function ProfileScreen({ user, authUser }) {
   const [profileTab, setProfileTab] = useState("profile"); // profile | path

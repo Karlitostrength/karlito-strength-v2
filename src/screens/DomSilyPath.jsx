@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { s } from "../lib/styles";
 import { DOM_SILY_LEVELS, getDomSilyLevel, getNextLevelGaps } from "../constants/levels";

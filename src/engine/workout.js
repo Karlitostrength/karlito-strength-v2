@@ -1,3 +1,12 @@
+// ─── PHASES ──────────────────────────────────────────────────────────────────
+
+export const PHASES = {
+  1: { name: "FUNDAMENTALS", color: "#4a9eff", weeks: [1,2], scheme: "5×8 paused" },
+  2: { name: "BUILDING",     color: "#f0a020", weeks: [3,4], scheme: "6×6" },
+  3: { name: "STRENGTH",     color: "#c41e1e", weeks: [5,6], scheme: "5×5" },
+  4: { name: "PEAK",         color: "#a78bfa", weeks: [7,8], scheme: "5×3" },
+};
+
 export function getPhase(week) {
   if (week <= 2) return 1;
   if (week <= 4) return 2;
@@ -5,8 +14,9 @@ export function getPhase(week) {
   return 4;
 }
 
-export function getPct(week, level) {
-  // Intensity by phase: FUNDAMENT 70%, BUDOWANIE 75%, SIŁA 80%, SZCZYT 87%
+// ─── INTERNAL HELPERS ────────────────────────────────────────────────────────
+
+function getPct(week, level) {
   const base = {
     beginner:     [0.68, 0.73, 0.78, 0.85],
     intermediate: [0.70, 0.75, 0.80, 0.87],
@@ -16,11 +26,15 @@ export function getPct(week, level) {
   return arr[getPhase(week) - 1];
 }
 
-export function getSetsReps(week) {
-  if (week <= 2) return { sets: 5, reps: 8 };  // FUNDAMENT
-  if (week <= 4) return { sets: 6, reps: 6 };  // BUDOWANIE
-  if (week <= 6) return { sets: 5, reps: 5 };  // SIŁA
-  return { sets: 5, reps: 3 };                  // SZCZYT
+function getSetsReps(week) {
+  if (week <= 2) return { sets: 5, reps: 8 };
+  if (week <= 4) return { sets: 6, reps: 6 };
+  if (week <= 6) return { sets: 5, reps: 5 };
+  return { sets: 5, reps: 3 };
+}
+
+function calcWeight(oneRM, pct) {
+  return Math.round(oneRM * pct / 2.5) * 2.5;
 }
 
 export function getSwingProtocol(week) {
@@ -29,12 +43,9 @@ export function getSwingProtocol(week) {
   return { minutes: 10, reps: 20, label: `10 min × 20 reps/min (Power EMOM)` };
 }
 
-export function getSnatchMaxProtocol(week, level) {
-  // 4×6/6, progress to 4×12/12, then heavier KB
-  // Beginners: one arm swing; intermediate/advanced: snatch
+function getSnatchMaxProtocol(week, level) {
   const startReps = 6;
   const targetReps = 12;
-  // +1 rep every 2 weeks
   const currentReps = Math.min(startReps + Math.floor((week - 1) / 2), targetReps);
   const reachedTarget = currentReps >= targetReps;
   const isSwing = level === "beginner";
@@ -52,30 +63,17 @@ export function getSnatchMaxProtocol(week, level) {
   };
 }
 
-export function adjustWeight(weight, rpe) {
-  if (rpe > 9) return Math.round(weight * 0.95 / 2.5) * 2.5;
-  if (rpe < 7) return Math.round(weight * 1.025 / 2.5) * 2.5;
-  return weight;
-}
-
-export function calcWeight(oneRM, pct) {
-  return Math.round(oneRM * pct / 2.5) * 2.5;
-}
-
-export const ACCESSORIES = {
-  // DAY A — SQUAT DAY (spec: Lunge + Copenhagen + KB conditioning per poziom)
+const ACCESSORIES = {
   A: {
     beginner:     ["Reverse Lunge 3×8", "Copenhagen Plank (short lever) 3×20s"],
     intermediate: ["Goblet Hold Reverse Lunge 3×8", "Copenhagen Plank (long lever) 3×20s"],
     advanced:     ["Double KB Front Rack Reverse Lunge 3×6", "Copenhagen Side Plank 3×20s"],
   },
-  // DAY B — DEADLIFT DAY (spec: KB EMOM per poziom)
   B: {
     beginner:     ["EMOM 5 min × 3 rounds: 1) KB Clean ×5 | 2) Farmers Carry 30m | 3) KB Press ×5/side | 4) Inverted Row | 5) Rest"],
     intermediate: ["EMOM 4 min × 3 rounds: 1) KB Clean 5/5 | 2) Suitcase Carry 15m/side | 3) Hollow Hold 30s | 4) Rest"],
     advanced:     ["15 min work block: 2×KB Clean & Press ×5 | Pull Ups ×5 (lub Rows ×10) | Sandbag Carry 30m"],
   },
-  // DAY C — BENCH DAY (spec: TGU + Push/Pull per poziom)
   C: {
     beginner:     ["Turkish Get Up 3–5×1 EMOM (quality)", "Superset: Push Up + Gorilla Row", "15 min AMRAP: 8 KB Swing / 8 Skull Crusher / 8 Ab Wheel"],
     intermediate: ["Turkish Get Up 3–5×1 EMOM (quality)", "15 min AMRAP: Push Up ×10 / Pull Up ×5 / KB Swing ×10"],
@@ -83,12 +81,9 @@ export const ACCESSORIES = {
   },
 };
 
-
-// Bench progression per level (spec: Beginner/Intermediate week-by-week RPE, Advanced: single + back-off)
-export function getBenchScheme(week, level, oneRM) {
+function getBenchScheme(week, level, oneRM) {
   if (level === "advanced") {
     if (week <= 4) {
-      // 6×6 @70% + weight each session
       const advPct = 0.70 + (week - 1) * 0.02;
       return [{ name: "Paused Bench Press", sets: 6, reps: 6, weight: calcWeight(oneRM.bench, advPct), pct: advPct, note: `@${Math.round(advPct*100)}% — dodaj ciężar każdą sesję`, isMain: true }];
     }
@@ -105,7 +100,6 @@ export function getBenchScheme(week, level, oneRM) {
       { name: "Bench Press (back-off)", sets: d.workSets, reps: d.workReps, note: `−${d.drop*100}% od topu → ${d.workSets}×${d.workReps}` },
     ];
   }
-  // Beginner & Intermediate — identyczny schemat tygodniowy
   const scheme = [
     { week: 1, sets: 4, reps: 10, rpe: 6, paused: true },
     { week: 2, sets: 4, reps: 10, rpe: 7, paused: true },
@@ -116,19 +110,17 @@ export function getBenchScheme(week, level, oneRM) {
     { week: 7, sets: 4, reps: 4,  rpe: null, paused: false },
     { week: 8, sets: 5, reps: 3,  rpe: 9,   paused: false },
   ];
-  const s = scheme[Math.min(week, 8) - 1];
-  const exName = s.paused ? "Paused Bench Press" : "Bench Press";
-  const exNote = s.rpe ? `RPE ${s.rpe}` : "";
-  return [{ name: exName, sets: s.sets, reps: s.reps, rpe: s.rpe, note: exNote, isMain: true }];
+  const sc = scheme[Math.min(week, 8) - 1];
+  const exName = sc.paused ? "Paused Bench Press" : "Bench Press";
+  const exNote = sc.rpe ? `RPE ${sc.rpe}` : "";
+  return [{ name: exName, sets: sc.sets, reps: sc.reps, rpe: sc.rpe, note: exNote, isMain: true }];
 }
 
-// Deadlift progression per level (spec: Beginner/Intermediate paused→non-paused, Advanced: Bolton wave)
-export function getDeadliftScheme(week, level, oneRM, injuries) {
+function getDeadliftScheme(week, level, oneRM, injuries) {
   injuries = injuries || {};
   const baseEx = injuries.lowerBack ? "Block Pull" : "Deadlift";
 
   if (level === "advanced") {
-    // Andy Bolton wave
     const bolton = [
       { heavy: { pct: 0.75, sets: 1, reps: 2 }, speed: { pct: 0.60, sets: 5, reps: 3 } },
       { heavy: { pct: 0.80, sets: 1, reps: 2 }, speed: { pct: 0.65, sets: 5, reps: 3 } },
@@ -157,31 +149,28 @@ export function getDeadliftScheme(week, level, oneRM, injuries) {
   return [{ name: baseEx, sets: 3, reps: 3, weight: calcWeight(oneRM.deadlift, 0.87), pct: 0.87, note: "3×3", isMain: true }];
 }
 
-// Squat: wszystkie poziomy ten sam schemat (5×8→6×6→5×5→5×3), paused tygodnie 1–4
-export function getSquatExercise(week, injuries) {
+function getSquatExercise(week, injuries) {
   injuries = injuries || {};
   const base = injuries.knee ? "Box Squat" : "Back Squat";
   return week <= 4 ? `Paused ${base}` : base;
 }
+
+// ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 
 export function generateWorkout(day, week, level, oneRM, injuries = {}) {
   injuries = injuries || {};
   const { sets, reps } = getSetsReps(week);
   const acc = ACCESSORIES[day]?.[level] || [];
 
-  // ── DAY A — SQUAT ──────────────────────────────────────────────────────────
-  // Spec: główny squat (paused tygodnie 1-4), brak back-off setów,
-  //       akcesoria (Lunge + Copenhagen), KB conditioning per poziom
   if (day === "A") {
     const sqName = getSquatExercise(week, injuries);
     const pct = getPct(week, level);
     const sqWeight = calcWeight(oneRM.squat, pct);
-    // KB conditioning: beginner = Swing, intermediate = Single Arm Swing, advanced = Snatch
     const kbA = level === "beginner"
       ? getSwingProtocol(week)
       : level === "intermediate"
-        ? getSnatchMaxProtocol(week, "intermediate")   // single arm swing 7/7→12/12
-        : getSnatchMaxProtocol(week, "advanced");      // hardstyle snatch 10/10→20/20
+        ? getSnatchMaxProtocol(week, "intermediate")
+        : getSnatchMaxProtocol(week, "advanced");
     return {
       title: "DAY A — SQUAT",
       sections: [
@@ -198,9 +187,6 @@ export function generateWorkout(day, week, level, oneRM, injuries = {}) {
     };
   }
 
-  // ── DAY B — DEADLIFT ───────────────────────────────────────────────────────
-  // Spec: progresja per poziom (Beginner/Int paused→heavy, Advanced: Bolton wave),
-  //       brak back-off setów, akcesoria KB EMOM per poziom
   if (day === "B") {
     const dlExercises = getDeadliftScheme(week, level, oneRM, injuries);
     return {
@@ -213,9 +199,6 @@ export function generateWorkout(day, week, level, oneRM, injuries = {}) {
     };
   }
 
-  // ── DAY C — BENCH ──────────────────────────────────────────────────────────
-  // Spec: progresja tygodniowa per poziom, TGU practice, akcesoria Push/Pull per poziom,
-  //       back-off TYLKO advanced tygodnie 5-8 (wbudowany w getBenchScheme)
   const benchExercises = getBenchScheme(week, level, oneRM);
   return {
     title: "DAY C — BENCH",

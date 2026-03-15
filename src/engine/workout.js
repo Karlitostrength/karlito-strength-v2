@@ -16,7 +16,7 @@ export function getPhase(week) {
 
 // ─── INTERNAL HELPERS ────────────────────────────────────────────────────────
 
-function getPct(week, level) {
+export function getPct(week, level) {
   const base = {
     beginner:     [0.68, 0.73, 0.78, 0.85],
     intermediate: [0.70, 0.75, 0.80, 0.87],
@@ -149,7 +149,7 @@ function getDeadliftScheme(week, level, oneRM, injuries) {
   return [{ name: baseEx, sets: 3, reps: 3, weight: calcWeight(oneRM.deadlift, 0.87), pct: 0.87, note: "3×3", isMain: true }];
 }
 
-function getSquatExercise(week, injuries) {
+export function getSquatExercise(week, injuries) {
   injuries = injuries || {};
   const base = injuries.knee ? "Box Squat" : "Back Squat";
   return week <= 4 ? `Paused ${base}` : base;

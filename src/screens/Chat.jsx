@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
-
+import { s } from "../lib/styles";
 export function ChatScreen({ authUser, isCoach }) {
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState("");

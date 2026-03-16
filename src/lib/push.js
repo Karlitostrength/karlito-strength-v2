@@ -21,15 +21,25 @@ export async function sendPushToAllUsers(title, message, tag = "ks", url = "/") 
 
 export async function sendPushToUser(userId, title, message, tag = "ks", url = "/") {
   try {
- await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy'}`,
-  },
-  body: JSON.stringify({ user_id: userId, title, message, tag, url }),
-});
+    await fetch(`${SUPABASE_FUNCTIONS_URL}/send-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer sb_publishable_-9TPMx_XdGI0Ur5m-Utqeg_drghUgIy`,
+      },
+      body: JSON.stringify({ user_id: userId, title, message, tag, url }),
+    });
   } catch(e) { console.log("Push failed (non-critical):", e); }
+}
+
+export async function sendEmailNotification(type, data) {
+  try {
+    await fetch(`${SUPABASE_FUNCTIONS_URL}/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, data }),
+    });
+  } catch(e) { console.log("Email notification failed (non-critical):", e); }
 }
 
 export async function registerPushSubscription(userId) {

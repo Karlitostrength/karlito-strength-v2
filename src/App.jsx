@@ -31,27 +31,32 @@ const NAV_COACH = [
   { id: "profile",   icon: "👤", label: "ME" },
 ];
 
-
 export default function App() {
-  // Check for invite code in URL
+  const [splashDone, setSplashDone] = useState(false);
   const [inviteCode, setInviteCode] = useState(null);
-  
+  const [authUser, setAuthUser] = useState(undefined);
+  const [user, setUser] = useState(null);
+  const [isCoach, setIsCoach] = useState(false);
+  const [hasCoach, setHasCoach] = useState(false);
+  const [week, setWeek] = useState(1);
+  const [tab, setTab] = useState("dashboard");
+  const [activeDay, setActiveDay] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+
   useEffect(() => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const refParam = params.get("ref");
-
     if (path.startsWith("/invite/")) {
       const code = path.replace("/invite/", "").toUpperCase();
       setInviteCode(code);
       localStorage.setItem("ks_invite", code);
     } else if (refParam) {
-      // ?ref=KARLITO or any code in query param
       const code = refParam.toUpperCase();
       setInviteCode(code);
       localStorage.setItem("ks_invite", code);
     } else if (path === "/free" || path === "/start" || path === "/join") {
-      // Free program path - no invite code, clear any saved
       localStorage.removeItem("ks_invite");
       setInviteCode(null);
     } else {
@@ -59,14 +64,6 @@ export default function App() {
       if (saved) setInviteCode(saved);
     }
   }, []);
-
-const [authUser, setAuthUser] = useState(undefined);
-  const [user, setUser] = useState(null);
- const [isCoach, setIsCoach] = useState(false);
-const [hasCoach, setHasCoach] = useState(false);
-  const [week, setWeek] = useState(1);
-  const [tab, setTab] = useState("dashboard");
-  const [activeDay, setActiveDay] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -77,14 +74,10 @@ const [hasCoach, setHasCoach] = useState(false);
     });
   }, []);
 
- useEffect(() => {
+  useEffect(() => {
     if (!authUser) return;
-
-    // Load from localStorage first (instant)
     const saved = localStorage.getItem("ks_profile");
     if (saved) setUser(JSON.parse(saved));
-
-    // Sync full profile from Supabase
     supabase.from("profiles")
       .select("role, coach_id, name, squat, bench, deadlift, kb_weight, level, pullups, recovery, main_goal, competition_date, athlete_notes")
       .eq("id", authUser.id)
@@ -93,8 +86,6 @@ const [hasCoach, setHasCoach] = useState(false);
         if (!data) return;
         setIsCoach(data.role === "coach");
         setHasCoach(data.role === "athlete" && !!data.coach_id);
-
-        // Merge DB data into user profile
         if (data.squat || data.bench || data.level) {
           const merged = {
             ...(saved ? JSON.parse(saved) : {}),
@@ -115,9 +106,6 @@ const [hasCoach, setHasCoach] = useState(false);
       });
   }, [authUser]);
 
-  const [showAuth, setShowAuth] = useState(false);
-  const [showPwaBanner, setShowPwaBanner] = useState(false);
-
   useEffect(() => {
     const dismissed = localStorage.getItem("ks_pwa_dismissed");
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
@@ -127,9 +115,11 @@ const [hasCoach, setHasCoach] = useState(false);
     }
   }, []);
 
+  // ── SPLASH ──
+  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
+
+  // ── LOADING ──
   if (authUser === undefined) {
-    const [splashDone, setSplashDone] = useState(false);
-if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "var(--gray)", letterSpacing: "0.2em" }}>LOADING...</div>
@@ -144,11 +134,10 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
   if (!authUser) {
     return <AuthScreen onAuth={async (u) => {
       setAuthUser(u);
-      // If invite code, assign coach
       const code = localStorage.getItem("ks_invite");
       if (code === "KARLITO") {
-        await supabase.from("profiles").update({ 
-          coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" 
+        await supabase.from("profiles").update({
+          coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c"
         }).eq("id", u.id);
         localStorage.removeItem("ks_invite");
         setHasCoach(true);
@@ -160,7 +149,6 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
     return <OnboardingScreen onComplete={async (u) => {
       localStorage.setItem("ks_profile", JSON.stringify(u));
       setUser(u);
-      // Save to Supabase so coach can see it
       try {
         await supabase.from("profiles").update({
           squat: u.oneRM?.squat || null,
@@ -178,7 +166,6 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
 
   const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };
   const handleWorkoutDone = async (workoutInfo) => {
-    // Push to coach when athlete completes workout
     if (!isCoach && authUser) {
       const athleteName = user?.name || authUser.email?.split("@")[0] || "Athlete";
       const dayLabel = workoutInfo?.day ? `Day ${workoutInfo.day}` : "a session";
@@ -187,8 +174,7 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
         "a6efb4f6-a5aa-4829-89c3-adb486cf187c",
         `💪 ${athleteName} just logged ${dayLabel}`,
         `${weekLabel} — tap to review their session`,
-        "workout",
-        "/"
+        "workout", "/"
       );
     }
     setActiveDay(null);
@@ -198,7 +184,7 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   return (
-<div style={{...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url('https://drive.google.com/uc?export=view&id=1U8QROGZWsy5_BxVcrUFs98HIYt1yud7-') center 20% / cover fixed`}}>
+    <div style={{ ...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url('https://drive.google.com/uc?export=view&id=1U8QROGZWsy5_BxVcrUFs98HIYt1yud7-') center 20% / cover fixed` }}>
 
       {showPwaBanner && (
         <div style={{ position: "fixed", bottom: 70, left: 12, right: 12, zIndex: 9999, background: "#1a1a1a", border: "1px solid var(--accent)", borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.7)" }}>
@@ -214,6 +200,7 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
           <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "var(--accent)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.15em", padding: "8px 0", cursor: "pointer" }}>GOT IT</button>
         </div>
       )}
+
       <div style={s.header}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -236,7 +223,7 @@ if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "history" && <HistoryScreen />}
         {tab === "progress" && <ProgressScreen user={user} week={week} />}
-   {tab === "profile" && <ProfileScreen user={user} authUser={authUser} />}
+        {tab === "profile" && <ProfileScreen user={user} authUser={authUser} />}
         {tab === "coach" && <CoachScreen />}
       </div>
 

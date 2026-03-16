@@ -1,7 +1,7 @@
 import { SplashScreen } from "./screens/SplashScreen";
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
-import { sendPushToUser } from "./lib/push";
+import { sendPushToUser, sendEmailNotification } from "./lib/push";
 import { s } from "./lib/styles";
 import { PHASES } from "./constants/phases";
 import { getPhase } from "./engine/workout";
@@ -115,10 +115,8 @@ export default function App() {
     }
   }, []);
 
-  // ── SPLASH ──
   if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
 
-  // ── LOADING ──
   if (authUser === undefined) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -127,18 +125,14 @@ export default function App() {
     );
   }
 
-  if (!authUser && !showAuth) {
-    return <LandingScreen onSignUp={() => setShowAuth(true)} />;
-  }
+  if (!authUser && !showAuth) return <LandingScreen onSignUp={() => setShowAuth(true)} />;
 
   if (!authUser) {
     return <AuthScreen onAuth={async (u) => {
       setAuthUser(u);
       const code = localStorage.getItem("ks_invite");
       if (code === "KARLITO") {
-        await supabase.from("profiles").update({
-          coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c"
-        }).eq("id", u.id);
+        await supabase.from("profiles").update({ coach_id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" }).eq("id", u.id);
         localStorage.removeItem("ks_invite");
         setHasCoach(true);
       }
@@ -151,13 +145,9 @@ export default function App() {
       setUser(u);
       try {
         await supabase.from("profiles").update({
-          squat: u.oneRM?.squat || null,
-          bench: u.oneRM?.bench || null,
-          deadlift: u.oneRM?.deadlift || null,
-          kb_weight: u.kgKB || null,
-          level: u.level || null,
-          pullups: u.pullups || null,
-          recovery: u.recovery || null,
+          squat: u.oneRM?.squat || null, bench: u.oneRM?.bench || null,
+          deadlift: u.oneRM?.deadlift || null, kb_weight: u.kgKB || null,
+          level: u.level || null, pullups: u.pullups || null, recovery: u.recovery || null,
         }).eq("id", authUser.id);
       } catch(e) {}
       setTab("dashboard");
@@ -165,17 +155,26 @@ export default function App() {
   }
 
   const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };
+
   const handleWorkoutDone = async (workoutInfo) => {
     if (!isCoach && authUser) {
       const athleteName = user?.name || authUser.email?.split("@")[0] || "Athlete";
       const dayLabel = workoutInfo?.day ? `Day ${workoutInfo.day}` : "a session";
       const weekLabel = workoutInfo?.week ? `Wk ${workoutInfo.week}` : "";
+
       sendPushToUser(
         "a6efb4f6-a5aa-4829-89c3-adb486cf187c",
         `💪 ${athleteName} just logged ${dayLabel}`,
         `${weekLabel} — tap to review their session`,
         "workout", "/"
       );
+
+      sendEmailNotification("workout_done", {
+        athlete_name: athleteName,
+        day: workoutInfo?.day || "?",
+        week: workoutInfo?.week || week,
+        comment: workoutInfo?.comment || "",
+      });
     }
     setActiveDay(null);
     setTab("history");
@@ -193,9 +192,7 @@ export default function App() {
             <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "none", border: "none", color: "var(--gray)", fontSize: 18, cursor: "pointer", padding: "0 4px" }}>✕</button>
           </div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray)", letterSpacing: "0.05em", lineHeight: 1.5 }}>
-            {isIOS
-              ? "Tap the Share button below → \"Add to Home Screen\" for the full app experience."
-              : "Tap the menu (⋮) in your browser → \"Add to Home Screen\" for the full app experience."}
+            {isIOS ? "Tap the Share button below → \"Add to Home Screen\"" : "Tap the menu (⋮) → \"Add to Home Screen\""}
           </div>
           <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "var(--accent)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.15em", padding: "8px 0", cursor: "pointer" }}>GOT IT</button>
         </div>

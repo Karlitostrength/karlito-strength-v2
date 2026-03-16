@@ -35,7 +35,7 @@ export function LandingScreen({ onSignUp }) {
     const body = encodeURIComponent(
       `Name: ${formData.name}\nEmail: ${formData.email}\nGoal: ${formData.goal}\n\n${formData.message}`
     );
-    window.location.href = `mailto:karlitostrength@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:karolprzybycien91@gmail.com?subject=${subject}&body=${body}`;
     setFormSent(true);
   };
 
@@ -131,7 +131,7 @@ export function LandingScreen({ onSignUp }) {
           <button className="btn-ghost" onClick={onSignUp}>ENTER APP</button>
         </div>
         <div className="h5" style={{ display: "flex", gap: 40, marginTop: 72, paddingTop: 40, borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
-          {[["4+","Years coaching"],["35–55+","Specialist age group"],["3","Disciplines combined"]].map(([num, label]) => (
+          {[["5+","Years coaching"],["35–55+","Specialist age group"],["3","Disciplines combined"]].map(([num, label]) => (
             <div key={label}>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 38, fontWeight: 900, color: "var(--gold)", lineHeight: 1 }}>{num}</div>
               <div style={{ fontSize: 11, color: "var(--gray)", letterSpacing: "0.12em", marginTop: 6, textTransform: "uppercase" }}>{label}</div>
@@ -172,7 +172,7 @@ export function LandingScreen({ onSignUp }) {
             I combine kettlebell training, barbell work and structured periodisation into programmes built specifically for you — not copied from a template. Whether you want to lose 10kg, get your first pull-up or compete in kettlebell sport — the method is the same: progressive, measurable, no shortcuts.
           </p>
           {[
-            ["01","ASSESSMENT","We start with your 1RM data, movement quality, recovery capacity and injury history. The programme adapts to you — not the other way around."],
+            ["01","ASSESSMENT","We start with movement quality — how you squat, hinge, push and carry. Injury history, recovery capacity and training background shape every decision before we touch a weight."],
             ["02","PERIODISATION","8-week blocks: Fundamentals → Building → Strength → Peak. Volume and intensity wave intelligently so you're always progressing, never spinning your wheels."],
             ["03","KETTLEBELLS + BARBELL","The combination most coaches ignore. Barbell builds raw strength. Kettlebells build the body around it — carries, presses, swings, Turkish get-ups."],
             ["04","ACCOUNTABILITY","Every set logged in the Karlito Strength app. You see your progress. I see your numbers. Adjustments happen in real time, not at the end of the month."],
@@ -215,21 +215,6 @@ export function LandingScreen({ onSignUp }) {
             Push, Pull, Hinge, Squat, Carry, Engine. Six pillars. No shortcuts between them.
             You earn each rank through tested, verified strength. Your coach confirms it. The record stands.
           </p>
-
-          <div {...reveal("ds-ranks")} style={{ marginBottom: 48, border: "1px solid var(--border)" }}>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: "0.3em", color: "var(--gray2)", padding: "14px 16px", borderBottom: "1px solid var(--border)", textTransform: "uppercase" }}>The Six Ranks</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
-              {[
-                ["🔰","ADEPT","#6B7280"],["⚒️","APPRENTICE","#B8860B"],["🏋️","LIFTER","#C0392B"],
-                ["⚔️","WARRIOR","#7B3F00"],["🔱","TITAN","#1A237E"],["🏛️","GLADIATOR","#4A0000"],
-              ].map(([icon, name, color], i) => (
-                <div key={name} style={{ padding: "18px 12px", textAlign: "center", borderRight: i % 3 !== 2 ? "1px solid var(--border)" : "none", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-                  <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, fontWeight: 700, color, letterSpacing: "0.12em" }}>{name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div {...reveal("ds-quote")} style={{ borderLeft: "1px solid var(--gold-dim)", paddingLeft: 24, marginBottom: 40 }}>
             <p style={{ fontFamily: "'Cinzel', serif", fontSize: 14, lineHeight: 1.9, color: "#555", fontStyle: "italic" }}>

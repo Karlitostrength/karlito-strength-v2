@@ -1,3 +1,4 @@
+import { SplashScreen } from "./screens/SplashScreen";
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { sendPushToUser } from "./lib/push";
@@ -127,6 +128,8 @@ const [hasCoach, setHasCoach] = useState(false);
   }, []);
 
   if (authUser === undefined) {
+    const [splashDone, setSplashDone] = useState(false);
+if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: "var(--gray)", letterSpacing: "0.2em" }}>LOADING...</div>

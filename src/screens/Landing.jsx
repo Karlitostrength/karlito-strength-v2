@@ -99,7 +99,7 @@ export function LandingScreen({ onSignUp }) {
           KARLITO <span style={{ color: "var(--gold)" }}>STRENGTH</span>
         </div>
         <div className="desktop-nav" style={{ display: "flex", gap: 36, alignItems: "center" }}>
-          {[["about","About"],["method","Method"],["pricing","Pricing"],["dom-sily","Dom Siły"],["contact","Contact"]].map(([id, label]) => (
+          {[["about","About"],["method","Method"],["pricing","Pricing"],["dom-sily","House of Strength"],["contact","Contact"]].map(([id, label]) => (
             <a key={id} href={`#${id}`} className="nav-link">{label}</a>
           ))}
           <button className="btn-primary" onClick={onSignUp} style={{ padding: "9px 20px", fontSize: 12 }}>ENTER APP →</button>
@@ -107,7 +107,7 @@ export function LandingScreen({ onSignUp }) {
         <div className="hamburger" onClick={() => setMenuOpen(v => !v)}><div /><div /><div /></div>
         {menuOpen && (
           <div className="mobile-nav">
-            {[["about","About"],["method","Method"],["pricing","Pricing"],["dom-sily","Dom Siły"],["contact","Contact"]].map(([id, label]) => (
+            {[["about","About"],["method","Method"],["pricing","Pricing"],["dom-sily","House of Strength"],["contact","Contact"]].map(([id, label]) => (
               <a key={id} href={`#${id}`} className="nav-link" onClick={() => setMenuOpen(false)}>{label}</a>
             ))}
             <button className="btn-primary" onClick={() => { setMenuOpen(false); onSignUp(); }} style={{ padding: "12px 20px", fontSize: 13, textAlign: "center" }}>ENTER APP →</button>
@@ -197,13 +197,13 @@ export function LandingScreen({ onSignUp }) {
 
         <div className="section" style={{ position: "relative", zIndex: 1 }}>
           <div {...reveal("ds-tag")} style={{ fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: "0.4em", color: "var(--gold)", opacity: 0.7, marginBottom: 16 }}>
-            Ferrum · Sanguis · Gloria
+            The Ranking System
           </div>
           <h2 {...reveal("ds-h")} style={{ fontFamily: "'Cinzel', serif", fontSize: "clamp(36px, 9vw, 72px)", fontWeight: 900, lineHeight: 1.0, marginBottom: 8, letterSpacing: "0.02em" }}>
-            DOM SIŁY
+            HOUSE OF<br />STRENGTH
           </h2>
           <div {...reveal("ds-sub")} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, letterSpacing: "0.35em", color: "var(--gold)", marginBottom: 48, textTransform: "uppercase" }}>
-            House of Strength
+            Ferrum · Sanguis · Gloria
           </div>
 
           <p {...reveal("ds-p1")} style={{ fontSize: 16, lineHeight: 1.9, color: "#666", marginBottom: 24, fontStyle: "italic" }}>
@@ -226,7 +226,7 @@ export function LandingScreen({ onSignUp }) {
 
           <div {...reveal("ds-cta")} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button className="btn-primary" onClick={onSignUp} style={{ background: "#5a2d00" }}>ENTER THE HOUSE →</button>
-            <button className="btn-ghost" onClick={onSignUp}>VIEW MY RANK</button>
+            <button className="btn-ghost" onClick={onSignUp}>CHECK YOUR RANK</button>
           </div>
         </div>
       </section>

@@ -191,7 +191,7 @@ export function ChatScreen({ authUser, isCoach }) {
 
     // Email to coach when athlete sends message
     if (!isCoach) {
-      const { data: profile } = await supabase.from("profiles").select("name").eq("id", authUser.id).single().catch(() => ({ data: null }));
+      const { data: profile } = await supabase.from("profiles").select("name").eq("id", authUser.id).maybeSingle();
       sendEmailNotification("new_message", {
         sender_name: profile?.name || "Athlete",
         message_text: content,

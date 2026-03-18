@@ -218,7 +218,7 @@ export default function App() {
         {tab === "schedule" && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("workout"); }} />}
         {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}
-        {tab === "history" && <HistoryScreen />}
+       {tab === "history" && <HistoryScreen authUser={authUser} />}
         {tab === "progress" && <ProgressScreen user={user} week={week} />}
         {tab === "profile" && <ProfileScreen user={user} authUser={authUser} />}
         {tab === "coach" && <CoachScreen />}

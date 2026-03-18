@@ -1,19 +1,43 @@
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 import { s } from "../lib/styles";
 
-export function HistoryScreen() {
+export function HistoryScreen({ authUser }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("ks_logs");
-      const entries = raw ? JSON.parse(raw) : [];
-      setLogs(entries.sort((a, b) => new Date(b.date) - new Date(a.date)));
-    } catch { }
-    setLoading(false);
-  }, []);
+    const load = async () => {
+      try {
+        if (authUser) {
+          const { data } = await supabase
+            .from("workouts")
+            .select("*")
+            .eq("user_id", authUser.id)
+            .order("created_at", { ascending: false });
+          if (data && data.length > 0) {
+            setLogs(data.map(w => ({
+              ...w,
+              date: w.created_at,
+              workout: w.workout_title,
+              exercises: w.exercises || [],
+              comment: w.comment,
+              coach_comment: w.coach_comment,
+            })));
+            setLoading(false);
+            return;
+          }
+        }
+        // Fallback to localStorage
+        const raw = localStorage.getItem("ks_logs");
+        const entries = raw ? JSON.parse(raw) : [];
+        setLogs(entries.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      } catch { }
+      setLoading(false);
+    };
+    load();
+  }, [authUser]);
 
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" };
@@ -48,47 +72,53 @@ export function HistoryScreen() {
 
   const totalVol = logs.reduce((s, l) => s + volKg(l.exercises), 0);
   const totalSessions = logs.length;
+  const withFeedback = logs.filter(l => l.coach_comment).length;
 
   return (
     <div style={s.screen}>
       <div style={s.sectionLabel}>WORKOUT HISTORY</div>
 
-      {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
         {[
           ["SESSIONS", totalSessions, "total"],
           ["VOLUME", totalVol > 0 ? `${Math.round(totalVol / 1000)}t` : "—", "total"],
-          ["OSTATNI", logs[0] ? fmtDate(logs[0].date) : "—", "trening"],
+          ["FEEDBACK", withFeedback > 0 ? withFeedback : "—", "from coach"],
         ].map(([label, val, sub]) => (
           <div key={label} style={{ ...s.card, textAlign: "center", padding: "10px 6px" }}>
             <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.12em", marginBottom: 3 }}>{label}</div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: label === "OSTATNI" ? 13 : 22, fontWeight: 900, lineHeight: 1.1, color: "var(--red)" }}>{val}</div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, lineHeight: 1.1, color: label === "FEEDBACK" && withFeedback > 0 ? "var(--gold)" : "var(--red)" }}>{val}</div>
             <div style={{ fontSize: 9, color: "var(--gray2)", marginTop: 2 }}>{sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Entries */}
       {logs.map((log, idx) => {
         const vol = volKg(log.exercises);
         const rpe = maxRPE(log.exercises);
         const isOpen = expanded === idx;
         const col = dayCol[log.day] || "var(--red)";
+        const hasCoachFeedback = !!log.coach_comment;
         const doneSets = log.exercises?.reduce((s, ex) => s + ((ex.sets || []).filter(st => st.done).length || (ex.done ? 1 : 0)), 0) || 0;
         const allSets = log.exercises?.reduce((s, ex) => s + Math.max((ex.sets || []).length, 1), 0) || 0;
 
         return (
-          <div key={idx} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}`, cursor: "pointer" }}
+          <div key={idx}
+            style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${hasCoachFeedback ? "var(--gold)" : col}`, cursor: "pointer" }}
             onClick={() => setExpanded(isOpen ? null : idx)}>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {log.day}</div>
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {log.week}</div>
+                  {hasCoachFeedback && (
+                    <div style={{ fontSize: 9, background: "rgba(201,168,76,0.15)", color: "var(--gold)", padding: "2px 6px", borderRadius: 3, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.08em" }}>
+                      🎯 FEEDBACK
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 2 }}>
-                  {log.workout?.replace(/DAY [ABC] — /, "")}
+                  {(log.workout || "").replace(/DAY [ABC] — /, "")}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(log.date)}</div>
               </div>
@@ -106,7 +136,6 @@ export function HistoryScreen() {
               </div>
             </div>
 
-            {/* Expanded */}
             {isOpen && (
               <div style={{ marginTop: 14, animation: "fadeIn 0.2s ease" }}>
                 <div style={{ height: 1, background: "var(--border)", marginBottom: 12 }} />
@@ -128,12 +157,7 @@ export function HistoryScreen() {
                       ) : (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                           {ex.sets?.map((set, si) => !set.done ? null : (
-                            <div key={si} style={{
-                              background: "var(--bg3)",
-                              border: `1px solid ${set.rpe >= 9 ? "rgba(196,30,30,0.5)" : "var(--border)"}`,
-                              borderRadius: 5, padding: "4px 8px",
-                              fontFamily: "'Barlow Condensed', sans-serif",
-                            }}>
+                            <div key={si} style={{ background: "var(--bg3)", border: `1px solid ${set.rpe >= 9 ? "rgba(196,30,30,0.5)" : "var(--border)"}`, borderRadius: 5, padding: "4px 8px", fontFamily: "'Barlow Condensed', sans-serif" }}>
                               <span style={{ fontSize: 14, fontWeight: 700 }}>{set.weight}kg</span>
                               <span style={{ fontSize: 12, color: "var(--gray2)" }}>×</span>
                               <span style={{ fontSize: 14, fontWeight: 700 }}>{set.reps}</span>
@@ -151,9 +175,12 @@ export function HistoryScreen() {
                     💬 {log.comment}
                   </div>
                 )}
+
                 {log.coach_comment && (
-                  <div style={{ fontSize: 12, color: "var(--text)", background: "rgba(196,30,30,0.07)", borderRadius: 4, padding: "8px 10px", marginTop: 8, lineHeight: 1.5, borderLeft: "2px solid var(--red)" }}>
-                    <span style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em", display: "block", marginBottom: 3 }}>🎯 COACH FEEDBACK</span>
+                  <div style={{ fontSize: 13, color: "var(--text)", background: "rgba(201,168,76,0.06)", borderRadius: 6, padding: "12px 14px", marginTop: 10, lineHeight: 1.6, border: "1px solid rgba(201,168,76,0.25)" }}>
+                    <div style={{ fontSize: 10, color: "var(--gold)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.15em", marginBottom: 6 }}>
+                      🎯 COACH FEEDBACK
+                    </div>
                     {log.coach_comment}
                   </div>
                 )}

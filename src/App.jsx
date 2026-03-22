@@ -15,14 +15,18 @@ import { ProfileScreen } from "./screens/Profile";
 import { ChatScreen } from "./screens/Chat";
 import { HistoryScreen } from "./screens/History";
 import { LibraryScreen } from "./screens/Library";
+import { NutritionScreen } from "./screens/Nutrition";
 
+// ── ATHLETE nav: HOME | TRAIN | NUTRITION | CHAT | ME
 const NAV_ATHLETE = [
-  { id: "dashboard", icon: "⚡", label: "HOME" },
-  { id: "workout",   icon: "🏋️", label: "TRAIN" },
-  { id: "schedule",  icon: "📅", label: "PLAN" },
-  { id: "chat",      icon: "💬", label: "CHAT" },
-  { id: "profile",   icon: "👤", label: "ME" },
+  { id: "dashboard",  icon: "⚡", label: "HOME" },
+  { id: "train",      icon: "🏋️", label: "TRAIN" },
+  { id: "nutrition",  icon: "🥗", label: "NUTRITION" },
+  { id: "chat",       icon: "💬", label: "CHAT" },
+  { id: "profile",    icon: "👤", label: "ME" },
 ];
+
+// ── COACH nav: HOME | LIBRARY | CHAT | COACH | ME
 const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
   { id: "library",   icon: "📚", label: "LIBRARY" },
@@ -154,7 +158,7 @@ export default function App() {
     }} />;
   }
 
-  const handleStartWorkout = (day) => { setActiveDay(day); setTab("workout"); };
+  const handleStartWorkout = (day) => { setActiveDay(day); setTab("train"); };
 
   const handleWorkoutDone = async (workoutInfo) => {
     if (!isCoach && authUser) {
@@ -177,7 +181,7 @@ export default function App() {
       });
     }
     setActiveDay(null);
-    setTab("history");
+    setTab("dashboard");
   };
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -192,7 +196,7 @@ export default function App() {
             <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "none", border: "none", color: "var(--gray)", fontSize: 18, cursor: "pointer", padding: "0 4px" }}>✕</button>
           </div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray)", letterSpacing: "0.05em", lineHeight: 1.5 }}>
-            {isIOS ? "Tap the Share button below → \"Add to Home Screen\"" : "Tap the menu (⋮) → \"Add to Home Screen\""}
+            {isIOS ? "Tap the Share button → \"Add to Home Screen\"" : "Tap the menu (⋮) → \"Add to Home Screen\""}
           </div>
           <button onClick={() => { setShowPwaBanner(false); localStorage.setItem("ks_pwa_dismissed", "1"); }} style={{ background: "var(--accent)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: "0.15em", padding: "8px 0", cursor: "pointer" }}>GOT IT</button>
         </div>
@@ -212,21 +216,26 @@ export default function App() {
       </div>
 
       <div className="fade-in" key={tab + activeDay}>
+        {/* SHARED SCREENS */}
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
-        {tab === "workout" && !activeDay && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("workout"); }} />}
-        {tab === "workout" && activeDay && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} hasCoach={hasCoach} />}
-        {tab === "schedule" && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("workout"); }} />}
-        {tab === "chat" && <ChatScreen authUser={authUser} isCoach={isCoach} />}
+        {tab === "chat"      && <ChatScreen authUser={authUser} isCoach={isCoach} />}
+        {tab === "profile"   && <ProfileScreen user={user} authUser={authUser} />}
+
+        {/* ATHLETE SCREENS */}
+        {tab === "train" && !activeDay && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("train"); }} />}
+        {tab === "train" && activeDay   && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} hasCoach={hasCoach} />}
+        {tab === "nutrition" && <NutritionScreen authUser={authUser} user={user} />}
+        {tab === "history"   && <HistoryScreen authUser={authUser} />}
+        {tab === "progress"  && <ProgressScreen user={user} week={week} />}
+
+        {/* COACH SCREENS */}
         {tab === "library" && <LibraryScreen authUser={authUser} isCoach={isCoach} />}
-       {tab === "history" && <HistoryScreen authUser={authUser} />}
-        {tab === "progress" && <ProgressScreen user={user} week={week} />}
-        {tab === "profile" && <ProfileScreen user={user} authUser={authUser} />}
-        {tab === "coach" && <CoachScreen />}
+        {tab === "coach"   && <CoachScreen />}
       </div>
 
       <nav style={s.navBar}>
         {(isCoach ? NAV_COACH : NAV_ATHLETE).map(n => (
-          <div key={n.id} style={s.navItem(tab === n.id)} onClick={() => { setTab(n.id); if (n.id !== "workout") setActiveDay(null); }}>
+          <div key={n.id} style={s.navItem(tab === n.id)} onClick={() => { setTab(n.id); if (n.id !== "train") setActiveDay(null); }}>
             <div style={{ fontSize: 22, fontFamily: "'Barlow Condensed', sans-serif", color: tab === n.id ? "var(--gold)" : "var(--gray)" }}>{n.icon}</div>
             <div style={{ ...s.navLabel, color: tab === n.id ? "var(--gold)" : "var(--gray2)" }}>{n.label}</div>
           </div>

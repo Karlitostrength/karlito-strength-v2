@@ -108,142 +108,162 @@ export function CoachScreen() {
   };
 
   const DOM_SILY_8WK = {
-    beginner: [
-      { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7 },
-        { name:"Reverse Lunge", sets:3, reps:8, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:20, unit:"sec" },
-        { name:"KB Swing 2H", sets:3, reps:10, weight:0 },
-      ]},
-      { week:1, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"KB Clean", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"KB Press", sets:5, reps:5, weight:0 },
-      ]},
-      { week:1, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7 },
-        { name:"Push Up + Gorilla Row", sets:3, reps:8, weight:0 },
-        { name:"Ab Wheel", sets:3, reps:8, weight:0 },
-      ]},
-      { week:2, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7 },
-        { name:"Reverse Lunge", sets:3, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:25, unit:"sec" },
-        { name:"KB Swing 2H", sets:3, reps:12, weight:0 },
-      ]},
-      { week:2, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"KB Clean", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"KB Press", sets:5, reps:5, weight:0 },
-      ]},
-      { week:2, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7 },
-        { name:"Push Up + Gorilla Row", sets:3, reps:10, weight:0 },
-        { name:"Ab Wheel", sets:3, reps:10, weight:0 },
-      ]},
-      { week:3, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:7 },
-        { name:"Reverse Lunge", sets:3, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Swing 2H", sets:3, reps:12, weight:0 },
-      ]},
-      { week:3, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:7 },
-        { name:"KB Clean", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"KB Press", sets:5, reps:5, weight:0 },
-      ]},
-      { week:3, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:7 },
-        { name:"Push Up + Gorilla Row", sets:4, reps:10, weight:0 },
-        { name:"Ab Wheel", sets:3, reps:12, weight:0 },
-      ]},
-      { week:4, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:8 },
-        { name:"Reverse Lunge", sets:3, reps:12, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Swing 2H", sets:4, reps:12, weight:0 },
-      ]},
-      { week:4, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:8 },
-        { name:"KB Clean", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:4, reps:1, weight:0 },
-        { name:"KB Press", sets:5, reps:5, weight:0 },
-      ]},
-      { week:4, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:8 },
-        { name:"Push Up + Gorilla Row", sets:4, reps:12, weight:0 },
-        { name:"Ab Wheel", sets:4, reps:12, weight:0 },
-      ]},
-      { week:5, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Squat", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"Reverse Lunge", sets:3, reps:8, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Swing 2H", sets:4, reps:10, weight:0 },
-      ]},
-      { week:5, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"KB Clean + Press", sets:4, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"Pull Ups / Rows", sets:3, reps:8, weight:0 },
-      ]},
-      { week:5, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"Dips", sets:3, reps:10, weight:0 },
-        { name:"Pull Ups / Rows", sets:3, reps:8, weight:0 },
-      ]},
-      { week:6, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Squat", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"Reverse Lunge", sets:3, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:35, unit:"sec" },
-        { name:"KB Swing 2H", sets:4, reps:12, weight:0 },
-      ]},
-      { week:6, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"KB Clean + Press", sets:4, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:4, reps:1, weight:0 },
-        { name:"Pull Ups / Rows", sets:3, reps:10, weight:0 },
-      ]},
-      { week:6, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:5, weight:0, rpe:8 },
-        { name:"Dips", sets:3, reps:12, weight:0 },
-        { name:"Pull Ups / Rows", sets:3, reps:10, weight:0 },
-      ]},
-      { week:7, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Squat", sets:5, reps:3, weight:0, rpe:9 },
-        { name:"Reverse Lunge", sets:3, reps:6, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Swing 2H", sets:3, reps:8, weight:0 },
-      ]},
-      { week:7, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:3, weight:0, rpe:9 },
-        { name:"KB Clean + Press", sets:4, reps:4, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"Pull Ups / Rows", sets:3, reps:6, weight:0 },
-      ]},
-      { week:7, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:3, weight:0, rpe:9 },
-        { name:"Dips", sets:3, reps:8, weight:0 },
-        { name:"Pull Ups", sets:3, reps:6, weight:0 },
-      ]},
-      { week:8, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Squat", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"Reverse Lunge", sets:2, reps:5, weight:0 },
-        { name:"Copenhagen Plank", sets:2, reps:25, unit:"sec" },
-      ]},
-      { week:8, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"KB Clean + Press", sets:3, reps:3, weight:0 },
-        { name:"Farmer Carry 30m", sets:2, reps:1, weight:0 },
-      ]},
-      { week:8, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"Weighted Dips", sets:3, reps:5, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:5, weight:0 },
-      ]},
-    ],
+   // WKLEJ TO W MIEJSCE beginner: [...] W DOM_SILY_8WK W Coach.jsx
+// Zasada kolejności: GŁÓWNE ĆWICZENIE → AKCESORIUM → CORE/CARRY → KB
+
+beginner: [
+  // ─── WEEK 1 — FUNDAMENTALS ───────────────────────────────
+  { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
+    { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7, notes:"2-sec pause at bottom" },
+    { name:"Reverse Lunge",     sets:3, reps:8, weight:0 },
+    { name:"Copenhagen Plank",  sets:3, reps:20, unit:"sec" },
+    { name:"KB Swing 2H",       sets:3, reps:10, weight:0 },
+  ]},
+  { week:1, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
+    { name:"Deadlift (paused)", sets:5, reps:5, weight:0, rpe:7, notes:"Pause just off the floor" },
+    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
+    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
+  ]},
+  { week:1, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
+    { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7, notes:"1-sec pause on chest" },
+    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP — alternate push up + gorilla row" },
+    { name:"Ab Wheel",             sets:3, reps:8, weight:0 },
+  ]},
+
+  // ─── WEEK 2 — FUNDAMENTALS ───────────────────────────────
+  { week:2, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
+    { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7 },
+    { name:"Reverse Lunge",     sets:3, reps:10, weight:0 },
+    { name:"Copenhagen Plank",  sets:3, reps:25, unit:"sec" },
+    { name:"KB Swing 2H",       sets:3, reps:12, weight:0 },
+  ]},
+  { week:2, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
+    { name:"Deadlift (paused)", sets:5, reps:5, weight:0, rpe:7 },
+    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
+    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
+  ]},
+  { week:2, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
+    { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7 },
+    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
+    { name:"Ab Wheel",             sets:3, reps:10, weight:0 },
+  ]},
+
+  // ─── WEEK 3 — BUILDING ───────────────────────────────────
+  { week:3, day:"A", title:"BUILDING — Squat", exercises:[
+    { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:7 },
+    { name:"Reverse Lunge",  sets:3, reps:10, weight:0 },
+    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
+    { name:"KB Swing 2H",    sets:3, reps:12, weight:0 },
+  ]},
+  { week:3, day:"B", title:"BUILDING — Deadlift", exercises:[
+    { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:7 },
+    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
+    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
+  ]},
+  { week:3, day:"C", title:"BUILDING — Bench", exercises:[
+    { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:7 },
+    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
+    { name:"Ab Wheel",             sets:3, reps:10, weight:0 },
+  ]},
+
+  // ─── WEEK 4 — BUILDING ───────────────────────────────────
+  { week:4, day:"A", title:"BUILDING — Squat", exercises:[
+    { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:8 },
+    { name:"Reverse Lunge",  sets:3, reps:12, weight:0 },
+    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
+    { name:"KB Swing 2H",    sets:4, reps:12, weight:0 },
+  ]},
+  { week:4, day:"B", title:"BUILDING — Deadlift", exercises:[
+    { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:8 },
+    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",      sets:4, reps:30, unit:"m", weight:0 },
+    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
+  ]},
+  { week:4, day:"C", title:"BUILDING — Bench", exercises:[
+    { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:8 },
+    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP — increase pace vs wk 3" },
+    { name:"Ab Wheel",             sets:4, reps:12, weight:0 },
+  ]},
+
+  // ─── WEEK 5 — STRENGTH ───────────────────────────────────
+  { week:5, day:"A", title:"STRENGTH — Squat", exercises:[
+    { name:"Squat",          sets:5, reps:5, weight:0, rpe:8 },
+    { name:"Reverse Lunge",  sets:3, reps:8, weight:0 },
+    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
+    { name:"KB Swing 2H",    sets:4, reps:10, weight:0 },
+  ]},
+  { week:5, day:"B", title:"STRENGTH — Deadlift", exercises:[
+    { name:"Deadlift",      sets:5, reps:5, weight:0, rpe:8 },
+    { name:"KB Clean",      sets:4, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",  sets:3, reps:30, unit:"m", weight:0 },
+    { name:"Pull Ups / Rows",sets:3, reps:8, weight:0, notes:"assisted if needed" },
+  ]},
+  { week:5, day:"C", title:"STRENGTH — Bench", exercises:[
+    { name:"Bench Press",           sets:5, reps:5, weight:0, rpe:8 },
+    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — push the pace" },
+    { name:"Pull Ups / Rows",       sets:3, reps:8, weight:0, notes:"assisted if needed" },
+    { name:"Ab Wheel",              sets:3, reps:10, weight:0 },
+  ]},
+
+  // ─── WEEK 6 — STRENGTH ───────────────────────────────────
+  { week:6, day:"A", title:"STRENGTH — Squat", exercises:[
+    { name:"Squat",           sets:5, reps:5, weight:0, rpe:8 },
+    { name:"Reverse Lunge",   sets:3, reps:10, weight:0 },
+    { name:"Copenhagen Plank",sets:3, reps:35, unit:"sec" },
+    { name:"KB Swing 2H",     sets:4, reps:12, weight:0 },
+  ]},
+  { week:6, day:"B", title:"STRENGTH — Deadlift", exercises:[
+    { name:"Deadlift",       sets:5, reps:5, weight:0, rpe:8 },
+    { name:"KB Clean",       sets:4, reps:5, weight:0, notes:"per side" },
+    { name:"Farmer Carry",   sets:4, reps:30, unit:"m", weight:0 },
+    { name:"Pull Ups / Rows",sets:3, reps:10, weight:0, notes:"assisted if needed" },
+  ]},
+  { week:6, day:"C", title:"STRENGTH — Bench", exercises:[
+    { name:"Bench Press",           sets:5, reps:5, weight:0, rpe:8 },
+    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
+    { name:"Pull Ups / Rows",       sets:3, reps:10, weight:0, notes:"assisted if needed" },
+    { name:"Ab Wheel",              sets:3, reps:12, weight:0 },
+  ]},
+
+  // ─── WEEK 7 — PEAK ───────────────────────────────────────
+  { week:7, day:"A", title:"PEAK — Squat", exercises:[
+    { name:"Squat",           sets:5, reps:3, weight:0, rpe:9 },
+    { name:"Reverse Lunge",   sets:3, reps:6, weight:0 },
+    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
+    { name:"KB Swing 2H",     sets:3, reps:8, weight:0 },
+  ]},
+  { week:7, day:"B", title:"PEAK — Deadlift", exercises:[
+    { name:"Deadlift",       sets:5, reps:3, weight:0, rpe:9 },
+    { name:"KB Clean",       sets:4, reps:4, weight:0, notes:"per side" },
+    { name:"Farmer Carry",   sets:3, reps:30, unit:"m", weight:0 },
+    { name:"Pull Ups / Rows",sets:3, reps:6, weight:0, notes:"assisted if needed" },
+  ]},
+  { week:7, day:"C", title:"PEAK — Bench", exercises:[
+    { name:"Bench Press",           sets:5, reps:3, weight:0, rpe:9 },
+    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — test yourself" },
+    { name:"Pull Ups / Rows",       sets:3, reps:6, weight:0, notes:"assisted if needed" },
+  ]},
+
+  // ─── WEEK 8 — PEAK (test week) ────────────────────────────
+  { week:8, day:"A", title:"PEAK — Squat", exercises:[
+    { name:"Squat", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double — note your best" },
+    { name:"Reverse Lunge", sets:2, reps:5, weight:0 },
+    { name:"Copenhagen Plank", sets:2, reps:25, unit:"sec" },
+  ]},
+  { week:8, day:"B", title:"PEAK — Deadlift", exercises:[
+    { name:"Deadlift", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double" },
+    { name:"KB Clean", sets:3, reps:3, weight:0, notes:"per side" },
+    { name:"Farmer Carry", sets:2, reps:30, unit:"m", weight:0 },
+  ]},
+  { week:8, day:"C", title:"PEAK — Bench", exercises:[
+    { name:"Bench Press", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double" },
+    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — final test" },
+    { name:"Pull Ups / Rows", sets:3, reps:5, weight:0, notes:"assisted if needed" },
+  ]},
+],
     intermediate: [
       { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
         { name:"Paused Back Squat", sets:5, reps:5, weight:0, rpe:7 },

@@ -603,33 +603,33 @@ export function CoachScreen() {
       )}
 
       {/* ── SESSIONS VIEW ── */}
-      {view === "sessions" && !selectedSession && (
+      {view === "sessions" && !selectedSession && !selectedClient && (
         <>
-          <div style={s.sectionLabel}>ALL SESSIONS</div>
-          {workouts.length === 0 ? (
-            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div></div>
-          ) : workouts.map((w, i) => {
-            const client = clients.find(c => c.id === w.user_id);
-            const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+          <div style={s.sectionLabel}>SESSIONS BY ATHLETE</div>
+          {athletes.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No athletes yet</div></div>
+          ) : athletes.map(a => {
+            const aw = workouts.filter(w => w.user_id === a.id);
+            const lastW = aw[0];
+            const unread = aw.filter(w => w.comment && !w.coach_comment).length;
             return (
-              <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setCommentSaved(false); }}
-                style={{ ...s.card, marginBottom: 8, borderLeft: `3px solid ${col}`, cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div key={a.id} onClick={() => setSelectedClient(a.id)}
+                style={{ ...s.card, marginBottom: 8, cursor: "pointer", borderLeft: `3px solid ${unread > 0 ? "var(--gold)" : "var(--border)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 3 }}>
-                      <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
-                      <div style={{ fontSize: 11, color: "var(--gray2)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>{client?.name || "Athlete"}</div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, fontWeight: 900, marginBottom: 3 }}>{a.name || "Athlete"}</div>
+                    <div style={{ fontSize: 11, color: "var(--gray)" }}>
+                      {aw.length} session{aw.length !== 1 ? "s" : ""} total
+                      {lastW ? ` · last: ${fmtDate(lastW.created_at)}` : ""}
                     </div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>
-                      {(w.workout_title || "").replace(/DAY [ABCD] — /,"")}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(w.created_at)}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    {w.comment && <div style={{ fontSize: 10, color: "var(--accent)" }}>💬 comment</div>}
-                    {w.coach_comment && <div style={{ fontSize: 10, color: "var(--gold)" }}>🎯 feedback</div>}
-                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {unread > 0 && (
+                      <div style={{ background: "rgba(201,168,76,0.15)", color: "var(--gold)", fontSize: 10, padding: "3px 8px", borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                        {unread} NEEDS FEEDBACK
+                      </div>
+                    )}
+                    <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
                   </div>
                 </div>
               </div>
@@ -637,6 +637,47 @@ export function CoachScreen() {
           })}
         </>
       )}
+
+      {view === "sessions" && !selectedSession && selectedClient && (() => {
+        const a = clients.find(c => c.id === selectedClient);
+        const aw = workouts.filter(w => w.user_id === selectedClient);
+        return (
+          <>
+            <button onClick={() => setSelectedClient(null)} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, marginBottom: 4 }}>{a?.name || "Athlete"}</div>
+            <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 16 }}>{aw.length} sessions logged</div>
+            {aw.length === 0 ? (
+              <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div></div>
+            ) : aw.map((w, i) => {
+              const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+              const needsFeedback = w.comment && !w.coach_comment;
+              return (
+                <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setCommentSaved(false); }}
+                  style={{ ...s.card, marginBottom: 8, borderLeft: `3px solid ${needsFeedback ? "var(--gold)" : col}`, cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
+                        <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
+                        {needsFeedback && <div style={{ fontSize: 10, background: "rgba(201,168,76,0.15)", color: "var(--gold)", padding: "2px 6px", borderRadius: 3, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>NEEDS FEEDBACK</div>}
+                      </div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>
+                        {(w.workout_title || "").replace(/DAY [ABCD] — /,"")}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(w.created_at)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {w.comment && <div style={{ fontSize: 10, color: "var(--accent)" }}>💬 comment</div>}
+                      {w.coach_comment && <div style={{ fontSize: 10, color: "var(--gold)" }}>🎯 feedback</div>}
+                      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
 
       {view === "sessions" && selectedSession && (() => {
         const w = selectedSession;

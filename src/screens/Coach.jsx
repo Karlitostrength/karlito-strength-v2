@@ -2,60 +2,208 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { sendPushToUser } from "../lib/push";
 import { s } from "../lib/styles";
-import { DOM_SILY_LEVELS } from "../constants/levels";
 import { RanksCoachView } from "../components/RankComponents";
 
-
 export function CoachScreen() {
-  const [clients, setClients] = useState([]);
-  const [workouts, setWorkouts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [clients, setClients]           = useState([]);
+  const [workouts, setWorkouts]         = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [view, setView] = useState("dashboard");
-  const [newEx, setNewEx] = useState({ name: "", sets: 3, reps: 10, weight: 0, rpe: 0, unit: "kg", notes: "", day: "A", week: 1 });
-  const [saving, setSaving] = useState(false);
-  const [exercises, setExercises] = useState([]);
-  const [programDays, setProgramDays] = useState([]);
-  const [buildMode, setBuildMode] = useState(false);
+  const [view, setView]                 = useState("dashboard");
+  const [saving, setSaving]             = useState(false);
+  const [exercises, setExercises]       = useState([]);
+  const [programDays, setProgramDays]   = useState([]);
+  const [buildMode, setBuildMode]       = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [templates, setTemplates] = useState([]);
-  const [tplMode, setTplMode] = useState("list");
-  const [tplName, setTplName] = useState("");
-  const [tplDays, setTplDays] = useState([{ day: "A", title: "", notes: "", exercises: [{ name: "", sets: 3, reps: 5, weight: 0 }] }]);
-  const [selectedTpl, setSelectedTpl] = useState(null);
+  const [templates, setTemplates]       = useState([]);
+  const [tplMode, setTplMode]           = useState("list");
+  const [tplName, setTplName]           = useState("");
+  const [tplDays, setTplDays]           = useState([{ day: "A", title: "", notes: "", exercises: [{ name: "", sets: 3, reps: 5, weight: 0 }] }]);
+  const [selectedTpl, setSelectedTpl]   = useState(null);
   const [tplWeekStart, setTplWeekStart] = useState(1);
   const [tplAssignClients, setTplAssignClients] = useState([]);
-  const [savingTpl, setSavingTpl] = useState(false);
-  const [dietClient, setDietClient] = useState(null);
+  const [savingTpl, setSavingTpl]       = useState(false);
+  const [dietClient, setDietClient]     = useState(null);
   const [dietUploading, setDietUploading] = useState(false);
-  const [dietFiles, setDietFiles] = useState([]);
-  const [dietError, setDietError] = useState("");
-  const dietFileRef = useRef(null);
+  const [dietFiles, setDietFiles]       = useState([]);
+  const [dietError, setDietError]       = useState("");
+  const dietFileRef                     = useRef(null);
   const [coachComment, setCoachComment] = useState("");
   const [savingComment, setSavingComment] = useState(false);
   const [commentSaved, setCommentSaved] = useState(false);
-  const [editingDay, setEditingDay] = useState(null);
-  const [buildWeek, setBuildWeek] = useState(1);
-  const [buildDay, setBuildDay] = useState("A");
-  const [buildTitle, setBuildTitle] = useState("");
-  const [buildNotes, setBuildNotes] = useState("");
-  const [buildExercises, setBuildExercises] = useState([
-    { name: "", sets: 3, reps: 8, weight: 0, notes: "" }
-  ]);
+  const [editingDay, setEditingDay]     = useState(null);
+  const [buildWeek, setBuildWeek]       = useState(1);
+  const [buildDay, setBuildDay]         = useState("A");
+  const [buildTitle, setBuildTitle]     = useState("");
+  const [buildNotes, setBuildNotes]     = useState("");
+  const [buildExercises, setBuildExercises] = useState([{ name: "", sets: 3, reps: 8, weight: 0, notes: "" }]);
   const [libraryPicker, setLibraryPicker] = useState(null);
-  const [libraryList, setLibraryList] = useState([]);
+  const [libraryList, setLibraryList]   = useState([]);
   const [libPickerCat, setLibPickerCat] = useState("All");
   const [libPickerSearch, setLibPickerSearch] = useState("");
   const [copyWeekFrom, setCopyWeekFrom] = useState(1);
-  const [copyWeekTo, setCopyWeekTo] = useState(2);
-  const [copyingWeek, setCopyingWeek] = useState(false);
+  const [copyWeekTo, setCopyWeekTo]     = useState(2);
+  const [copyingWeek, setCopyingWeek]   = useState(false);
   const [showCopyWeek, setShowCopyWeek] = useState(false);
+  const [clientFilter, setClientFilter] = useState("all"); // all | active | inactive
+
+  // ── DATA ──────────────────────────────────────────────────────────────────
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: profiles } = await supabase.from("profiles").select("*");
+      setClients(profiles || []);
+      const { data: logs } = await supabase.from("workouts").select("*").order("created_at", { ascending: false });
+      setWorkouts(logs || []);
+      const { data: exs } = await supabase.from("custom_exercises").select("*")
+        .order("sort_order", { ascending: true }).order("created_at", { ascending: true });
+      setExercises(exs || []);
+      const { data: days } = await supabase.from("program_days").select("*").order("week", { ascending: true });
+      setProgramDays(days || []);
+    } catch(e) { console.log("Coach load error:", e); }
+    setLoading(false);
+  };
 
   const loadTemplates = async () => {
-    const { data } = await supabase.from("program_templates")
-      .select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("program_templates").select("*").order("created_at", { ascending: false });
     setTemplates(data || []);
   };
+
+  useEffect(() => { loadData(); loadTemplates(); }, []);
+
+  // ── COPY WEEK (fixed — checks for existing days) ──────────────────────────
+
+  const copyWeek = async () => {
+    if (!selectedClient) return;
+    setCopyingWeek(true);
+    try {
+      const { data: sourceDays } = await supabase.from("program_days").select("*")
+        .eq("athlete_id", selectedClient).eq("week", copyWeekFrom);
+
+      if (!sourceDays || sourceDays.length === 0) {
+        alert(`Week ${copyWeekFrom} has no days to copy.`);
+        setCopyingWeek(false);
+        return;
+      }
+
+      const { data: au } = await supabase.auth.getUser();
+      const coachId = au.user?.id;
+
+      for (const day of sourceDays) {
+        // Check if destination day already exists
+        const { data: existing } = await supabase.from("program_days").select("id")
+          .eq("athlete_id", selectedClient).eq("week", copyWeekTo).eq("day", day.day)
+          .maybeSingle();
+
+        let destDayId;
+        if (existing) {
+          // Update existing — delete old exercises first
+          await supabase.from("custom_exercises").delete()
+            .eq("athlete_id", selectedClient).eq("week", copyWeekTo).eq("day", day.day);
+          await supabase.from("program_days").update({ title: day.title, notes: day.notes }).eq("id", existing.id);
+          destDayId = existing.id;
+        } else {
+          const { data: newDay } = await supabase.from("program_days").insert({
+            coach_id: coachId, athlete_id: selectedClient,
+            week: copyWeekTo, day: day.day, title: day.title, notes: day.notes,
+          }).select().single();
+          destDayId = newDay?.id;
+        }
+
+        if (destDayId) {
+          const { data: exs } = await supabase.from("custom_exercises").select("*")
+            .eq("athlete_id", selectedClient).eq("week", copyWeekFrom).eq("day", day.day)
+            .order("sort_order", { ascending: true }).order("created_at", { ascending: true });
+
+          for (let idx = 0; idx < (exs || []).length; idx++) {
+            const ex = exs[idx];
+            await supabase.from("custom_exercises").insert({
+              athlete_id: ex.athlete_id, coach_id: ex.coach_id,
+              week: copyWeekTo, day: ex.day, name: ex.name,
+              sets: ex.sets, reps: ex.reps, weight: ex.weight,
+              notes: ex.notes || "", sort_order: idx,
+            });
+          }
+        }
+      }
+
+      await loadData();
+      setShowCopyWeek(false);
+      alert(`✅ Week ${copyWeekFrom} → Week ${copyWeekTo} copied!`);
+    } catch(e) { console.log("Copy week error:", e); alert("Error copying week"); }
+    setCopyingWeek(false);
+  };
+
+  // ── SAVE PROGRAM DAY (fixed — no duplicates, sort_order) ─────────────────
+
+  const saveProgramDay = async () => {
+    if (!selectedClient || !buildTitle) return;
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const validExercises = buildExercises.filter(e => e.name.trim());
+
+      if (editingDay) {
+        // Editing existing day
+        await supabase.from("program_days").update({ title: buildTitle, notes: buildNotes }).eq("id", editingDay.dayId);
+        await supabase.from("custom_exercises").delete().eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
+        for (let idx = 0; idx < validExercises.length; idx++) {
+          const ex = validExercises[idx];
+          await supabase.from("custom_exercises").insert({
+            coach_id: user.id, athlete_id: selectedClient,
+            name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
+            notes: ex.notes || "", day: buildDay, week: buildWeek, sort_order: idx,
+          });
+        }
+        setEditingDay(null);
+      } else {
+        // New day — check if already exists
+        const { data: existing } = await supabase.from("program_days").select("id")
+          .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing
+          await supabase.from("custom_exercises").delete()
+            .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
+          await supabase.from("program_days").update({ title: buildTitle, notes: buildNotes }).eq("id", existing.id);
+        } else {
+          await supabase.from("program_days").insert({
+            coach_id: user.id, athlete_id: selectedClient,
+            week: buildWeek, day: buildDay, title: buildTitle, notes: buildNotes,
+          });
+          sendPushToUser(selectedClient, "💪 New programme from your coach", `Week ${buildWeek} · Day ${buildDay} — ${buildTitle}`, "program", "/");
+        }
+
+        for (let idx = 0; idx < validExercises.length; idx++) {
+          const ex = validExercises[idx];
+          await supabase.from("custom_exercises").insert({
+            coach_id: user.id, athlete_id: selectedClient,
+            name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
+            notes: ex.notes || "", day: buildDay, week: buildWeek, sort_order: idx,
+          });
+        }
+      }
+
+      setBuildMode(false);
+      setBuildTitle("");
+      setBuildNotes("");
+      setBuildExercises([{ name: "", sets: 3, reps: 5, weight: 0, notes: "" }]);
+      await loadData();
+      setView("profile");
+    } catch(e) { console.log("Save program day error:", e); }
+    setSaving(false);
+  };
+
+  const deleteProgramDay = async (dayId, wk, dy) => {
+    await supabase.from("program_days").delete().eq("id", dayId);
+    await supabase.from("custom_exercises").delete()
+      .eq("athlete_id", selectedClient).eq("week", wk).eq("day", dy);
+    await loadData();
+  };
+
+  // ── TEMPLATES ─────────────────────────────────────────────────────────────
 
   const saveTemplate = async () => {
     if (!tplName.trim()) return;
@@ -63,9 +211,7 @@ export function CoachScreen() {
     try {
       const { data: { user: au } } = await supabase.auth.getUser();
       const { data: tpl } = await supabase.from("program_templates").insert({
-        coach_id: au.id,
-        name: tplName,
-        days: tplDays,
+        coach_id: au.id, name: tplName, days: tplDays,
       }).select().single();
       setTemplates(prev => [tpl, ...prev]);
       setTplMode("list");
@@ -82,22 +228,32 @@ export function CoachScreen() {
       const { data: { user: au } } = await supabase.auth.getUser();
       for (const clientId of tplAssignClients) {
         for (const tday of (selectedTpl.days || [])) {
-          const { data: newDay } = await supabase.from("program_days").insert({
-            coach_id: au.id, athlete_id: clientId,
-            week: tplWeekStart, day: tday.day,
-            title: tday.title || selectedTpl.name, notes: tday.notes || "",
-          }).select().single();
-          if (newDay) {
-            for (const ex of (tday.exercises || []).filter(e => e.name?.trim())) {
-              await supabase.from("custom_exercises").insert({
-                coach_id: au.id, athlete_id: clientId,
-                name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
-                day: tday.day, week: tplWeekStart,
-              });
-            }
+          const { data: existing } = await supabase.from("program_days").select("id")
+            .eq("athlete_id", clientId).eq("week", tplWeekStart).eq("day", tday.day).maybeSingle();
+
+          if (existing) {
+            await supabase.from("custom_exercises").delete()
+              .eq("athlete_id", clientId).eq("week", tplWeekStart).eq("day", tday.day);
+            await supabase.from("program_days").update({ title: tday.title || selectedTpl.name, notes: tday.notes || "" }).eq("id", existing.id);
+          } else {
+            await supabase.from("program_days").insert({
+              coach_id: au.id, athlete_id: clientId,
+              week: tplWeekStart, day: tday.day,
+              title: tday.title || selectedTpl.name, notes: tday.notes || "",
+            });
           }
-          sendPushToUser(clientId, "💪 New program from Coach Karlito", `Week ${tplWeekStart} — ${selectedTpl.name}`, "program", "/");
+
+          const exs = (tday.exercises || []).filter(e => e.name?.trim());
+          for (let idx = 0; idx < exs.length; idx++) {
+            const ex = exs[idx];
+            await supabase.from("custom_exercises").insert({
+              coach_id: au.id, athlete_id: clientId,
+              name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight || 0,
+              day: tday.day, week: tplWeekStart, sort_order: idx,
+            });
+          }
         }
+        sendPushToUser(clientId, "💪 New programme assigned", `${selectedTpl.name} — Week ${tplWeekStart}`, "program", "/");
       }
       setTplMode("list");
       setSelectedTpl(null);
@@ -107,511 +263,38 @@ export function CoachScreen() {
     setSavingTpl(false);
   };
 
-  const DOM_SILY_8WK = {
-   // WKLEJ TO W MIEJSCE beginner: [...] W DOM_SILY_8WK W Coach.jsx
-// Zasada kolejności: GŁÓWNE ĆWICZENIE → AKCESORIUM → CORE/CARRY → KB
+  // ── MISC ──────────────────────────────────────────────────────────────────
 
-beginner: [
-  // ─── WEEK 1 — FUNDAMENTALS ───────────────────────────────
-  { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-    { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7, notes:"2-sec pause at bottom" },
-    { name:"Reverse Lunge",     sets:3, reps:8, weight:0 },
-    { name:"Copenhagen Plank",  sets:3, reps:20, unit:"sec" },
-    { name:"KB Swing 2H",       sets:3, reps:10, weight:0 },
-  ]},
-  { week:1, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-    { name:"Deadlift (paused)", sets:5, reps:5, weight:0, rpe:7, notes:"Pause just off the floor" },
-    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
-    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
-  ]},
-  { week:1, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-    { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7, notes:"1-sec pause on chest" },
-    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP — alternate push up + gorilla row" },
-    { name:"Ab Wheel",             sets:3, reps:8, weight:0 },
-  ]},
-
-  // ─── WEEK 2 — FUNDAMENTALS ───────────────────────────────
-  { week:2, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-    { name:"Squat (paused 2s)", sets:5, reps:8, weight:0, rpe:7 },
-    { name:"Reverse Lunge",     sets:3, reps:10, weight:0 },
-    { name:"Copenhagen Plank",  sets:3, reps:25, unit:"sec" },
-    { name:"KB Swing 2H",       sets:3, reps:12, weight:0 },
-  ]},
-  { week:2, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-    { name:"Deadlift (paused)", sets:5, reps:5, weight:0, rpe:7 },
-    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
-    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
-  ]},
-  { week:2, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-    { name:"Bench Press (paused)", sets:5, reps:8, weight:0, rpe:7 },
-    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
-    { name:"Ab Wheel",             sets:3, reps:10, weight:0 },
-  ]},
-
-  // ─── WEEK 3 — BUILDING ───────────────────────────────────
-  { week:3, day:"A", title:"BUILDING — Squat", exercises:[
-    { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:7 },
-    { name:"Reverse Lunge",  sets:3, reps:10, weight:0 },
-    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
-    { name:"KB Swing 2H",    sets:3, reps:12, weight:0 },
-  ]},
-  { week:3, day:"B", title:"BUILDING — Deadlift", exercises:[
-    { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:7 },
-    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",      sets:3, reps:30, unit:"m", weight:0 },
-    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
-  ]},
-  { week:3, day:"C", title:"BUILDING — Bench", exercises:[
-    { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:7 },
-    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
-    { name:"Ab Wheel",             sets:3, reps:10, weight:0 },
-  ]},
-
-  // ─── WEEK 4 — BUILDING ───────────────────────────────────
-  { week:4, day:"A", title:"BUILDING — Squat", exercises:[
-    { name:"Squat (paused)", sets:6, reps:6, weight:0, rpe:8 },
-    { name:"Reverse Lunge",  sets:3, reps:12, weight:0 },
-    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
-    { name:"KB Swing 2H",    sets:4, reps:12, weight:0 },
-  ]},
-  { week:4, day:"B", title:"BUILDING — Deadlift", exercises:[
-    { name:"Deadlift (paused)", sets:6, reps:6, weight:0, rpe:8 },
-    { name:"KB Clean",          sets:5, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",      sets:4, reps:30, unit:"m", weight:0 },
-    { name:"KB Press",          sets:5, reps:5, weight:0, notes:"per side" },
-  ]},
-  { week:4, day:"C", title:"BUILDING — Bench", exercises:[
-    { name:"Bench Press (paused)", sets:6, reps:6, weight:0, rpe:8 },
-    { name:"Push Up + Gorilla Row",sets:1, reps:1, weight:0, notes:"15 min AMRAP — increase pace vs wk 3" },
-    { name:"Ab Wheel",             sets:4, reps:12, weight:0 },
-  ]},
-
-  // ─── WEEK 5 — STRENGTH ───────────────────────────────────
-  { week:5, day:"A", title:"STRENGTH — Squat", exercises:[
-    { name:"Squat",          sets:5, reps:5, weight:0, rpe:8 },
-    { name:"Reverse Lunge",  sets:3, reps:8, weight:0 },
-    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
-    { name:"KB Swing 2H",    sets:4, reps:10, weight:0 },
-  ]},
-  { week:5, day:"B", title:"STRENGTH — Deadlift", exercises:[
-    { name:"Deadlift",      sets:5, reps:5, weight:0, rpe:8 },
-    { name:"KB Clean",      sets:4, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",  sets:3, reps:30, unit:"m", weight:0 },
-    { name:"Pull Ups / Rows",sets:3, reps:8, weight:0, notes:"assisted if needed" },
-  ]},
-  { week:5, day:"C", title:"STRENGTH — Bench", exercises:[
-    { name:"Bench Press",           sets:5, reps:5, weight:0, rpe:8 },
-    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — push the pace" },
-    { name:"Pull Ups / Rows",       sets:3, reps:8, weight:0, notes:"assisted if needed" },
-    { name:"Ab Wheel",              sets:3, reps:10, weight:0 },
-  ]},
-
-  // ─── WEEK 6 — STRENGTH ───────────────────────────────────
-  { week:6, day:"A", title:"STRENGTH — Squat", exercises:[
-    { name:"Squat",           sets:5, reps:5, weight:0, rpe:8 },
-    { name:"Reverse Lunge",   sets:3, reps:10, weight:0 },
-    { name:"Copenhagen Plank",sets:3, reps:35, unit:"sec" },
-    { name:"KB Swing 2H",     sets:4, reps:12, weight:0 },
-  ]},
-  { week:6, day:"B", title:"STRENGTH — Deadlift", exercises:[
-    { name:"Deadlift",       sets:5, reps:5, weight:0, rpe:8 },
-    { name:"KB Clean",       sets:4, reps:5, weight:0, notes:"per side" },
-    { name:"Farmer Carry",   sets:4, reps:30, unit:"m", weight:0 },
-    { name:"Pull Ups / Rows",sets:3, reps:10, weight:0, notes:"assisted if needed" },
-  ]},
-  { week:6, day:"C", title:"STRENGTH — Bench", exercises:[
-    { name:"Bench Press",           sets:5, reps:5, weight:0, rpe:8 },
-    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP" },
-    { name:"Pull Ups / Rows",       sets:3, reps:10, weight:0, notes:"assisted if needed" },
-    { name:"Ab Wheel",              sets:3, reps:12, weight:0 },
-  ]},
-
-  // ─── WEEK 7 — PEAK ───────────────────────────────────────
-  { week:7, day:"A", title:"PEAK — Squat", exercises:[
-    { name:"Squat",           sets:5, reps:3, weight:0, rpe:9 },
-    { name:"Reverse Lunge",   sets:3, reps:6, weight:0 },
-    { name:"Copenhagen Plank",sets:3, reps:30, unit:"sec" },
-    { name:"KB Swing 2H",     sets:3, reps:8, weight:0 },
-  ]},
-  { week:7, day:"B", title:"PEAK — Deadlift", exercises:[
-    { name:"Deadlift",       sets:5, reps:3, weight:0, rpe:9 },
-    { name:"KB Clean",       sets:4, reps:4, weight:0, notes:"per side" },
-    { name:"Farmer Carry",   sets:3, reps:30, unit:"m", weight:0 },
-    { name:"Pull Ups / Rows",sets:3, reps:6, weight:0, notes:"assisted if needed" },
-  ]},
-  { week:7, day:"C", title:"PEAK — Bench", exercises:[
-    { name:"Bench Press",           sets:5, reps:3, weight:0, rpe:9 },
-    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — test yourself" },
-    { name:"Pull Ups / Rows",       sets:3, reps:6, weight:0, notes:"assisted if needed" },
-  ]},
-
-  // ─── WEEK 8 — PEAK (test week) ────────────────────────────
-  { week:8, day:"A", title:"PEAK — Squat", exercises:[
-    { name:"Squat", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double — note your best" },
-    { name:"Reverse Lunge", sets:2, reps:5, weight:0 },
-    { name:"Copenhagen Plank", sets:2, reps:25, unit:"sec" },
-  ]},
-  { week:8, day:"B", title:"PEAK — Deadlift", exercises:[
-    { name:"Deadlift", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double" },
-    { name:"KB Clean", sets:3, reps:3, weight:0, notes:"per side" },
-    { name:"Farmer Carry", sets:2, reps:30, unit:"m", weight:0 },
-  ]},
-  { week:8, day:"C", title:"PEAK — Bench", exercises:[
-    { name:"Bench Press", sets:5, reps:2, weight:0, rpe:9, notes:"Build to heavy double" },
-    { name:"Push Up + Gorilla Row", sets:1, reps:1, weight:0, notes:"15 min AMRAP — final test" },
-    { name:"Pull Ups / Rows", sets:3, reps:5, weight:0, notes:"assisted if needed" },
-  ]},
-],
-    intermediate: [
-      { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"Goblet Hold Reverse Lunge", sets:3, reps:8, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:25, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:4, reps:10, weight:0, notes:"per side" },
-      ]},
-      { week:1, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"KB Clean", sets:5, reps:5, weight:0, notes:"per side" },
-        { name:"Suitcase Carry 15m", sets:3, reps:1, weight:0, notes:"per side" },
-        { name:"KB Press", sets:5, reps:5, weight:0, notes:"per side" },
-      ]},
-      { week:1, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"quality — per side EMOM" },
-        { name:"Push Up + Gorilla Row", sets:4, reps:10, weight:0 },
-        { name:"Ab Wheel", sets:3, reps:10, weight:0 },
-      ]},
-      { week:2, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"Goblet Hold Reverse Lunge", sets:3, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:4, reps:12, weight:0, notes:"per side" },
-      ]},
-      { week:2, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused at knee)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"KB Clean", sets:5, reps:5, weight:0, notes:"per side" },
-        { name:"Suitcase Carry 15m", sets:4, reps:1, weight:0, notes:"per side" },
-        { name:"KB Press", sets:5, reps:5, weight:0, notes:"per side" },
-      ]},
-      { week:2, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:5, weight:0, rpe:7 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"quality — per side EMOM" },
-        { name:"Push Up + Gorilla Row", sets:4, reps:12, weight:0 },
-        { name:"Ab Wheel", sets:3, reps:12, weight:0 },
-      ]},
-      { week:3, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:4, weight:0, rpe:7 },
-        { name:"Goblet Hold Reverse Lunge", sets:3, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:5, reps:10, weight:0, notes:"per side" },
-      ]},
-      { week:3, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Paused Deadlift", sets:5, reps:4, weight:0, rpe:7 },
-        { name:"KB Clean + Press", sets:5, reps:5, weight:0, notes:"per side" },
-        { name:"Suitcase Carry 15m", sets:4, reps:1, weight:0, notes:"per side" },
-        { name:"Hollow Hold", sets:3, reps:30, unit:"sec" },
-      ]},
-      { week:3, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:4, weight:0, rpe:7 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Dips", sets:3, reps:10, weight:0 },
-        { name:"Pull Ups", sets:3, reps:8, weight:0 },
-      ]},
-      { week:4, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:4, weight:0, rpe:8 },
-        { name:"Goblet Hold Reverse Lunge", sets:4, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:35, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:5, reps:12, weight:0, notes:"per side" },
-      ]},
-      { week:4, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Paused Deadlift", sets:5, reps:4, weight:0, rpe:8 },
-        { name:"KB Clean + Press", sets:5, reps:5, weight:0, notes:"per side" },
-        { name:"Suitcase Carry 15m", sets:4, reps:1, weight:0, notes:"per side" },
-        { name:"Hollow Hold", sets:3, reps:35, unit:"sec" },
-      ]},
-      { week:4, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Bench Press (paused)", sets:5, reps:4, weight:0, rpe:8 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Dips", sets:4, reps:10, weight:0 },
-        { name:"Pull Ups", sets:4, reps:8, weight:0 },
-      ]},
-      { week:5, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Back Squat", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Reverse Lunge", sets:4, reps:8, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:35, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:5, reps:10, weight:0, notes:"per side" },
-      ]},
-      { week:5, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Clean + Press", sets:4, reps:5, weight:0 },
-        { name:"Front Rack Carry 30m", sets:3, reps:1, weight:0 },
-        { name:"Pull Ups", sets:3, reps:8, weight:0 },
-      ]},
-      { week:5, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Dips", sets:3, reps:12, weight:0 },
-        { name:"Pull Ups", sets:3, reps:10, weight:0 },
-      ]},
-      { week:6, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Back Squat", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Reverse Lunge", sets:4, reps:10, weight:0 },
-        { name:"Copenhagen Plank", sets:3, reps:40, unit:"sec" },
-        { name:"KB Single Arm Swing", sets:5, reps:12, weight:0, notes:"per side" },
-      ]},
-      { week:6, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Clean + Press", sets:4, reps:5, weight:0 },
-        { name:"Front Rack Carry 30m", sets:4, reps:1, weight:0 },
-        { name:"Pull Ups", sets:3, reps:10, weight:0 },
-      ]},
-      { week:6, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Weighted Dips", sets:3, reps:8, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:6, weight:0 },
-      ]},
-      { week:7, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Back Squat", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Reverse Lunge", sets:3, reps:6, weight:0 },
-        { name:"Copenhagen Side Plank", sets:3, reps:25, unit:"sec" },
-      ]},
-      { week:7, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Double KB Clean + Press", sets:3, reps:4, weight:0 },
-        { name:"Farmer Carry 30m", sets:3, reps:1, weight:0 },
-      ]},
-      { week:7, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Weighted Dips", sets:3, reps:6, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:6, weight:0 },
-      ]},
-      { week:8, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Back Squat", sets:3, reps:1, weight:0, rpe:9, notes:"build to heavy single" },
-        { name:"Back Squat (back-off)", sets:3, reps:3, weight:0, notes:"~85% of today's single" },
-      ]},
-      { week:8, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:3, reps:1, weight:0, rpe:9, notes:"build to heavy single" },
-        { name:"Deadlift (back-off)", sets:3, reps:3, weight:0, notes:"~85% of today's single" },
-      ]},
-      { week:8, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:3, reps:1, weight:0, rpe:9, notes:"build to heavy single" },
-        { name:"Bench Press (back-off)", sets:3, reps:3, weight:0, notes:"~85% of today's single" },
-        { name:"Weighted Dips", sets:3, reps:5, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:5, weight:0 },
-      ]},
-    ],
-    advanced: [
-      { week:1, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Paused Back Squat", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Double KB Front Rack Reverse Lunge", sets:3, reps:6, weight:0, notes:"per side" },
-        { name:"Copenhagen Side Plank", sets:3, reps:25, unit:"sec" },
-        { name:"KB Snatch", sets:5, reps:10, weight:0, notes:"per side EMOM" },
-      ]},
-      { week:1, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused below knee)", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Suitcase Carry 15m", sets:4, reps:1, weight:0, notes:"per side — heavy" },
-        { name:"Pull Ups", sets:4, reps:8, weight:0 },
-      ]},
-      { week:1, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Paused Bench Press", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM — quality" },
-        { name:"Dips + Pull Ups (50+50 total)", sets:1, reps:50, weight:0 },
-        { name:"KB Snatch Finisher 10/10", sets:3, reps:10, weight:0, notes:"per side" },
-      ]},
-      { week:2, day:"A", title:"FUNDAMENTALS — Squat", exercises:[
-        { name:"Paused Back Squat", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Double KB Front Rack Reverse Lunge", sets:3, reps:8, weight:0, notes:"per side" },
-        { name:"Copenhagen Side Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Snatch", sets:5, reps:12, weight:0, notes:"per side EMOM" },
-      ]},
-      { week:2, day:"B", title:"FUNDAMENTALS — Deadlift", exercises:[
-        { name:"Deadlift (paused below knee)", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Suitcase Carry 15m", sets:4, reps:1, weight:0, notes:"per side — heavy" },
-        { name:"Weighted Pull Ups", sets:4, reps:6, weight:0 },
-      ]},
-      { week:2, day:"C", title:"FUNDAMENTALS — Bench", exercises:[
-        { name:"Paused Bench Press", sets:6, reps:4, weight:0, rpe:7 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM — quality" },
-        { name:"Dips + Pull Ups (50+50 total)", sets:1, reps:50, weight:0 },
-        { name:"KB Snatch Finisher 12/12", sets:3, reps:12, weight:0, notes:"per side" },
-      ]},
-      { week:3, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Front Rack Reverse Lunge", sets:4, reps:6, weight:0, notes:"per side" },
-        { name:"Copenhagen Side Plank", sets:3, reps:30, unit:"sec" },
-        { name:"KB Snatch", sets:5, reps:15, weight:0, notes:"per side" },
-      ]},
-      { week:3, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Paused Deadlift", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Front Rack Carry 30m", sets:4, reps:1, weight:0 },
-        { name:"Weighted Pull Ups", sets:4, reps:6, weight:0 },
-      ]},
-      { week:3, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Paused Bench Press", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM — heavier" },
-        { name:"Dips + Pull Ups (70+70 total)", sets:1, reps:70, weight:0 },
-        { name:"KB Snatch Finisher 15/15", sets:3, reps:15, weight:0, notes:"per side" },
-      ]},
-      { week:4, day:"A", title:"BUILDING — Squat", exercises:[
-        { name:"Paused Back Squat", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Front Rack Reverse Lunge", sets:4, reps:8, weight:0, notes:"per side" },
-        { name:"Copenhagen Side Plank", sets:3, reps:35, unit:"sec" },
-        { name:"KB Snatch", sets:6, reps:15, weight:0, notes:"per side" },
-      ]},
-      { week:4, day:"B", title:"BUILDING — Deadlift", exercises:[
-        { name:"Paused Deadlift", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Front Rack Carry 30m", sets:5, reps:1, weight:0 },
-        { name:"Weighted Pull Ups", sets:4, reps:8, weight:0 },
-      ]},
-      { week:4, day:"C", title:"BUILDING — Bench", exercises:[
-        { name:"Paused Bench Press", sets:5, reps:3, weight:0, rpe:8 },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM — heavier" },
-        { name:"Dips + Pull Ups (70+70 total)", sets:1, reps:70, weight:0 },
-        { name:"KB Snatch Finisher 15/15", sets:4, reps:15, weight:0, notes:"per side" },
-      ]},
-      { week:5, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Back Squat", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"Back Squat (back-off)", sets:3, reps:5, weight:0, notes:"~80%" },
-        { name:"Double KB Front Rack Reverse Lunge", sets:3, reps:6, weight:0 },
-        { name:"KB Snatch", sets:5, reps:20, weight:0, notes:"per side" },
-      ]},
-      { week:5, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"Deadlift (speed)", sets:5, reps:3, weight:0, notes:"~70% — fast" },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:4, reps:1, weight:0, notes:"bodyweight/hand" },
-        { name:"Weighted Pull Ups", sets:4, reps:5, weight:0 },
-      ]},
-      { week:5, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:5, reps:2, weight:0, rpe:9 },
-        { name:"Bench Press (back-off)", sets:3, reps:5, weight:0, notes:"~80%" },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Weighted Dips", sets:3, reps:8, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:8, weight:0 },
-      ]},
-      { week:6, day:"A", title:"STRENGTH — Squat", exercises:[
-        { name:"Back Squat", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Back Squat (back-off)", sets:3, reps:4, weight:0, notes:"~82%" },
-        { name:"Double KB Front Rack Reverse Lunge", sets:3, reps:8, weight:0 },
-        { name:"KB Snatch", sets:5, reps:20, weight:0, notes:"per side" },
-      ]},
-      { week:6, day:"B", title:"STRENGTH — Deadlift", exercises:[
-        { name:"Deadlift", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Deadlift (speed)", sets:5, reps:3, weight:0, notes:"~72% — fast" },
-        { name:"Double KB Clean + Press", sets:5, reps:5, weight:0 },
-        { name:"Farmer Carry 30m", sets:4, reps:1, weight:0, notes:"bodyweight/hand" },
-        { name:"Weighted Pull Ups", sets:4, reps:6, weight:0 },
-      ]},
-      { week:6, day:"C", title:"STRENGTH — Bench", exercises:[
-        { name:"Bench Press", sets:4, reps:2, weight:0, rpe:9 },
-        { name:"Bench Press (back-off)", sets:3, reps:4, weight:0, notes:"~82%" },
-        { name:"Turkish Get Up", sets:5, reps:1, weight:0, notes:"EMOM" },
-        { name:"Weighted Dips", sets:3, reps:6, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:6, weight:0 },
-      ]},
-      { week:7, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Back Squat", sets:3, reps:2, weight:0, rpe:9 },
-        { name:"Back Squat (opener prep)", sets:2, reps:1, weight:0, notes:"opener weight" },
-      ]},
-      { week:7, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:3, reps:2, weight:0, rpe:9 },
-        { name:"Deadlift (opener prep)", sets:2, reps:1, weight:0, notes:"opener weight" },
-        { name:"KB Snatch", sets:3, reps:20, weight:0, notes:"per side — conditioning" },
-      ]},
-      { week:7, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:3, reps:2, weight:0, rpe:9 },
-        { name:"Bench Press (opener prep)", sets:2, reps:1, weight:0, notes:"opener weight" },
-        { name:"Weighted Dips", sets:3, reps:5, weight:0 },
-        { name:"Weighted Pull Ups", sets:3, reps:5, weight:0 },
-      ]},
-      { week:8, day:"A", title:"PEAK — Squat", exercises:[
-        { name:"Back Squat", sets:2, reps:1, weight:0, rpe:8, notes:"~90% — feel opener" },
-      ]},
-      { week:8, day:"B", title:"PEAK — Deadlift", exercises:[
-        { name:"Deadlift", sets:2, reps:1, weight:0, rpe:8, notes:"~90% — feel opener" },
-      ]},
-      { week:8, day:"C", title:"PEAK — Bench", exercises:[
-        { name:"Bench Press", sets:2, reps:1, weight:0, rpe:8, notes:"~90% — feel opener" },
-        { name:"Weighted Dips", sets:2, reps:5, weight:0 },
-        { name:"Weighted Pull Ups", sets:2, reps:5, weight:0 },
-      ]},
-    ],
-  };
-
-  const [assign8wkClients, setAssign8wkClients] = useState([]);
-  const [assign8wkLevel, setAssign8wkLevel] = useState("beginner");
-
-  const assign8WeekProgram = async () => {
-    if (assign8wkClients.length === 0) return;
-    const lvl = assign8wkLevel;
-    setSavingTpl(true);
+  const saveCoachComment = async () => {
+    if (!selectedSession?.id) return;
+    setSavingComment(true);
     try {
-      const { data: { user: au } } = await supabase.auth.getUser();
-      let exInsertErrors = 0;
-      for (const clientId of assign8wkClients) {
-        await supabase.from("custom_exercises").delete().eq("athlete_id", clientId);
-        await supabase.from("program_days").delete().eq("athlete_id", clientId);
-        const programData = DOM_SILY_8WK[lvl] || DOM_SILY_8WK.beginner;
-        for (const d of programData) {
-          const { error: dayErr } = await supabase.from("program_days").insert({
-            coach_id: au.id, athlete_id: clientId,
-            week: d.week, day: d.day, title: d.title, notes: "",
-          });
-          if (dayErr) { console.error("program_days insert error:", dayErr); continue; }
-          for (const ex of d.exercises) {
-            const { error: exErr } = await supabase.from("custom_exercises").insert({
-              coach_id: au.id, athlete_id: clientId,
-              name: ex.name, sets: ex.sets, reps: ex.reps,
-              weight: ex.weight || 0, notes: ex.notes || "",
-              day: d.day, week: d.week,
-            });
-            if (exErr) { exInsertErrors++; }
-          }
-        }
-        sendPushToUser(clientId, "💪 DOM SIŁY 8-Week Program assigned!", "Your full 8-week program is ready — start Week 1", "program", "/");
-      }
-      if (exInsertErrors > 0) { alert(`⚠️ Program assigned but ${exInsertErrors} exercises failed to save.`); return; }
-      setTplMode("list");
-      setAssign8wkClients([]);
-      await loadData();
-      alert(`✅ 8-week program assigned to ${assign8wkClients.length} athlete(s)!`);
-    } catch(e) { console.log("8wk assign error:", e); alert("Error: " + e.message); }
-    setSavingTpl(false);
+      await supabase.from("workouts").update({ coach_comment: coachComment }).eq("id", selectedSession.id);
+      setCommentSaved(true);
+      setSelectedSession(prev => ({ ...prev, coach_comment: coachComment }));
+      sendPushToUser(selectedSession.user_id, "💬 Coach feedback on your workout", "Tap to read your coach's feedback", "feedback", "/");
+      setTimeout(() => setCommentSaved(false), 3000);
+    } catch(e) {}
+    setSavingComment(false);
   };
 
   const loadDietFiles = async (clientId) => {
     if (!clientId) return;
-    try {
-      const { data } = await supabase.from("diet_files")
-        .select("*").eq("athlete_id", clientId)
-        .order("created_at", { ascending: false });
-      setDietFiles(data || []);
-    } catch(e) {}
+    const { data } = await supabase.from("diet_files").select("*").eq("athlete_id", clientId).order("created_at", { ascending: false });
+    setDietFiles(data || []);
   };
 
   const uploadDiet = async (file, clientId) => {
     if (!file || !clientId) return;
-    setDietUploading(true);
-    setDietError("");
+    setDietUploading(true); setDietError("");
     try {
       const { data: { user: au } } = await supabase.auth.getUser();
       const fileName = `diets/${clientId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const { error: upErr } = await supabase.storage
-        .from("diet-files").upload(fileName, file, { contentType: "application/pdf", upsert: false });
+      const { error: upErr } = await supabase.storage.from("diet-files").upload(fileName, file, { contentType: "application/pdf", upsert: false });
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("diet-files").getPublicUrl(fileName);
-      await supabase.from("diet_files").insert({
-        coach_id: au.id, athlete_id: clientId,
-        file_name: file.name, file_url: urlData.publicUrl,
-      });
-      sendPushToUser(clientId, "🥗 New diet plan from Coach Karlito", "Tap to download your nutrition plan", "diet", "/");
+      await supabase.from("diet_files").insert({ coach_id: au.id, athlete_id: clientId, file_name: file.name, file_url: urlData.publicUrl });
+      sendPushToUser(clientId, "🥗 New diet plan from your coach", "Tap to download your nutrition plan", "diet", "/");
       await loadDietFiles(clientId);
     } catch(e) { setDietError(e.message || "Upload failed"); }
     setDietUploading(false);
@@ -623,145 +306,7 @@ beginner: [
     setLibraryList(data || []);
   };
 
-  const copyWeek = async () => {
-    if (!selectedClient) return;
-    setCopyingWeek(true);
-    try {
-      const { data: days } = await supabase.from("program_days").select("*")
-        .eq("athlete_id", selectedClient).eq("week", copyWeekFrom);
-      for (const day of (days || [])) {
-        const { data: newDay } = await supabase.from("program_days").insert({
-          coach_id: day.coach_id, athlete_id: day.athlete_id,
-          week: copyWeekTo, day: day.day, title: day.title, notes: day.notes
-        }).select().single();
-        if (newDay) {
-          const { data: exs } = await supabase.from("custom_exercises").select("*")
-            .eq("athlete_id", selectedClient).eq("week", copyWeekFrom).eq("day", day.day);
-          for (const ex of (exs || [])) {
-            await supabase.from("custom_exercises").insert({
-              athlete_id: ex.athlete_id, coach_id: ex.coach_id,
-              week: copyWeekTo, day: ex.day, name: ex.name,
-              sets: ex.sets, reps: ex.reps, weight: ex.weight, notes: ex.notes
-            });
-          }
-        }
-      }
-      await loadData();
-      setShowCopyWeek(false);
-      alert(`Week ${copyWeekFrom} copied to Week ${copyWeekTo}!`);
-    } catch(e) { alert("Error copying week"); }
-    setCopyingWeek(false);
-  };
-
-  useEffect(() => { loadData(); loadTemplates(); }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const { data: profiles } = await supabase.from("profiles").select("*");
-      setClients(profiles || []);
-      const { data: logs } = await supabase.from("workouts").select("*").order("created_at", { ascending: false });
-      setWorkouts(logs || []);
-      const { data: exs } = await supabase.from("custom_exercises").select("*").order("created_at", { ascending: true });
-      setExercises(exs || []);
-      const { data: days } = await supabase.from("program_days").select("*").order("week", { ascending: true });
-      setProgramDays(days || []);
-    } catch(e) { console.log("Coach load error:", e); }
-    setLoading(false);
-  };
-
-  const saveExercise = async () => {
-    if (!selectedClient || !newEx.name) return;
-    setSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("custom_exercises").insert({
-        coach_id: user.id, athlete_id: selectedClient, ...newEx,
-      });
-      setNewEx({ name: "", sets: 3, reps: 10, weight: 0, rpe: 0, unit: "kg", notes: "", day: "A", week: 1 });
-      await loadData();
-      setView("profile");
-    } catch(e) { console.log("Save exercise error:", e); }
-    setSaving(false);
-  };
-
-  const saveCoachComment = async () => {
-    if (!selectedSession?.id) return;
-    setSavingComment(true);
-    setCommentSaved(false);
-    try {
-      await supabase.from("workouts").update({ coach_comment: coachComment }).eq("id", selectedSession.id);
-      setCommentSaved(true);
-      setSelectedSession(prev => ({ ...prev, coach_comment: coachComment }));
-      sendPushToUser(selectedSession.user_id, "💬 Coach feedback on your workout", "Tap to read your coach's feedback", "feedback", "/");
-      setTimeout(() => setCommentSaved(false), 3000);
-    } catch(e) { console.log("Comment save error:", e); }
-    setSavingComment(false);
-  };
-
-  const saveProgramDay = async () => {
-    if (!selectedClient || !buildTitle) return;
-    setSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const validExercises = buildExercises.filter(e => e.name.trim());
-      if (editingDay) {
-        await supabase.from("program_days").update({ title: buildTitle, notes: buildNotes }).eq("id", editingDay.dayId);
-        await supabase.from("custom_exercises").delete().eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
-        for (const ex of validExercises) {
-          await supabase.from("custom_exercises").insert({
-            coach_id: user.id, athlete_id: selectedClient,
-            name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
-            notes: ex.notes, day: buildDay, week: buildWeek,
-          });
-        }
-        setEditingDay(null);
-      } else {
-        // Sprawdź czy dzień już istnieje
-const { data: existing } = await supabase.from("program_days").select("id")
-  .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay).single();
-
-if (existing) {
-  // Aktualizuj istniejący
-  await supabase.from("custom_exercises").delete()
-    .eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
-  await supabase.from("program_days").update({ title: buildTitle, notes: buildNotes }).eq("id", existing.id);
-} else {
-  // Wstaw nowy
-  await supabase.from("program_days").insert({
-    coach_id: user.id, athlete_id: selectedClient,
-    week: buildWeek, day: buildDay, title: buildTitle, notes: buildNotes,
-  });
-}
-        for (const ex of validExercises) {
-          await supabase.from("custom_exercises").insert({
-            coach_id: user.id, athlete_id: selectedClient,
-            name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight,
-            notes: ex.notes, day: buildDay, week: buildWeek,
-          });
-        }
-        sendPushToUser(selectedClient, "💪 New program from Coach Karlito", `Week ${buildWeek} · Day ${buildDay} — ${buildTitle}`, "program", "/");
-      }
-      setBuildMode(false);
-      setBuildTitle("");
-      setBuildNotes("");
-      setBuildExercises([{ name: "", sets: 3, reps: 5, weight: 0, notes: "" }]);
-      await loadData();
-      setView("profile");
-    } catch(e) { console.log("Save program day error:", e); }
-    setSaving(false);
-  };
-
-  const deleteProgramDay = async (dayId) => {
-    await supabase.from("program_days").delete().eq("id", dayId);
-    await supabase.from("custom_exercises").delete().eq("athlete_id", selectedClient).eq("week", buildWeek).eq("day", buildDay);
-    await loadData();
-  };
-
-  const deleteExercise = async (id) => {
-    await supabase.from("custom_exercises").delete().eq("id", id);
-    await loadData();
-  };
+  // ── DERIVED DATA ───────────────────────────────────────────────────────────
 
   const selectedClientData = clients.find(c => c.id === selectedClient);
   const athletes = clients.filter(c => c.role === "athlete");
@@ -776,25 +321,26 @@ if (existing) {
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   const clientExercises = selectedClient ? exercises.filter(e => e.athlete_id === selectedClient) : [];
   const clientWorkouts = selectedClient ? workouts.filter(w => w.user_id === selectedClient) : workouts;
+
   const weeklyData = (() => {
     if (!selectedClient) return [];
-    const weeks = [];
-    for (let i = 3; i >= 0; i--) {
+    return [3,2,1,0].map(i => {
       const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1 - i * 7); start.setHours(0,0,0,0);
       const end = new Date(start); end.setDate(start.getDate() + 7);
       const wks = clientWks(selectedClient).filter(w => { const d = new Date(w.created_at); return d >= start && d < end; });
       const vol = wks.reduce((s, w) => s + (w.exercises || []).reduce((s2, ex) =>
         s2 + (ex.sets || []).filter(st => st.done && st.weight && st.reps)
           .reduce((s3, st) => s3 + parseFloat(st.weight) * parseFloat(st.reps), 0), 0), 0);
-      weeks.push({ label: i === 0 ? "now" : `-${i}w`, sessions: wks.length, vol: Math.round(vol) });
-    }
-    return weeks;
+      return { label: i === 0 ? "now" : `-${i}w`, sessions: wks.length, vol: Math.round(vol) };
+    });
   })();
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={s.screen}>
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[["dashboard", "📊"], ["sessions", "📋"], ["templates", "📁"], ["diet", "🥗"], ["ranks", "🏆"]].map(([v, icon]) => (
+        {[["dashboard","📊"],["sessions","📋"],["templates","📁"],["diet","🥗"],["ranks","🏆"]].map(([v, icon]) => (
           <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); setEditingDay(null); }}
             style={{ ...s.pill(view === v && !selectedClient), padding: "8px 0", flex: 1, textAlign: "center", fontSize: 18 }}>
             {icon}
@@ -802,6 +348,7 @@ if (existing) {
         ))}
       </div>
 
+      {/* ── DASHBOARD ── */}
       {view === "dashboard" && !selectedClient && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
@@ -818,94 +365,271 @@ if (existing) {
             ))}
           </div>
 
-          {(() => {
-            const summary = athletes.map(a => {
-              const wkSessions = workouts.filter(w => w.user_id === a.id && new Date(w.created_at) >= startOfWeek);
-              const lastSession = workouts.filter(w => w.user_id === a.id).sort((x, y) => new Date(y.created_at) - new Date(x.created_at))[0];
-              const daysSince = lastSession ? Math.floor((new Date() - new Date(lastSession.created_at)) / 86400000) : null;
-              return { ...a, wkSessions: wkSessions.length, daysSince, lastDay: lastSession?.day };
-            });
+          <div style={s.sectionLabel}>ATHLETE STATUS</div>
+          {athletes.map(a => {
+            const isActive = wksThisWeek(a.id) > 0;
+            const last = lastWorkout(a.id);
+            const daysSince = last ? Math.floor((now - new Date(last.created_at)) / 86400000) : null;
+            const statusColor = isActive ? "var(--red)" : daysSince !== null && daysSince >= 5 ? "#b8860b" : "var(--gray2)";
+            const statusText = isActive ? `${wksThisWeek(a.id)} session${wksThisWeek(a.id) > 1 ? "s" : ""} this week`
+              : daysSince === null ? "No sessions yet"
+              : daysSince === 0 ? "Trained today"
+              : `Last trained ${daysSince}d ago`;
+
             return (
-              <div style={{ marginBottom: 20 }}>
-                <div style={s.sectionLabel}>THIS WEEK — ATHLETE STATUS</div>
-                {summary.length === 0 && <div style={{ ...s.card, textAlign: "center", padding: 20, fontSize: 13, color: "var(--gray2)" }}>No athletes yet</div>}
-                {summary.map(a => {
-                  const isActive = a.wkSessions > 0;
-                  const isInactive = a.daysSince !== null && a.daysSince >= 5;
-                  const statusColor = isActive ? "var(--red)" : isInactive ? "#b8860b" : "var(--gray2)";
-                  const statusText = isActive ? `${a.wkSessions} session${a.wkSessions > 1 ? "s" : ""} this week`
-                    : a.daysSince === null ? "No sessions yet"
-                    : a.daysSince === 0 ? "Trained today"
-                    : `Last trained ${a.daysSince}d ago`;
+              <div key={a.id} onClick={() => { setSelectedClient(a.id); setView("profile"); }}
+                style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: "12px 14px", marginBottom: 8, borderLeft: `3px solid ${statusColor}` }}>
+                <div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>{a.name || a.email?.split("@")[0] || "Athlete"}</div>
+                  <div style={{ fontSize: 11, color: statusColor, marginTop: 2 }}>{statusText}</div>
+                  {!hasProgram(a.id) && <div style={{ fontSize: 10, color: "var(--gray2)", marginTop: 2 }}>⚠ No programme assigned</div>}
+                </div>
+                <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* ── CLIENT PROFILE ── */}
+      {selectedClient && selectedClientData && view === "profile" && !buildMode && (
+        <>
+          <button onClick={() => { setSelectedClient(null); setView("dashboard"); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
+
+          <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{selectedClientData.name || "Athlete"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
+              {[["SQ", selectedClientData.squat], ["BP", selectedClientData.bench], ["DL", selectedClientData.deadlift], ["KB", selectedClientData.kb_weight]].map(([k, v]) => (
+                <div key={k} style={{ background: "var(--bg3)", borderRadius: 6, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.08em" }}>{k}</div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900 }}>{v || "—"}</div>
+                  {v && <div style={{ fontSize: 9, color: "var(--gray2)" }}>kg</div>}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 6 }}>LAST 4 WEEKS — SESSIONS</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 48, marginBottom: 12 }}>
+              {weeklyData.map((w, i) => {
+                const maxV = Math.max(...weeklyData.map(x => x.sessions), 1);
+                const h = Math.max(4, (w.sessions / maxV) * 40);
+                return (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                    <div style={{ fontSize: 9, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif" }}>{w.sessions > 0 ? w.sessions : ""}</div>
+                    <div style={{ width: "100%", borderRadius: 3, background: i === 3 ? "var(--red)" : "var(--bg3)", border: "1px solid var(--border)", height: h }} />
+                    <div style={{ fontSize: 8, color: "var(--gray2)" }}>{w.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[["TOTAL", clientWorkouts.length], ["THIS WK", wksThisWeek(selectedClient)], ["THIS MO", wksThisMonth(selectedClient)], ["PROG", hasProgram(selectedClient) ? "✓" : "✗"]].map(([k, v]) => (
+                <div key={k} style={{ flex: 1, background: "var(--bg3)", borderRadius: 6, padding: "6px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: 8, color: "var(--gray2)", letterSpacing: "0.06em" }}>{k}</div>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: v === "✗" ? "var(--gray2)" : "var(--accent)" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Goals */}
+          {(selectedClientData.main_goal || selectedClientData.athlete_notes) && (
+            <div style={{ ...s.card, borderColor: "rgba(184,134,11,0.2)", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", marginBottom: 10, fontFamily: "'Cinzel', serif" }}>GOALS & NOTES</div>
+              {selectedClientData.main_goal && <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 600, lineHeight: 1.5, marginBottom: 8 }}>{selectedClientData.main_goal}</div>}
+              {selectedClientData.athlete_notes && <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, background: "var(--bg3)", borderRadius: 4, padding: "8px 12px", borderLeft: "2px solid var(--accent)" }}>{selectedClientData.athlete_notes}</div>}
+            </div>
+          )}
+
+          {/* Program actions */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAMME DAY</button>
+            <button onClick={() => setShowCopyWeek(v => !v)} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>⧉ COPY WEEK</button>
+          </div>
+
+          {showCopyWeek && (
+            <div style={{ ...s.card, marginBottom: 12, borderColor: "rgba(200,160,40,0.3)" }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: "var(--gold)", marginBottom: 10 }}>COPY WEEK</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>FROM WEEK</div>
+                  <input type="number" min={1} max={12} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
+                </div>
+                <div style={{ fontSize: 18, color: "var(--gray2)", paddingTop: 16 }}>→</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>TO WEEK</div>
+                  <input type="number" min={1} max={12} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 10 }}>
+                ℹ️ If Week {copyWeekTo} already has sessions, they will be overwritten.
+              </div>
+              <button onClick={copyWeek} disabled={copyingWeek || copyWeekFrom === copyWeekTo}
+                style={{ ...s.btn, fontSize: 13, opacity: (copyingWeek || copyWeekFrom === copyWeekTo) ? 0.5 : 1 }}>
+                {copyingWeek ? "COPYING..." : `COPY WEEK ${copyWeekFrom} → WEEK ${copyWeekTo}`}
+              </button>
+            </div>
+          )}
+
+          {/* Programme overview */}
+          {programDays.filter(d => d.athlete_id === selectedClient).length > 0 && (
+            <div style={{ ...s.card, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>PROGRAMME</div>
+              {programDays
+                .filter(d => d.athlete_id === selectedClient)
+                .sort((a, b) => a.week !== b.week ? a.week - b.week : a.day < b.day ? -1 : 1)
+                .map(day => {
+                  const dayExs = exercises.filter(e => e.athlete_id === selectedClient && e.week === day.week && e.day === day.day);
+                  const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)", D: "#a78bfa" }[day.day] || "var(--red)";
                   return (
-                    <div key={a.id} onClick={() => { setSelectedClient(a.id); setView("profile"); }}
-                      style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: "12px 14px", marginBottom: 8, borderLeft: `3px solid ${statusColor}` }}>
-                      <div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>{a.name || a.email?.split("@")[0] || "Athlete"}</div>
-                        <div style={{ fontSize: 11, color: statusColor, marginTop: 2 }}>{statusText}</div>
+                    <div key={day.id} style={{ borderLeft: `3px solid ${col}`, paddingLeft: 10, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900 }}>
+                          Wk {day.week} · Day {day.day} — {day.title}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <div onClick={() => {
+                            setBuildWeek(day.week); setBuildDay(day.day); setBuildTitle(day.title);
+                            setBuildNotes(day.notes || "");
+                            setBuildExercises(dayExs.length > 0
+                              ? dayExs.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, notes: e.notes || "" }))
+                              : [{ name: "", sets: 3, reps: 5, weight: 0, notes: "" }]);
+                            setEditingDay({ dayId: day.id });
+                            setBuildMode(true);
+                          }} style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer", padding: "4px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>EDIT</div>
+                          <div onClick={() => deleteProgramDay(day.id, day.week, day.day)}
+                            style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer", padding: "4px 8px" }}>✕</div>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        {isInactive && <div style={{ fontSize: 10, background: "rgba(184,134,11,0.15)", color: "#b8860b", padding: "2px 8px", borderRadius: 3, fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>INACTIVE</div>}
-                        {isActive && <div style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "var(--red)", padding: "2px 8px", borderRadius: 3, fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>ACTIVE</div>}
-                        <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
-                      </div>
+                      {dayExs.map(ex => (
+                        <div key={ex.id} style={{ fontSize: 11, color: "var(--gray)", marginTop: 3 }}>
+                          · {ex.name} — {ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}kg` : ""}
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
-              </div>
-            );
-          })()}
+            </div>
+          )}
 
-          <div style={s.sectionLabel}>CLIENTS</div>
-          {athletes.length === 0 ? (
-            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No athletes yet</div></div>
-          ) : athletes.map(client => {
-            const last = lastWorkout(client.id);
-            const thisWk = wksThisWeek(client.id);
-            const thisMo = wksThisMonth(client.id);
-            const prog = hasProgram(client.id);
-            const active = thisWk > 0;
-            const bars = [3,2,1,0].map(i => {
-              const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1 - i * 7); start.setHours(0,0,0,0);
-              const end = new Date(start); end.setDate(start.getDate() + 7);
-              return clientWks(client.id).filter(w => { const d = new Date(w.created_at); return d >= start && d < end; }).length;
-            });
-            const maxB = Math.max(...bars, 1);
-            return (
-              <div key={client.id} onClick={() => { setSelectedClient(client.id); setView("profile"); }}
-                style={{ ...s.card, marginBottom: 10, cursor: "pointer", borderLeft: `3px solid ${active ? "var(--red)" : "var(--border)"}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>{client.name || "Athlete"}</div>
-                      {active && <div style={{ ...s.badge("var(--red)"), fontSize: 9 }}>ACTIVE</div>}
-                      {!prog && <div style={{ background: "var(--bg3)", color: "var(--gray)", fontSize: 9, padding: "2px 6px", borderRadius: 4 }}>NO PROGRAM</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
-                      {[["SQ", client.squat], ["BP", client.bench], ["DL", client.deadlift], ["KB", client.kb_weight]].map(([k, v]) => (
-                        <div key={k} style={{ fontSize: 11, color: "var(--gray2)" }}><span style={{ color: "var(--gray)", fontWeight: 700 }}>{k}</span> {v ? `${v}kg` : "—"}</div>
-                      ))}
-                    </div>
-                    <div style={{ display: "flex", gap: 12 }}>
-                      <div style={{ fontSize: 11, color: "var(--gray2)" }}><span style={{ color: "var(--accent)", fontWeight: 700 }}>{thisWk}</span> this wk</div>
-                      <div style={{ fontSize: 11, color: "var(--gray2)" }}><span style={{ color: "var(--accent)", fontWeight: 700 }}>{thisMo}</span> this mo</div>
-                      {last && <div style={{ fontSize: 11, color: "var(--gray2)" }}>last: <span style={{ color: "var(--white)" }}>{fmtDate(last.created_at)}</span></div>}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif" }}>VIEW</span>
-                    <span style={{ color: "var(--gray2)", fontSize: 16 }}>›</span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 }}>
-                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", paddingBottom: 2 }}>ACTIVITY (4 WKS)</div>
-                  <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 24, width: 100 }}>
-                    {bars.map((n, i) => (
-                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                        <div style={{ width: "100%", borderRadius: 2, background: n > 0 ? "var(--red)" : "var(--bg3)", height: Math.max(3, (n / maxB) * 18) }} />
-                        <div style={{ fontSize: 7, color: "var(--gray2)" }}>{i === 3 ? "now" : `-${3-i}w`}</div>
+          {/* Recent workouts */}
+          {clientWorkouts.length > 0 && (
+            <div style={{ ...s.card, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>RECENT SESSIONS</div>
+              {clientWorkouts.slice(0, 5).map((w, i) => {
+                const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" }[w.day] || "var(--red)";
+                return (
+                  <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setView("sessions"); }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>
+                    <div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2 }}>
+                        <div style={{ ...s.badge(col), fontSize: 9 }}>DAY {w.day}</div>
+                        <div style={{ fontSize: 10, color: "var(--gray2)", fontFamily: "'Barlow Condensed', sans-serif" }}>WK {w.week}</div>
                       </div>
-                    ))}
+                      <div style={{ fontSize: 13, color: "var(--text)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                        {(w.workout_title || "").replace(/DAY [ABCD] — /, "")}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(w.created_at)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {w.comment && <div style={{ fontSize: 10, color: "var(--accent)" }}>💬</div>}
+                      {w.coach_comment && <div style={{ fontSize: 10, color: "var(--gold)" }}>🎯</div>}
+                      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── BUILD MODE ── */}
+      {buildMode && selectedClient && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>
+            {editingDay ? "✏️ EDIT PROGRAMME DAY" : "BUILD PROGRAMME DAY"}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
+            <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={buildDay} onChange={e => setBuildDay(e.target.value)} style={s.input}>{["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+          </div>
+          <label style={s.label}>TITLE</label>
+          <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)} placeholder="e.g. Squat / Deadlift" style={{ ...s.input, marginBottom: 12 }} />
+          <label style={s.label}>NOTES (optional)</label>
+          <input value={buildNotes} onChange={e => setBuildNotes(e.target.value)} placeholder="Focus points for this session..." style={{ ...s.input, marginBottom: 12 }} />
+          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>EXERCISES</div>
+          {buildExercises.map((ex, i) => (
+            <div key={i} style={{ background: "var(--bg3)", borderRadius: 6, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+                <input value={ex.name}
+                  onChange={e => { const a=[...buildExercises]; a[i].name=e.target.value; setBuildExercises(a); }}
+                  placeholder="Exercise name..."
+                  style={{ ...s.input, flex: 2, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, marginBottom: 0 }} />
+                <div onClick={() => { setLibraryPicker(i); loadLibraryList(); }}
+                  style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 10px", cursor: "pointer", flexShrink: 0 }}>
+                  <span style={{ fontSize: 14 }}>📚</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, alignSelf: "center" }}>
+                  <div onClick={() => { if (i === 0) return; const a=[...buildExercises]; [a[i-1],a[i]]=[a[i],a[i-1]]; setBuildExercises(a); }}
+                    style={{ color: i===0?"var(--bg4)":"var(--accent)", cursor:"pointer", fontSize:14, padding:"0 6px", lineHeight:1 }}>▲</div>
+                  <div onClick={() => { if (i===buildExercises.length-1) return; const a=[...buildExercises]; [a[i],a[i+1]]=[a[i+1],a[i]]; setBuildExercises(a); }}
+                    style={{ color: i===buildExercises.length-1?"var(--bg4)":"var(--accent)", cursor:"pointer", fontSize:14, padding:"0 6px", lineHeight:1 }}>▼</div>
+                  <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))}
+                    style={{ color:"var(--red-dim)", cursor:"pointer", fontSize:14, padding:"0 6px", lineHeight:1 }}>✕</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[["Sets","sets",1,20],["Reps","reps",1,100],["kg","weight",0,500]].map(([lbl,key,min,max]) => (
+                  <div key={key} style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", marginBottom: 2 }}>{lbl}</div>
+                    <input type="number" min={min} max={max} value={ex[key]}
+                      onChange={e => { const a=[...buildExercises]; a[i][key]=+e.target.value; setBuildExercises(a); }}
+                      style={{ ...s.input, padding: "8px 6px" }} />
+                  </div>
+                ))}
+              </div>
+              <input value={ex.notes} onChange={e => { const a=[...buildExercises]; a[i].notes=e.target.value; setBuildExercises(a); }}
+                placeholder="Notes... e.g. per side, paused, RPE 8"
+                style={{ ...s.input, marginTop: 6, fontSize: 12 }} />
+            </div>
+          ))}
+          <button onClick={() => setBuildExercises([...buildExercises,{name:"",sets:3,reps:8,weight:0,notes:""}])}
+            style={{ ...s.btnGhost, width: "100%", marginBottom: 10, fontSize: 12 }}>+ ADD EXERCISE</button>
+          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>
+            {saving ? "SAVING..." : "SAVE PROGRAMME DAY"}
+          </button>
+          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => { setBuildMode(false); setEditingDay(null); }}>← CANCEL</button>
+        </div>
+      )}
+
+      {/* ── SESSIONS VIEW ── */}
+      {view === "sessions" && !selectedSession && (
+        <>
+          <div style={s.sectionLabel}>ALL SESSIONS</div>
+          {workouts.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div></div>
+          ) : workouts.map((w, i) => {
+            const client = clients.find(c => c.id === w.user_id);
+            const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+            return (
+              <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setCommentSaved(false); }}
+                style={{ ...s.card, marginBottom: 8, borderLeft: `3px solid ${col}`, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 3 }}>
+                      <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
+                      <div style={{ fontSize: 11, color: "var(--gray2)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>{client?.name || "Athlete"}</div>
+                    </div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>
+                      {(w.workout_title || "").replace(/DAY [ABCD] — /,"")}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(w.created_at)}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {w.comment && <div style={{ fontSize: 10, color: "var(--accent)" }}>💬 comment</div>}
+                    {w.coach_comment && <div style={{ fontSize: 10, color: "var(--gold)" }}>🎯 feedback</div>}
+                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
                   </div>
                 </div>
               </div>
@@ -914,289 +638,86 @@ if (existing) {
         </>
       )}
 
-      {selectedClient && selectedClientData && view === "profile" && !buildMode && (
-        <>
-          <button onClick={() => { setSelectedClient(null); setView("dashboard"); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
-          <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{selectedClientData.name || "Athlete"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
-              {[["SQUAT", selectedClientData.squat], ["BENCH", selectedClientData.bench], ["DEADLIFT", selectedClientData.deadlift], ["KB", selectedClientData.kb_weight]].map(([k, v]) => (
-                <div key={k} style={{ background: "var(--bg3)", borderRadius: 6, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.08em" }}>{k}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900 }}>{v || "—"}</div>
-                  {v && <div style={{ fontSize: 9, color: "var(--gray2)" }}>kg</div>}
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 6 }}>LAST 4 WEEKS — VOLUME</div>
-            <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 52, marginBottom: 12 }}>
-              {weeklyData.map((w, i) => {
-                const maxVol = Math.max(...weeklyData.map(x => x.vol), 1);
-                const h = Math.max(4, (w.vol / maxVol) * 44);
-                return (
-                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                    <div style={{ fontSize: 9, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif" }}>{w.sessions > 0 ? w.sessions : ""}</div>
-                    <div style={{ width: "100%", borderRadius: 3, background: i === 3 ? "var(--red)" : "var(--bg3)", border: "1px solid var(--border)", height: h }} />
-                    <div style={{ fontSize: 8, color: "var(--gray2)" }}>{w.label}</div>
-                    {w.vol > 0 && <div style={{ fontSize: 8, color: "var(--gray2)" }}>{w.vol > 999 ? `${(w.vol/1000).toFixed(1)}t` : `${w.vol}kg`}</div>}
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {[["SESSIONS", clientWorkouts.length, "total"], ["THIS WK", wksThisWeek(selectedClient), ""], ["THIS MO", wksThisMonth(selectedClient), ""], ["PROGRAM", hasProgram(selectedClient) ? "YES" : "NO", ""]].map(([k, v, sub]) => (
-                <div key={k} style={{ flex: 1, background: "var(--bg3)", borderRadius: 6, padding: "6px 4px", textAlign: "center" }}>
-                  <div style={{ fontSize: 8, color: "var(--gray2)", letterSpacing: "0.06em" }}>{k}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: v === "NO" ? "var(--gray2)" : "var(--accent)" }}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ ...s.card, borderColor: "rgba(184,134,11,0.25)", background: "rgba(184,134,11,0.03)", marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", marginBottom: 14, fontFamily: "'Cinzel', serif" }}>ATHLETE PROFILE</div>
-            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.12em", marginBottom: 8 }}>1RM</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {[["SQUAT", selectedClientData.squat], ["BENCH", selectedClientData.bench], ["DEADLIFT", selectedClientData.deadlift]].map(([k, v]) => (
-                <div key={k} style={{ background: "var(--bg3)", borderRadius: 4, padding: "10px 8px", textAlign: "center", border: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>{k}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, color: v ? "var(--white)" : "var(--gray2)" }}>{v ? `${v}` : "—"}</div>
-                  {v && <div style={{ fontSize: 9, color: "var(--gray2)" }}>kg</div>}
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {[["KB WEIGHT", selectedClientData.kb_weight ? `${selectedClientData.kb_weight}kg` : "—"],
-                ["LEVEL", selectedClientData.level ? selectedClientData.level.toUpperCase() : "—"],
-                ["PULL-UPS MAX", selectedClientData.pullups || "—"],
-                ["RECOVERY", selectedClientData.recovery ? `${selectedClientData.recovery}/5` : "—"],
-              ].map(([k, v]) => (
-                <div key={k} style={{ background: "var(--bg3)", borderRadius: 4, padding: "10px 12px", border: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 4 }}>{k}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>{v}</div>
-                </div>
-              ))}
-            </div>
-            {(selectedClientData.main_goal || selectedClientData.competition_date || selectedClientData.athlete_notes) && (
-              <>
-                <div style={{ height: 1, background: "var(--border)", margin: "4px 0 14px" }} />
-                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.12em", marginBottom: 12, fontFamily: "'Cinzel', serif" }}>GOALS</div>
-                {selectedClientData.main_goal && (
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>MAIN GOAL</div>
-                    <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 600, lineHeight: 1.4 }}>{selectedClientData.main_goal}</div>
-                  </div>
-                )}
-                {selectedClientData.competition_date && (
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>COMPETITION DATE</div>
-                    <div style={{ fontSize: 13, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                      {new Date(selectedClientData.competition_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                      <span style={{ color: "var(--gray2)", fontWeight: 400, marginLeft: 8 }}>
-                        ({Math.ceil((new Date(selectedClientData.competition_date) - new Date()) / (1000*60*60*24))} days out)
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {selectedClientData.athlete_notes && (
-                  <div>
-                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>NOTES FOR COACH</div>
-                    <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, background: "var(--bg3)", borderRadius: 4, padding: "10px 12px", borderLeft: "2px solid var(--accent)" }}>{selectedClientData.athlete_notes}</div>
-                  </div>
-                )}
-              </>
-            )}
-            {!selectedClientData.squat && !selectedClientData.main_goal && (
-              <div style={{ fontSize: 12, color: "var(--gray2)", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>Athlete hasn't completed their profile yet</div>
-            )}
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAM DAY</button>
-            <button onClick={() => setShowCopyWeek(v => !v)} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>⧉ COPY WEEK</button>
-            <button onClick={() => setView("addExercise")} style={{ ...s.btnGhost, flex: 1, fontSize: 12, padding: "10px" }}>+ EXERCISE</button>
-          </div>
-
-          {showCopyWeek && (
-            <div style={{ ...s.card, marginBottom: 12, borderColor: "rgba(200,160,40,0.3)" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: "var(--gold)", marginBottom: 10, letterSpacing: "0.1em" }}>⧇ COPY WEEK</div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>FROM WEEK</div>
-                  <input type="number" min={1} max={8} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
-                </div>
-                <div style={{ fontSize: 18, color: "var(--gray2)", paddingTop: 16 }}>→</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>TO WEEK</div>
-                  <input type="number" min={1} max={8} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
-                </div>
+      {view === "sessions" && selectedSession && (() => {
+        const w = selectedSession;
+        const client = clients.find(c => c.id === w.user_id);
+        const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
+        return (
+          <div>
+            <button onClick={() => setSelectedSession(null)} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
+            <div style={{ ...s.card, borderLeft: `3px solid ${col}`, marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week} · {fmtDate(w.created_at)}</div>
               </div>
-              <button onClick={copyWeek} disabled={copyingWeek || copyWeekFrom === copyWeekTo} style={{ ...s.btn, fontSize: 13, opacity: (copyingWeek || copyWeekFrom === copyWeekTo) ? 0.5 : 1 }}>
-                {copyingWeek ? "COPYING..." : "COPY WEEK " + copyWeekFrom + " → WEEK " + copyWeekTo}
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>
+                {(w.workout_title || "").replace(/DAY [ABCD] — /,"")}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 2 }}>{client?.name || "Athlete"}</div>
+            </div>
+            {(w.exercises || []).map((ex, ei) => (
+              <div key={ei} style={{ ...s.card, marginBottom: 8, borderLeft: `3px solid ${ex.done ? "var(--red)" : "var(--border)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ex.result ? 6 : 0 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900 }}>{ex.name}</div>
+                    {ex.planned && <div style={{ fontSize: 11, color: "var(--gray2)" }}>Plan: {ex.planned.sets}×{ex.planned.reps} @ {ex.planned.weight}kg</div>}
+                  </div>
+                  <div style={{ fontSize: 12, color: ex.done ? "var(--red)" : "var(--gray2)", fontWeight: 700 }}>{ex.done ? "✓" : "—"}</div>
+                </div>
+                {ex.result && <div style={{ fontSize: 13, color: "var(--text)", background: "var(--bg3)", borderRadius: 5, padding: "6px 10px", lineHeight: 1.5 }}>{ex.result}</div>}
+              </div>
+            ))}
+            {w.comment && (
+              <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>💬 ATHLETE COMMENT</div>
+                <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, fontStyle: "italic" }}>{w.comment}</div>
+              </div>
+            )}
+            {w.video_link && (
+              <a href={w.video_link} target="_blank" rel="noopener noreferrer"
+                style={{ ...s.card, display: "flex", alignItems: "center", gap: 10, marginBottom: 12, borderColor: "var(--gold-dim)", textDecoration: "none", cursor: "pointer" }}>
+                <span style={{ fontSize: 24 }}>▶</span>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>WATCH VIDEO</div>
+              </a>
+            )}
+            <div style={{ ...s.card, borderColor: "rgba(196,30,30,0.4)", background: "rgba(196,30,30,0.03)", marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: "var(--red)", letterSpacing: "0.15em", marginBottom: 8 }}>🎯 COACH FEEDBACK</div>
+              {w.coach_comment && (
+                <div style={{ fontSize: 13, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", marginBottom: 10 }}>{w.coach_comment}</div>
+              )}
+              <textarea value={coachComment} onChange={e => setCoachComment(e.target.value)}
+                placeholder="Add or update feedback..." rows={3}
+                style={{ ...s.input, resize: "none", lineHeight: 1.5, fontSize: 13, marginBottom: 10 }} />
+              <button onClick={saveCoachComment} disabled={savingComment || !coachComment.trim()}
+                style={{ ...s.btn, opacity: (savingComment || !coachComment.trim()) ? 0.5 : 1 }}>
+                {commentSaved ? "✓ SENT" : savingComment ? "SAVING..." : "SEND FEEDBACK →"}
               </button>
             </div>
-          )}
-
-          {clientExercises.length > 0 && (
-            <div style={{ ...s.card, marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>CUSTOM EXERCISES</div>
-              {clientExercises.map(ex => (
-                <div key={ex.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>{ex.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--gray)" }}>{ex.sets}×{ex.reps} · {ex.weight}kg · Day {ex.day} · Wk {ex.week}</div>
-                  </div>
-                  <div onClick={() => deleteExercise(ex.id)} style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {programDays.filter(d => d.athlete_id === selectedClient).length > 0 && (
-            <div style={{ ...s.card, marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>PROGRAM</div>
-              {programDays.filter(d => d.athlete_id === selectedClient).map(day => {
-                const dayExs = exercises.filter(e => e.athlete_id === selectedClient && e.week === day.week && e.day === day.day);
-                const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" }[day.day] || "var(--red)";
-                return (
-                  <div key={day.id} style={{ borderLeft: `3px solid ${col}`, paddingLeft: 10, marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900 }}>Wk {day.week} · Day {day.day} — {day.title}</div>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <div onClick={() => {
-                          setBuildWeek(day.week); setBuildDay(day.day); setBuildTitle(day.title);
-                          setBuildNotes(day.notes || "");
-                          setBuildExercises(dayExs.length > 0 ? dayExs.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, notes: e.notes || "", _id: e.id })) : [{ name: "", sets: 3, reps: 5, weight: 0, notes: "" }]);
-                          setEditingDay({ dayId: day.id, exIds: dayExs.map(e => e.id) });
-                          setBuildMode(true);
-                        }} style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer", padding: "4px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>EDIT</div>
-                        <div onClick={() => deleteProgramDay(day.id)} style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer", padding: "4px 8px" }}>✕</div>
-                      </div>
-                    </div>
-                    {dayExs.map(ex => <div key={ex.id} style={{ fontSize: 11, color: "var(--gray)", marginTop: 3 }}>· {ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}kg</div>)}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {clientWorkouts.filter(w => w.video_link).length > 0 && (
-            <div style={{ ...s.card, marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 8 }}>🎥 VIDEO FEEDBACK</div>
-              {clientWorkouts.filter(w => w.video_link).slice(0, 5).map((w, i) => {
-                const col = { A: "#4a9eff", B: "#f0a020", C: "var(--red)" }[w.day] || "var(--red)";
-                return (
-                  <div key={i} style={{ borderBottom: i < 4 ? "1px solid var(--border)" : "none", padding: "10px 0" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <div>
-                        <span style={{ ...s.badge(col), fontSize: 9 }}>DAY {w.day}</span>
-                        <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: "var(--gray)", marginLeft: 8 }}>WK {w.week} · {fmtDate(w.created_at)}</span>
-                      </div>
-                    </div>
-                    {w.comment && <div style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic", marginBottom: 6 }}>"{w.comment}"</div>}
-                    <a href={w.video_link} target="_blank" rel="noopener noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(201,168,76,0.1)", border: "1px solid var(--gold-dim)", borderRadius: 6, textDecoration: "none", cursor: "pointer" }}>
-                      <span style={{ fontSize: 14 }}>▶</span>
-                      <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, color: "var(--gold)", letterSpacing: "0.08em" }}>OBEJRZYJ WIDEO</span>
-                    </a>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {buildMode && selectedClient && (
-        <div style={{ ...s.card, marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>{editingDay ? "✏️ EDIT PROGRAM DAY" : "BUILD PROGRAM DAY"}</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="8" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
-            <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={buildDay} onChange={e => setBuildDay(e.target.value)} style={s.input}>{["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
           </div>
-          <label style={s.label}>TITLE</label>
-          <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)} placeholder="e.g. Upper Strength" style={{ ...s.input, marginBottom: 12 }} />
-          <label style={s.label}>NOTES (optional)</label>
-          <input value={buildNotes} onChange={e => setBuildNotes(e.target.value)} placeholder="Focus points..." style={{ ...s.input, marginBottom: 12 }} />
-          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>EXERCISES</div>
-          {buildExercises.map((ex, i) => (
-            <div key={i} style={{ background: "var(--bg3)", borderRadius: 6, padding: 10, marginBottom: 8 }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-                <input
-                  value={ex.name}
-                  onChange={e => { const a=[...buildExercises]; a[i].name=e.target.value; setBuildExercises(a); }}
-                  placeholder="Exercise name..."
-                  style={{ ...s.input, flex: 2, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, marginBottom: 0 }}
-                />
-                <div onClick={() => { setLibraryPicker(i); loadLibraryList(); }}
-                  style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 10px", cursor: "pointer", flexShrink: 0 }}>
-                  <span style={{ fontSize: 14 }}>📚</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, alignSelf: "center" }}>
-                  <div onClick={() => {
-                    if (i === 0) return;
-                    const a = [...buildExercises]; [a[i-1], a[i]] = [a[i], a[i-1]]; setBuildExercises(a);
-                  }} style={{ color: i === 0 ? "var(--bg4)" : "var(--accent)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>▲</div>
-                  <div onClick={() => {
-                    if (i === buildExercises.length - 1) return;
-                    const a = [...buildExercises]; [a[i], a[i+1]] = [a[i+1], a[i]]; setBuildExercises(a);
-                  }} style={{ color: i === buildExercises.length - 1 ? "var(--bg4)" : "var(--accent)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>▼</div>
-                  <div onClick={() => setBuildExercises(buildExercises.filter((_,j)=>j!==i))}
-                    style={{ color: "var(--red-dim)", cursor: "pointer", fontSize: 14, padding: "0 6px", lineHeight: 1 }}>✕</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {[["Sets","sets",1,8],["Reps","reps",1,30],["kg","weight",0,500]].map(([lbl,key,min,max]) => (
-                  <div key={key} style={{ flex: 1 }}>
-                    <div style={{ fontSize: 9, color: "var(--gray2)", marginBottom: 2 }}>{lbl}</div>
-                    <input type="number" min={min} max={max} value={ex[key]} onChange={e => { const a=[...buildExercises]; a[i][key]=+e.target.value; setBuildExercises(a); }} style={{ ...s.input, padding: "8px 6px" }} />
-                  </div>
-                ))}
-              </div>
-              <input value={ex.notes} onChange={e => { const a=[...buildExercises]; a[i].notes=e.target.value; setBuildExercises(a); }} placeholder="Notes..." style={{ ...s.input, marginTop: 6, fontSize: 12 }} />
-            </div>
-          ))}
-          <button onClick={() => setBuildExercises([...buildExercises,{name:"",sets:3,reps:8,weight:0,notes:""}])} style={{ ...s.btnGhost, width: "100%", marginBottom: 10, fontSize: 12 }}>+ ADD EXERCISE</button>
-          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveProgramDay} disabled={saving}>{saving ? "SAVING..." : "SAVE PROGRAM DAY"}</button>
-          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => { setBuildMode(false); setEditingDay(null); }}>← CANCEL</button>
-        </div>
-      )}
+        );
+      })()}
 
+      {/* ── TEMPLATES ── */}
       {view === "templates" && !selectedClient && (
         <div>
           {tplMode === "list" && (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <div style={s.sectionLabel}>PROGRAM TEMPLATES</div>
+                <div style={s.sectionLabel}>PROGRAMME TEMPLATES</div>
                 <button onClick={() => setTplMode("create")} style={{ ...s.btn, width: "auto", padding: "8px 16px", fontSize: 12 }}>+ NEW</button>
-              </div>
-              <div style={{ ...s.card, borderColor: "rgba(184,134,11,0.5)", background: "rgba(184,134,11,0.06)", marginBottom: 16 }}>
-                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 10, color: "var(--accent)", letterSpacing: "0.2em", marginBottom: 8 }}>BUILT-IN PROGRAM</div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>DOM SIŁY — 8 WEEKS</div>
-                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>3 days/week · SBD + Kettlebell · 4 phases</div>
-                  </div>
-                  <button onClick={() => setTplMode("assign8wk")} style={{ ...s.btn, width: "auto", padding: "8px 14px", fontSize: 11, background: "var(--accent)", color: "#111" }}>ASSIGN →</button>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {[["Wk 1–2","FUNDAMENT 5×8","#4a9eff"],["Wk 3–4","BUDOWANIE 6×6","#f0a020"],["Wk 5–6","SIŁA 5×5","var(--red)"],["Wk 7–8","SZCZYT 5×3","#a78bfa"]].map(([wk,ph,col])=>(
-                    <div key={wk} style={{ background:"var(--bg3)", borderRadius:6, padding:"4px 10px", borderLeft:`2px solid ${col}`, fontSize:11 }}>{wk} · {ph}</div>
-                  ))}
-                </div>
               </div>
               {templates.length === 0 ? (
                 <div style={{ ...s.card, textAlign: "center", padding: 32 }}>
                   <div style={{ fontSize: 24, marginBottom: 8 }}>📁</div>
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 6 }}>NO TEMPLATES YET</div>
-                  <div style={{ fontSize: 13, color: "var(--gray)" }}>Create reusable program templates to assign to multiple athletes at once.</div>
+                  <div style={{ fontSize: 13, color: "var(--gray)" }}>Create a template to quickly assign a programme to multiple athletes.</div>
                 </div>
-              ) : (templates || []).map(tpl => (
+              ) : templates.map(tpl => (
                 <div key={tpl.id} style={{ ...s.card, marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div>
                       <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900 }}>{tpl.name}</div>
-                      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>{(tpl.days || []).length} days · {(tpl.days || []).reduce((s, d) => s + (d.exercises || []).filter(e => e.name).length, 0)} exercises</div>
+                      <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>{(tpl.days || []).length} days</div>
                     </div>
                     <button onClick={() => { setSelectedTpl(tpl); setTplWeekStart(1); setTplAssignClients([]); setTplMode("assign"); }}
                       style={{ ...s.btn, width: "auto", padding: "8px 14px", fontSize: 11 }}>ASSIGN →</button>
@@ -1217,7 +738,7 @@ if (existing) {
               <button onClick={() => setTplMode("list")} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>CREATE TEMPLATE</div>
               <label style={s.label}>TEMPLATE NAME</label>
-              <input value={tplName} onChange={e => setTplName(e.target.value)} placeholder="e.g. Week 1 Accumulation..." style={{ ...s.input, marginBottom: 16 }} />
+              <input value={tplName} onChange={e => setTplName(e.target.value)} placeholder="e.g. 8-Week Strength Block" style={{ ...s.input, marginBottom: 16 }} />
               {tplDays.map((tday, di) => (
                 <div key={di} style={{ ...s.card, marginBottom: 12, borderColor: "var(--red-dim)" }}>
                   <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -1228,11 +749,11 @@ if (existing) {
                       </select>
                     </div>
                     <div style={{ flex: 3 }}>
-                      <label style={s.label}>DAY TITLE</label>
+                      <label style={s.label}>TITLE</label>
                       <input value={tday.title} onChange={e => setTplDays(p => p.map((d, i) => i === di ? { ...d, title: e.target.value } : d))} placeholder="e.g. Squat / Deadlift" style={s.input} />
                     </div>
                     {tplDays.length > 1 && (
-                      <div onClick={() => setTplDays(p => p.filter((_, i) => i !== di))} style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "24px 4px 0", alignSelf: "flex-start" }}>✕</div>
+                      <div onClick={() => setTplDays(p => p.filter((_, i) => i !== di))} style={{ color: "var(--red-dim)", fontSize: 18, cursor: "pointer", padding: "24px 4px 0" }}>✕</div>
                     )}
                   </div>
                   {(tday.exercises || []).map((ex, ei) => (
@@ -1255,55 +776,13 @@ if (existing) {
             </div>
           )}
 
-          {tplMode === "assign8wk" && (
-            <div>
-              <button onClick={() => { setTplMode("list"); setAssign8wkClients([]); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>DOM SIŁY — 8-WEEK PROGRAM</div>
-              <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 16, padding: "10px 12px", background: "var(--bg3)", borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
-                ⚠️ This will write all 24 training days to the athlete's calendar (Weeks 1–8). Weights are left at 0 — coach adjusts individually.
-              </div>
-              <label style={s.label}>ATHLETE LEVEL</label>
-              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                {[["beginner","BEGINNER","#4a9eff"],["intermediate","INTERMEDIATE","#f0a020"],["advanced","ADVANCED","var(--red)"]].map(([val,label,col]) => (
-                  <div key={val} onClick={() => setAssign8wkLevel(val)}
-                    style={{ flex: 1, textAlign: "center", padding: "10px 6px", borderRadius: 6, cursor: "pointer",
-                      border: `2px solid ${assign8wkLevel === val ? col : "var(--border)"}`,
-                      background: assign8wkLevel === val ? col + "22" : "var(--bg3)",
-                      fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700,
-                      color: assign8wkLevel === val ? col : "var(--gray)" }}>
-                    {label}
-                  </div>
-                ))}
-              </div>
-              <label style={s.label}>SELECT ATHLETES</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                {athletes.map(a => {
-                  const selected = assign8wkClients.includes(a.id);
-                  return (
-                    <div key={a.id} onClick={() => setAssign8wkClients(p => selected ? p.filter(id => id !== a.id) : [...p, a.id])}
-                      style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", borderColor: selected ? "var(--accent)" : "var(--border)", padding: "12px 16px" }}>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{a.name || a.email}</div>
-                      <div style={{ width: 24, height: 24, borderRadius: 5, background: selected ? "var(--accent)" : "var(--bg3)", border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#111" }}>
-                        {selected ? "✓" : ""}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <button onClick={assign8WeekProgram} disabled={savingTpl || assign8wkClients.length === 0}
-                style={{ ...s.btn, background: "var(--accent)", color: "#111", opacity: savingTpl || assign8wkClients.length === 0 ? 0.5 : 1 }}>
-                {savingTpl ? "ASSIGNING..." : `ASSIGN 8 WEEKS TO ${assign8wkClients.length || "?"} ATHLETE${assign8wkClients.length !== 1 ? "S" : ""} →`}
-              </button>
-            </div>
-          )}
-
           {tplMode === "assign" && selectedTpl && (
             <div>
               <button onClick={() => { setTplMode("list"); setSelectedTpl(null); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>ASSIGN: {selectedTpl.name.toUpperCase()}</div>
-              <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 16 }}>{(selectedTpl.days || []).length} days · select athletes + week</div>
               <label style={s.label}>START WEEK</label>
-              <input type="number" min="1" max="8" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
+              <input type="number" min="1" max="12" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
+              <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 16 }}>ℹ️ Existing sessions for this week will be overwritten.</div>
               <label style={s.label}>SELECT ATHLETES</label>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                 {athletes.map(a => {
@@ -1328,14 +807,15 @@ if (existing) {
         </div>
       )}
 
+      {/* ── RANKS ── */}
       {view === "ranks" && !selectedClient && (
         <RanksCoachView athletes={athletes} authUser={{ id: "a6efb4f6-a5aa-4829-89c3-adb486cf187c" }} />
       )}
 
+      {/* ── DIET ── */}
       {view === "diet" && !selectedClient && (
         <div>
           <div style={s.sectionLabel}>DIET PLANS</div>
-          <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 16 }}>Upload PDF nutrition plans for your athletes.</div>
           <label style={s.label}>SELECT ATHLETE</label>
           <select value={dietClient || ""} onChange={e => { setDietClient(e.target.value || null); setDietFiles([]); if (e.target.value) loadDietFiles(e.target.value); }}
             style={{ ...s.input, marginBottom: 16 }}>
@@ -1348,30 +828,26 @@ if (existing) {
                 style={{ ...s.card, borderColor: dietUploading ? "var(--red)" : "var(--border)", borderStyle: "dashed", textAlign: "center", padding: "28px 16px", cursor: "pointer", marginBottom: 12 }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>{dietUploading ? "⏳" : "📄"}</div>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 900, marginBottom: 4 }}>{dietUploading ? "UPLOADING..." : "TAP TO UPLOAD PDF"}</div>
-                <div style={{ fontSize: 12, color: "var(--gray2)" }}>PDF files only · Max 10MB</div>
+                <div style={{ fontSize: 12, color: "var(--gray2)" }}>PDF only · Max 10MB</div>
               </div>
               <input ref={dietFileRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadDiet(f, dietClient); e.target.value = ""; }} />
               {dietError && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>⚠ {dietError}</div>}
-              {dietFiles.length > 0 && (
-                <>
-                  <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", marginBottom: 10, marginTop: 8 }}>UPLOADED PLANS</div>
-                  {(dietFiles || []).map((f, i) => (
-                    <div key={i} style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "12px 16px" }}>
-                      <div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>📄 {f.file_name}</div>
-                        <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
-                      </div>
-                      <a href={f.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, textDecoration: "none" }}>VIEW →</a>
-                    </div>
-                  ))}
-                </>
-              )}
+              {dietFiles.map((f, i) => (
+                <div key={i} style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>📄 {f.file_name}</div>
+                    <div style={{ fontSize: 11, color: "var(--gray2)" }}>{new Date(f.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                  </div>
+                  <a href={f.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, textDecoration: "none" }}>VIEW →</a>
+                </div>
+              ))}
             </>
           )}
         </div>
       )}
 
+      {/* ── LIBRARY PICKER ── */}
       {libraryPicker !== null && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "flex-end" }}
           onClick={() => setLibraryPicker(null)}>
@@ -1383,7 +859,7 @@ if (existing) {
             </div>
             <input value={libPickerSearch} onChange={e => setLibPickerSearch(e.target.value)} placeholder="Search..." style={{ ...s.input, marginBottom: 10 }} />
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-              {["All", "Squat", "Hinge", "Press", "Pull", "KB", "Accessories"].map(cat => (
+              {["All","Squat","Hinge","Press","Pull","KB","Accessories"].map(cat => (
                 <div key={cat} onClick={() => setLibPickerCat(cat)}
                   style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
                     background: libPickerCat === cat ? "var(--accent)" : "var(--bg3)", color: libPickerCat === cat ? "#fff" : "var(--gray)" }}>
@@ -1405,129 +881,6 @@ if (existing) {
           </div>
         </div>
       )}
-
-      {view === "addExercise" && selectedClient && (
-        <div style={{ ...s.card, marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 14, color: "var(--accent)" }}>ADD CUSTOM EXERCISE</div>
-          <label style={s.label}>EXERCISE NAME</label>
-          <input value={newEx.name} onChange={e => setNewEx({...newEx,name:e.target.value})} placeholder="e.g. DB Row" style={{ ...s.input, marginBottom: 10 }} />
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            {[["SETS","sets",1],["REPS","reps",1],["KG","weight",0],["RPE","rpe",0]].map(([lbl,key,min]) => (
-              <div key={key} style={{ flex: 1 }}><label style={s.label}>{lbl}</label><input type="number" min={min} value={newEx[key]} onChange={e => setNewEx({...newEx,[key]:+e.target.value})} style={s.input} /></div>
-            ))}
-          </div>
-          <label style={s.label}>UNIT</label>
-          <select value={newEx.unit} onChange={e => setNewEx({...newEx, unit: e.target.value})} style={{ ...s.input, marginBottom: 10 }}>
-            <option value="kg">kg (weight)</option>
-            <option value="sec">sec (time hold)</option>
-            <option value="m">m (distance)</option>
-            <option value="reps">reps only</option>
-          </select>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={newEx.day} onChange={e => setNewEx({...newEx,day:e.target.value})} style={s.input}>{["A","B","C","D"].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="8" value={newEx.week} onChange={e => setNewEx({...newEx,week:+e.target.value})} style={s.input} /></div>
-          </div>
-          <label style={s.label}>NOTES</label>
-          <input value={newEx.notes} onChange={e => setNewEx({...newEx,notes:e.target.value})} placeholder="Cues..." style={{ ...s.input, marginBottom: 10 }} />
-          <button style={{ ...s.btn, opacity: saving ? 0.6 : 1 }} onClick={saveExercise} disabled={saving}>{saving ? "SAVING..." : "SAVE EXERCISE"}</button>
-          <button style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("profile")}>← CANCEL</button>
-        </div>
-      )}
-
-      {view === "sessions" && !selectedClient && !selectedSession && (
-        <>
-          <div style={s.sectionLabel}>ALL SESSIONS</div>
-          {workouts.length === 0 ? (
-            <div style={{ ...s.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 13, color: "var(--gray)" }}>No sessions yet</div></div>
-          ) : workouts.map((w, i) => {
-            const client = clients.find(c => c.id === w.user_id);
-            const exs = w.exercises || [];
-            const doneExs = exs.filter(ex => ex.done || (ex.sets||[]).some(s=>s.done)).length;
-            const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
-            return (
-              <div key={i} onClick={() => { setSelectedSession(w); setCoachComment(w.coach_comment || ""); setCommentSaved(false); }}
-                style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${col}`, cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                      <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week}</div>
-                    </div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{w.workout_title?.replace(/DAY [ABCD] — /,"")}</div>
-                    <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>{fmtDate(w.created_at)} · {client?.name||"Athlete"}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 11, color: "var(--gray2)" }}>{doneExs}/{exs.length} done</div>
-                    {w.comment && <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 4 }}>💬 comment</div>}
-                    {w.video_link && <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 2 }}>▶ video</div>}
-                    <div style={{ fontSize: 12, color: "var(--gray2)", marginTop: 4 }}>VIEW ›</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </>
-      )}
-
-      {view === "sessions" && !selectedClient && selectedSession && (() => {
-        const w = selectedSession;
-        const client = clients.find(c => c.id === w.user_id);
-        const col = {A:"#4a9eff",B:"#f0a020",C:"var(--red)"}[w.day]||"var(--red)";
-        return (
-          <div>
-            <button onClick={() => setSelectedSession(null)} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
-            <div style={{ ...s.card, borderLeft: `3px solid ${col}`, marginBottom: 12 }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <div style={{ ...s.badge(col), fontSize: 10 }}>DAY {w.day}</div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)" }}>WK {w.week} · {fmtDate(w.created_at)}</div>
-              </div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>{w.workout_title?.replace(/DAY [ABCD] — /,"")}</div>
-              <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 2 }}>{client?.name || "Athlete"}</div>
-            </div>
-            {(w.exercises || []).map((ex, ei) => (
-              <div key={ei} style={{ ...s.card, marginBottom: 10, borderLeft: `3px solid ${ex.done ? "var(--red)" : "var(--border)"}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ex.result ? 8 : 0 }}>
-                  <div>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900 }}>{ex.name}</div>
-                    {ex.planned && <div style={{ fontSize: 11, color: "var(--gray2)" }}>Plan: {ex.planned.sets}×{ex.planned.reps} @ {ex.planned.weight}kg</div>}
-                  </div>
-                  <div style={{ fontSize: 12, color: ex.done ? "var(--red)" : "var(--gray2)", fontWeight: 700 }}>{ex.done ? "✓ DONE" : "—"}</div>
-                </div>
-                {ex.result && <div style={{ fontSize: 13, color: "var(--text)", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>{ex.result}</div>}
-              </div>
-            ))}
-            {w.comment && (
-              <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>💬 ATHLETE COMMENT</div>
-                <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, fontStyle: "italic" }}>{w.comment}</div>
-              </div>
-            )}
-            {w.video_link && (
-              <a href={w.video_link} target="_blank" rel="noopener noreferrer"
-                style={{ ...s.card, display: "flex", alignItems: "center", gap: 10, marginBottom: 12, borderColor: "var(--gold-dim)", textDecoration: "none", cursor: "pointer" }}>
-                <span style={{ fontSize: 24 }}>▶</span>
-                <div>
-                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>WATCH VIDEO FEEDBACK</div>
-                  <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2 }}>{w.video_link}</div>
-                </div>
-              </a>
-            )}
-            <div style={{ ...s.card, borderColor: "rgba(196,30,30,0.4)", background: "rgba(196,30,30,0.03)", marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: "var(--red)", letterSpacing: "0.15em", marginBottom: 8 }}>🎯 COACH FEEDBACK</div>
-              {w.coach_comment && !coachComment && (
-                <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, fontStyle: "italic", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", marginBottom: 10 }}>{w.coach_comment}</div>
-              )}
-              <textarea value={coachComment} onChange={e => setCoachComment(e.target.value)}
-                placeholder="Add feedback for this session..." rows={3}
-                style={{ ...s.input, resize: "none", lineHeight: 1.5, fontSize: 13, marginBottom: 10 }} />
-              <button onClick={saveCoachComment} disabled={savingComment || !coachComment.trim()}
-                style={{ ...s.btn, opacity: (savingComment || !coachComment.trim()) ? 0.5 : 1 }}>
-                {commentSaved ? "✓ FEEDBACK SENT" : savingComment ? "SAVING..." : "SEND FEEDBACK →"}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { generateWorkout, PHASES, getPhase } from "../engine/workout";
+import { PHASES, getPhase } from "../engine/workout";
 import { EMOMTimer } from "../components/SmallComponents";
 import { s } from "../lib/styles";
-
-// ─── helpers ────────────────────────────────────────────────────────────────
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
@@ -15,15 +13,9 @@ function getYouTubeEmbedUrl(url) {
   return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
 }
 
-function getSwingProtocol(week) {
-  if (week <= 4) return { minutes: 8 + (week - 1), reps: 10 + (week - 1), label: `${8 + (week - 1)} min × ${10 + (week - 1)} reps/min` };
-  if (week <= 8) return { minutes: 10, reps: 15, label: `10 min × 15 reps/min` };
-  return { minutes: 10, reps: 20, label: `10 min × 20 reps/min (Power EMOM)` };
-}
+// ─── WorkoutScreen ────────────────────────────────────────────────────────────
 
-// ─── WorkoutScreen ───────────────────────────────────────────────────────────
-
-export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoach }) {
+export function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
   const [coachProgram, setCoachProgram]       = useState(null);
   const [loadingProgram, setLoadingProgram]   = useState(true);
   const [exResults, setExResults]             = useState({});
@@ -34,9 +26,6 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
   const [videoLink, setVideoLink]             = useState("");
   const [saving, setSaving]                   = useState(false);
   const [saved, setSaved]                     = useState(false);
-  const [showTimer, setShowTimer]             = useState(false);
-  const [condDone, setCondDone]               = useState({});
-  const [accDone, setAccDone]                 = useState({});
 
   useEffect(() => {
     const load = async () => {
@@ -47,7 +36,8 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         const day = days && days.length > 0 ? days[0] : null;
         if (day) {
           const { data: exs } = await supabase.from("custom_exercises").select("*")
-            .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey);
+            .eq("athlete_id", authUser.id).eq("week", week).eq("day", dayKey)
+            .order("sort_order", { ascending: true }).order("created_at", { ascending: true });
           setCoachProgram({ ...day, exercises: exs || [] });
         }
       } catch (e) { console.error("WorkoutScreen load error:", e); }
@@ -78,43 +68,30 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
     setExResults(init);
   }, [coachProgram]);
 
-  const defaultWorkout = generateWorkout(dayKey, week, user?.level, user?.oneRM, user?.injuries);
-  const defaultStrengthExercises = defaultWorkout?.sections
-    ?.find(sec => sec.title?.startsWith("SIŁA") || sec.title === "STRENGTH")?.exercises || [];
-
-  const workout = coachProgram ? {
-    title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "COACH PROGRAM"}`,
-    exercises: (coachProgram.exercises && coachProgram.exercises.length > 0)
-      ? coachProgram.exercises
-      : defaultStrengthExercises,
-    notes: coachProgram.notes || (coachProgram.exercises?.length === 0
-      ? "⚠ Brak ćwiczeń w bazie dla tego dnia — wyświetlam program automatyczny."
-      : ""),
-  } : {
-    title: defaultWorkout?.title || `DAY ${dayKey}`,
-    exercises: defaultStrengthExercises,
-    notes: (authUser && hasCoach) ? "⚠ No program assigned for this day — showing default workout." : "",
-  };
-
   if (loadingProgram) return (
     <div style={s.screen}>
       <div style={{ textAlign: "center", padding: 60, color: "var(--gray)", fontSize: 13, letterSpacing: "0.1em" }}>LOADING...</div>
     </div>
   );
 
-  if (!workout) return (
+  // No coach program — show waiting screen
+  if (!coachProgram) return (
     <div style={s.screen}>
-      <div style={{ ...s.card, textAlign: "center", padding: 32, borderColor: "var(--red-dim)" }}>
-        <div style={{ fontSize: 24 }}>⏳</div>
-        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginTop: 8 }}>AWAITING YOUR PROGRAM</div>
-        <div style={{ fontSize: 13, color: "var(--gray)", marginTop: 6 }}>Your coach hasn't assigned this week yet. Check back soon!</div>
+      <div style={{ ...s.card, textAlign: "center", padding: 40, borderColor: "var(--border)" }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, marginBottom: 8 }}>
+          AWAITING YOUR PROGRAMME
+        </div>
+        <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>
+          Your coach hasn't assigned Day {dayKey} for Week {week} yet.{"\n"}Check back soon or message your coach.
+        </div>
       </div>
     </div>
   );
 
   const saveWorkout = async () => {
     setSaving(true);
-    const exercises = workout.exercises.map((ex, i) => ({
+    const exercises = coachProgram.exercises.map((ex, i) => ({
       name: ex.name,
       planned: { sets: ex.sets, reps: ex.reps, weight: ex.weight },
       result: exResults[i]?.result || "",
@@ -126,7 +103,7 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         await supabase.from("workouts").insert({
           user_id: au.id,
           week, day: dayKey,
-          workout_title: workout.title,
+          workout_title: `DAY ${dayKey} — ${coachProgram.title?.toUpperCase() || "TRAINING"}`,
           exercises,
           comment: athleteComment,
           video_link: videoLink,
@@ -137,24 +114,17 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
     setSaved(true);
   };
 
-  const phaseData = PHASES[getPhase(week)];
   const doneCount = Object.values(exResults).filter(r => r.done).length;
-  const totalExs = workout.exercises.length;
-
-  if (showTimer) {
-    const swing = getSwingProtocol(week);
-    return <EMOMTimer minutes={swing.minutes} targetReps={swing.reps} kgKB={user?.kgKB}
-      onDone={() => { setShowTimer(false); setCondDone(p => ({ ...p, swing: true })); }} />;
-  }
+  const totalExs = coachProgram.exercises.length;
 
   return (
     <div style={s.screen}>
-      {!coachProgram && <div style={{ ...s.phaseBar(phaseData.color) }} />}
-
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={s.sectionLabel}>{coachProgram ? `Week ${week}` : `Week ${week} · ${phaseData.name}`}</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900 }}>{workout.title}</div>
+          <div style={s.sectionLabel}>Week {week}</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900 }}>
+            DAY {dayKey} — {coachProgram.title?.toUpperCase()}
+          </div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, color: doneCount === totalExs && totalExs > 0 ? "var(--red)" : "var(--white)" }}>
@@ -168,14 +138,14 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
         <div style={{ height: "100%", width: `${totalExs > 0 ? (doneCount / totalExs) * 100 : 0}%`, background: "var(--red)", borderRadius: 2, transition: "width 0.3s ease" }} />
       </div>
 
-      {workout.notes ? (
+      {coachProgram.notes ? (
         <div style={{ ...s.card, borderColor: "rgba(200,160,40,0.4)", background: "rgba(200,160,40,0.05)", marginBottom: 14 }}>
           <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.15em", marginBottom: 6 }}>📋 COACH NOTES</div>
-          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>{workout.notes}</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>{coachProgram.notes}</div>
         </div>
       ) : null}
 
-      {workout.exercises.map((ex, ei) => {
+      {coachProgram.exercises.map((ex, ei) => {
         const res = exResults[ei] || { result: "", done: false };
         const videoUrl = libraryMap[ex.name];
         const histExpanded = expandedHistory[ei];
@@ -184,8 +154,7 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
             const found = (w.exercises || []).find(e => e.name === ex.name);
             return found ? { date: w.created_at, week: w.week, result: found.result, planned: found.planned, coach_comment: w.coach_comment } : null;
           })
-          .filter(Boolean)
-          .slice(0, 4);
+          .filter(Boolean).slice(0, 3);
         const embedUrl = getYouTubeEmbedUrl(videoUrl);
 
         return (
@@ -203,7 +172,7 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: "0.04em" }}>{ex.name}</div>
                   <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 2, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                    {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.reps}
+                    {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.unit === "m" ? `${ex.reps}m` : ex.reps}
                     {ex.rpe ? ` · RPE ${ex.rpe}` : ex.weight ? ` @ ${ex.weight}kg` : ""}
                   </div>
                   {ex.notes ? <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2, fontStyle: "italic" }}>{ex.notes}</div> : null}
@@ -211,14 +180,14 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
                 <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
                   style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",
                     border: `1px solid ${res.done ? "var(--red)" : "var(--border)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s" }}>
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer", transition: "all 0.2s", flexShrink: 0 }}>
                   {res.done ? "✓" : "○"}
                 </div>
               </div>
 
               <textarea value={res.result}
                 onChange={e => setExResults(p => ({ ...p, [ei]: { ...res, result: e.target.value } }))}
-                placeholder={`Result... e.g. 3×5 @ ${ex.weight || "?"}kg, RPE 8, felt strong`}
+                placeholder={`Result... e.g. 5×5 @ ${ex.weight || "?"}kg, RPE 8`}
                 rows={2} style={{ ...s.input, resize: "none", fontSize: 13, lineHeight: 1.5, marginBottom: 0 }} />
 
               {prevResults.length > 0 && (
@@ -232,22 +201,16 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
                     <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
                       {prevResults.map((pr, pi) => (
                         <div key={pi} style={{ background: "var(--bg3)", borderRadius: 6, padding: "6px 10px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
                             <div style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
                               WK {pr.week} · {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                             </div>
-                            {pr.planned && (
-                              <div style={{ fontSize: 10, color: "var(--gray2)" }}>
-                                Plan: {pr.planned.sets}×{pr.planned.reps}@{pr.planned.weight}kg
-                              </div>
-                            )}
+                            {pr.planned && <div style={{ fontSize: 10, color: "var(--gray2)" }}>Plan: {pr.planned.sets}×{pr.planned.reps}@{pr.planned.weight}kg</div>}
                           </div>
                           {pr.result
                             ? <div style={{ fontSize: 12, color: "var(--text)", marginTop: 3, lineHeight: 1.4 }}>{pr.result}</div>
                             : <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 3, fontStyle: "italic" }}>No result logged</div>}
-                          {pr.coach_comment && (
-                            <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontStyle: "italic" }}>🎯 {pr.coach_comment}</div>
-                          )}
+                          {pr.coach_comment && <div style={{ fontSize: 11, color: "var(--gold)", marginTop: 4, fontStyle: "italic" }}>🎯 {pr.coach_comment}</div>}
                         </div>
                       ))}
                     </div>
@@ -258,40 +221,6 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
           </div>
         );
       })}
-
-      {!coachProgram && defaultWorkout?.sections?.filter(sec => sec.title !== "STRENGTH").map((sec, si) => (
-        <div key={si} style={{ marginBottom: 20 }}>
-          <div style={{ ...s.sectionLabel, marginBottom: 8 }}>{sec.title}</div>
-          {sec.exercises && sec.title === "ACCESSORIES" && (
-            <div style={s.card}>
-              {sec.exercises.map((ex, ei) => (
-                <div key={ei} onClick={() => setAccDone(p => ({ ...p, [`${si}-${ei}`]: !p[`${si}-${ei}`] }))}
-                  style={{ ...s.exerciseRow, cursor: "pointer", ...(ei === sec.exercises.length - 1 ? { borderBottom: "none" } : {}) }}>
-                  <div style={{ flex: 1, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
-                    color: accDone[`${si}-${ei}`] ? "var(--gray2)" : "var(--white)",
-                    textDecoration: accDone[`${si}-${ei}`] ? "line-through" : "none" }}>
-                    {ex.name}
-                  </div>
-                  <div style={{ width: 28, height: 28, borderRadius: 5, background: accDone[`${si}-${ei}`] ? "var(--red)" : "var(--bg3)",
-                    border: `1px solid ${accDone[`${si}-${ei}`] ? "var(--red)" : "var(--border)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
-                    {accDone[`${si}-${ei}`] ? "✓" : "○"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {sec.swing && (
-            <div style={{ ...s.card, background: "rgba(196,30,30,0.05)", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{sec.swingData?.label}</div>
-              <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 12 }}>2-hand swing · {user?.kgKB}kg KB</div>
-              {!condDone.swing
-                ? <button style={s.btn} onClick={() => setShowTimer(true)}>⏱ LAUNCH EMOM TIMER</button>
-                : <div style={{ color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>✓ DONE</div>}
-            </div>
-          )}
-        </div>
-      ))}
 
       {!saved ? (
         <div style={s.card}>
@@ -319,30 +248,51 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete, hasCoa
   );
 }
 
-// ─── ScheduleScreen ──────────────────────────────────────────────────────────
+// ─── ScheduleScreen ───────────────────────────────────────────────────────────
 
-export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorkout }) {
+export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
   const [allDays, setAllDays]             = useState([]);
   const [completedDays, setCompletedDays] = useState({});
+  const [completedLogs, setCompletedLogs] = useState([]);
   const [loading, setLoading]             = useState(true);
+  const [expandedLog, setExpandedLog]     = useState(null);
+  const [showHistory, setShowHistory]     = useState(false);
+  const [editingLog, setEditingLog]       = useState(null);
+  const [editResult, setEditResult]       = useState("");
+  const [editIdx, setEditIdx]             = useState(null);
+  const [savingEdit, setSavingEdit]       = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!authUser) { setLoading(false); return; }
-      try {
-        const { data: days } = await supabase.from("program_days").select("*")
-          .eq("athlete_id", authUser.id).order("week", { ascending: true });
-        const { data: logs } = await supabase.from("workouts").select("week, day")
-          .eq("user_id", authUser.id);
-        const done = {};
-        (logs || []).forEach(l => { done[`${l.week}-${l.day}`] = true; });
-        setAllDays(days || []);
-        setCompletedDays(done);
-      } catch (e) {}
-      setLoading(false);
-    };
-    load();
-  }, [authUser]);
+  const load = async () => {
+    if (!authUser) { setLoading(false); return; }
+    try {
+      const { data: days } = await supabase.from("program_days").select("*")
+        .eq("athlete_id", authUser.id).order("week", { ascending: true });
+      const { data: logs } = await supabase.from("workouts").select("*")
+        .eq("user_id", authUser.id).order("created_at", { ascending: false });
+      const done = {};
+      (logs || []).forEach(l => { done[`${l.week}-${l.day}`] = true; });
+      setAllDays(days || []);
+      setCompletedDays(done);
+      setCompletedLogs(logs || []);
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [authUser]);
+
+  const saveExerciseResult = async (log, exIdx, newResult) => {
+    setSavingEdit(true);
+    try {
+      const updatedExercises = (log.exercises || []).map((ex, i) =>
+        i === exIdx ? { ...ex, result: newResult } : ex
+      );
+      await supabase.from("workouts").update({ exercises: updatedExercises }).eq("id", log.id);
+      setCompletedLogs(prev => prev.map(l => l.id === log.id ? { ...l, exercises: updatedExercises } : l));
+      setEditingLog(null);
+      setEditIdx(null);
+    } catch (e) { console.log("Edit error:", e); }
+    setSavingEdit(false);
+  };
 
   if (loading) return (
     <div style={s.screen}>
@@ -357,7 +307,9 @@ export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorko
   });
   const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
   const dayCol = { A: "#4a9eff", B: "#f0a020", C: "var(--red)", D: "#a78bfa" };
-  const currentWeek = weeks.find(w => byWeek[w].some(d => !completedDays[`${w}-${d.day}`])) || weeks[0] || week;
+  const currentWeek = weeks.find(w => byWeek[w].some(d => !completedDays[`${w}-${d.day}`])) || weeks[weeks.length - 1] || week;
+
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
   return (
     <div style={s.screen}>
@@ -365,33 +317,19 @@ export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorko
       <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: 20 }}>
         {allDays.length > 0
           ? `${Object.keys(completedDays).length} sessions completed · ${allDays.length - Object.keys(completedDays).length} remaining`
-          : hasCoach ? "No program assigned yet" : "Free 8-week program"}
+          : "No programme assigned yet — contact your coach"}
       </div>
 
-      {allDays.length === 0 && !hasCoach && (
-        <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 6 }}>⚡ FREE PROGRAM</div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 8 }}>8-WEEK AUTO PROGRAM</div>
-          <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, marginBottom: 12 }}>
-            Your program is auto-generated week by week. Go to HOME to start each session.
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {["A", "B", "C"].map(d => (
-              <div key={d} style={{ flex: 1, minWidth: 80, background: "var(--bg3)", borderRadius: 8, padding: "10px 8px", textAlign: "center", borderLeft: `3px solid ${dayCol[d]}` }}>
-                <div style={{ fontSize: 10, color: dayCol[d], fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em" }}>DAY {d}</div>
-                <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 4 }}>Wk {week}</div>
-                <button onClick={() => onStartWorkout(d)}
-                  style={{ marginTop: 8, fontSize: 10, padding: "4px 10px", background: "var(--red)", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
-                  START
-                </button>
-              </div>
-            ))}
-          </div>
+      {allDays.length === 0 && (
+        <div style={{ ...s.card, textAlign: "center", padding: 40, borderColor: "var(--border)" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 8 }}>AWAITING YOUR PROGRAMME</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>Your coach will assign your programme soon. Message them if you have questions.</div>
         </div>
       )}
 
       {weeks.map(wk => {
-        const wkDays = byWeek[wk];
+        const wkDays = byWeek[wk].sort((a, b) => a.day < b.day ? -1 : 1);
         const wkDone = wkDays.filter(d => completedDays[`${wk}-${d.day}`]).length;
         const isCurrentWk = wk === currentWeek;
         const isPast = wkDone === wkDays.length;
@@ -403,31 +341,39 @@ export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorko
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 900, color: isCurrentWk ? "var(--red)" : "var(--gray2)", letterSpacing: "0.08em" }}>
                 WEEK {wk}
               </div>
-              <div style={{ fontSize: 10, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 8px" }}>{phase?.name || ""}</div>
+              {phase?.name && <div style={{ fontSize: 10, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 8px" }}>{phase.name}</div>}
               <div style={{ marginLeft: "auto", fontSize: 11, color: isPast ? "var(--red)" : isCurrentWk ? "var(--gold)" : "var(--gray2)" }}>
                 {isPast ? "✓ DONE" : `${wkDone}/${wkDays.length}`}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {wkDays.sort((a, b) => a.day < b.day ? -1 : 1).map(d => {
+              {wkDays.map(d => {
                 const isDone = completedDays[`${wk}-${d.day}`];
                 const col = dayCol[d.day] || "var(--red)";
                 return (
-                  <div key={d.id} style={{ ...s.card, borderLeft: `3px solid ${isDone ? "rgba(196,30,30,0.5)" : col}`, opacity: isDone ? 0.6 : 1, padding: "12px 16px" }}>
+                  <div key={d.id} style={{ ...s.card, borderLeft: `3px solid ${isDone ? "rgba(196,30,30,0.4)" : col}`, padding: "12px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
-                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: col, letterSpacing: "0.1em" }}>DAY {d.day}</div>
+                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 900, color: isDone ? "var(--gray2)" : col, letterSpacing: "0.1em" }}>DAY {d.day}</div>
                           {isDone && <div style={{ fontSize: 10, color: "var(--red)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>✓ COMPLETED</div>}
                         </div>
-                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{d.title || `Day ${d.day}`}</div>
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: isDone ? "var(--gray)" : "var(--text)" }}>{d.title || `Day ${d.day}`}</div>
                       </div>
-                      {!isDone && isCurrentWk && (
-                        <button onClick={() => { setWeek(wk); onStartWorkout(d.day); }}
-                          style={{ padding: "8px 16px", background: "var(--red)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 12, cursor: "pointer", letterSpacing: "0.08em" }}>
-                          START →
-                        </button>
-                      )}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {isDone && (
+                          <button onClick={() => { setWeek(wk); onStartWorkout(d.day); }}
+                            style={{ padding: "6px 12px", background: "transparent", border: "1px solid var(--border)", borderRadius: 6, color: "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                            REDO
+                          </button>
+                        )}
+                        {!isDone && (
+                          <button onClick={() => { setWeek(wk); onStartWorkout(d.day); }}
+                            style={{ padding: "8px 16px", background: "var(--red)", border: "none", borderRadius: 6, color: "#fff", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 12, cursor: "pointer", letterSpacing: "0.08em" }}>
+                            START →
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -449,6 +395,106 @@ export function ScheduleScreen({ authUser, hasCoach, week, setWeek, onStartWorko
             <span>{Object.keys(completedDays).length} completed</span>
             <span>{allDays.length} total sessions</span>
           </div>
+        </div>
+      )}
+
+      {/* ── HISTORY ── */}
+      {completedLogs.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <div style={{ height: 1, background: "var(--border)", marginBottom: 20 }} />
+          <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.2em", marginBottom: 6, fontFamily: "'Barlow Condensed', sans-serif" }}>
+            YOUR TRAINING LOG
+          </div>
+          <div onClick={() => setShowHistory(v => !v)}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: 8 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900 }}>
+              📋 WORKOUT HISTORY
+            </div>
+            <div style={{ fontSize: 12, color: "var(--accent)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+              {completedLogs.length} sessions
+              <span style={{ fontSize: 16, color: "var(--gray2)" }}>{showHistory ? " ▲" : " ▼"}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--gray)", marginBottom: showHistory ? 12 : 0, lineHeight: 1.5 }}>
+            {showHistory ? "Tap any session to expand. Tap EDIT to update a result." : "Your full session log — tap to expand and edit results."}
+          </div>
+
+          {showHistory && completedLogs.map((log, idx) => {
+            const col = dayCol[log.day] || "var(--red)";
+            const isOpen = expandedLog === idx;
+            const hasCoachFeedback = !!log.coach_comment;
+
+            return (
+              <div key={log.id || idx} style={{ ...s.card, marginBottom: 8, borderLeft: `3px solid ${hasCoachFeedback ? "var(--gold)" : col}`, padding: "12px 14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                  onClick={() => setExpandedLog(isOpen ? null : idx)}>
+                  <div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3, flexWrap: "wrap" }}>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 900, color: col }}>DAY {log.day}</div>
+                      <div style={{ fontSize: 10, color: "var(--gray2)", fontFamily: "'Barlow Condensed', sans-serif" }}>WK {log.week}</div>
+                      {hasCoachFeedback && (
+                        <div style={{ fontSize: 9, background: "rgba(201,168,76,0.15)", color: "var(--gold)", padding: "2px 6px", borderRadius: 3, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                          🎯 FEEDBACK
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, marginBottom: 2 }}>
+                      {(log.workout_title || "").replace(/DAY [ABCD] — /, "")}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--gray)" }}>{fmtDate(log.created_at)}</div>
+                  </div>
+                  <div style={{ fontSize: 18, color: "var(--gray2)", paddingLeft: 8 }}>{isOpen ? "▲" : "▼"}</div>
+                </div>
+
+                {isOpen && (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                    {(log.exercises || []).map((ex, ei) => {
+                      const isEditing = editingLog === log.id && editIdx === ei;
+                      return (
+                        <div key={ei} style={{ marginBottom: 10 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, color: col }}>{ex.name}</div>
+                            <div onClick={() => {
+                              if (isEditing) { setEditingLog(null); setEditIdx(null); }
+                              else { setEditingLog(log.id); setEditIdx(ei); setEditResult(ex.result || ""); }
+                            }} style={{ fontSize: 11, color: "var(--accent)", cursor: "pointer", padding: "2px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                              {isEditing ? "CANCEL" : "EDIT"}
+                            </div>
+                          </div>
+                          {isEditing ? (
+                            <div>
+                              <textarea value={editResult} onChange={e => setEditResult(e.target.value)} rows={2}
+                                style={{ ...s.input, resize: "none", fontSize: 13, marginBottom: 6 }} />
+                              <button onClick={() => saveExerciseResult(log, ei, editResult)} disabled={savingEdit}
+                                style={{ ...s.btn, fontSize: 12, padding: "8px 16px", opacity: savingEdit ? 0.6 : 1 }}>
+                                {savingEdit ? "SAVING..." : "SAVE ✓"}
+                              </button>
+                            </div>
+                          ) : (
+                            ex.result
+                              ? <div style={{ fontSize: 13, color: "var(--text)", background: "var(--bg3)", borderRadius: 4, padding: "5px 8px" }}>{ex.result}</div>
+                              : <div style={{ fontSize: 11, color: "var(--gray2)", fontStyle: "italic" }}>No result logged — tap EDIT to add</div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {log.comment && (
+                      <div style={{ fontSize: 12, color: "var(--gray)", fontStyle: "italic", background: "var(--bg3)", borderRadius: 4, padding: "8px 10px", marginTop: 8, borderLeft: `2px solid ${col}` }}>
+                        💬 {log.comment}
+                      </div>
+                    )}
+                    {log.coach_comment && (
+                      <div style={{ fontSize: 13, color: "var(--text)", background: "rgba(201,168,76,0.06)", borderRadius: 6, padding: "10px 12px", marginTop: 8, border: "1px solid rgba(201,168,76,0.2)" }}>
+                        <div style={{ fontSize: 10, color: "var(--gold)", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.15em", marginBottom: 4 }}>🎯 COACH FEEDBACK</div>
+                        {log.coach_comment}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

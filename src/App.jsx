@@ -222,8 +222,8 @@ export default function App() {
         {tab === "profile"   && <ProfileScreen user={user} authUser={authUser} />}
 
         {/* ATHLETE SCREENS */}
-        {tab === "train" && !activeDay && <ScheduleScreen authUser={authUser} hasCoach={hasCoach} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("train"); }} />}
-        {tab === "train" && activeDay   && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} hasCoach={hasCoach} />}
+        {tab === "train" && !activeDay && <ScheduleScreen authUser={authUser} week={week} setWeek={setWeek} onStartWorkout={(day) => { setActiveDay(day); setTab("train"); }} />}
+        {tab === "train" && activeDay   && <WorkoutScreen user={user} week={week} dayKey={activeDay} authUser={authUser} onComplete={handleWorkoutDone} />}
         {tab === "nutrition" && <NutritionScreen authUser={authUser} user={user} />}
         {tab === "history"   && <HistoryScreen authUser={authUser} />}
         {tab === "progress"  && <ProgressScreen user={user} week={week} />}

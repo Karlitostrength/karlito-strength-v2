@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { sendPushToUser } from "../lib/push";
 import { s } from "../lib/styles";
 import { RanksCoachView } from "../components/RankComponents";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export function CoachScreen() {
   const [clients, setClients]           = useState([]);
@@ -45,6 +46,11 @@ export function CoachScreen() {
   const [copyWeekTo, setCopyWeekTo]     = useState(2);
   const [copyingWeek, setCopyingWeek]   = useState(false);
   const [showCopyWeek, setShowCopyWeek] = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [newClient, setNewClient]           = useState({ name: "", email: "", password: "" });
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [createClientError, setCreateClientError] = useState("");
+  const [clientChartEx, setClientChartEx]   = useState("");
   const [clientFilter, setClientFilter] = useState("all"); // all | active | inactive
 
   // ── DATA ──────────────────────────────────────────────────────────────────
@@ -68,6 +74,57 @@ export function CoachScreen() {
   const loadTemplates = async () => {
     const { data } = await supabase.from("program_templates").select("*").order("created_at", { ascending: false });
     setTemplates(data || []);
+  };
+
+  const createAthlete = async () => {
+    if (!newClient.name || !newClient.email || !newClient.password) return;
+    setCreatingClient(true);
+    setCreateClientError("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-athlete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify(newClient),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setShowCreateClient(false);
+      const created = { ...newClient };
+      setNewClient({ name: "", email: "", password: "" });
+      await loadData();
+      alert(`✅ ${created.name} created!\nLogin: ${created.email}\nPassword: ${created.password}`);
+    } catch(e) {
+      setCreateClientError(e.message || "Error creating client");
+    }
+    setCreatingClient(false);
+  };
+
+  const buildClientChart = (clientId, exerciseName) => {
+    if (!exerciseName || !clientId) return [];
+    return workouts
+      .filter(w => w.user_id === clientId)
+      .map(w => {
+        const ex = (w.exercises || []).find(e => e.name === exerciseName);
+        if (!ex) return null;
+        const weight = (() => {
+          if (ex.result) {
+            const m = ex.result.match(/(\d+(?:\.\d+)?)\s*kg/i);
+            if (m) return parseFloat(m[1]);
+          }
+          return ex.planned?.weight || 0;
+        })();
+        if (!weight) return null;
+        return {
+          date: new Date(w.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          weight,
+        };
+      })
+      .filter(Boolean)
+      .reverse();
   };
 
   useEffect(() => { loadData(); loadTemplates(); }, []);
@@ -365,7 +422,13 @@ export function CoachScreen() {
             ))}
           </div>
 
-          <div style={s.sectionLabel}>ATHLETE STATUS</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.15em", fontFamily: "'Barlow Condensed', sans-serif" }}>ATHLETE STATUS</div>
+            <button onClick={() => setShowCreateClient(true)}
+              style={{ ...s.btn, width: "auto", padding: "7px 14px", fontSize: 12 }}>
+              + ADD CLIENT
+            </button>
+          </div>
           {athletes.map(a => {
             const isActive = wksThisWeek(a.id) > 0;
             const last = lastWorkout(a.id);
@@ -512,6 +575,48 @@ export function CoachScreen() {
           )}
 
           {/* Recent workouts */}
+          {clientWorkouts.length >= 2 && (() => {
+            const allExNames = [...new Set(
+              clientWorkouts.flatMap(w => (w.exercises || []).map(e => e.name)).filter(Boolean)
+            )].sort();
+            const currentEx = clientChartEx || allExNames[0] || "";
+            const chartData = buildClientChart(selectedClient, currentEx);
+            return (
+              <div style={{ ...s.card, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 10 }}>📈 PROGRESS CHART</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                  {allExNames.map(name => (
+                    <div key={name} onClick={() => setClientChartEx(name)}
+                      style={{ padding: "4px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer",
+                        fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
+                        background: currentEx === name ? "var(--red)" : "var(--bg3)",
+                        color: currentEx === name ? "#fff" : "var(--gray)" }}>
+                      {name}
+                    </div>
+                  ))}
+                </div>
+                {chartData.length >= 2 ? (
+                  <ResponsiveContainer width="100%" height={160}>
+                    <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
+                      <YAxis tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={false} />
+                      <Tooltip
+                        contentStyle={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }}
+                        formatter={(v) => [`${v}kg`, "Weight"]}
+                      />
+                      <Line type="monotone" dataKey="weight" stroke="var(--red)" strokeWidth={2.5} dot={{ fill: "var(--red)", r: 3 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ fontSize: 12, color: "var(--gray2)", textAlign: "center", padding: 16 }}>
+                    Need 2+ sessions with {currentEx} to show trend
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {clientWorkouts.length > 0 && (
             <div style={{ ...s.card, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>RECENT SESSIONS</div>
@@ -919,6 +1024,45 @@ export function CoachScreen() {
                   <div style={{ fontSize: 11, color: "var(--gray2)", background: "var(--bg3)", borderRadius: 4, padding: "2px 8px" }}>{ex.category}</div>
                 </div>
               ))}
+          </div>
+        </div>
+      )}
+      {/* ── CREATE CLIENT MODAL ── */}
+      {showCreateClient && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowCreateClient(false)}>
+          <div style={{ width: "100%", background: "var(--bg2)", borderRadius: "16px 16px 0 0", padding: 24, maxHeight: "80vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>
+              ➕ CREATE NEW CLIENT
+            </div>
+            <div style={{ fontSize: 12, color: "var(--gray2)", marginBottom: 20 }}>
+              Creates their account — share credentials with client
+            </div>
+            <label style={s.label}>FULL NAME</label>
+            <input value={newClient.name} onChange={e => setNewClient(p => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. John Smith" style={{ ...s.input, marginBottom: 12 }} />
+            <label style={s.label}>EMAIL</label>
+            <input type="email" value={newClient.email} onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))}
+              placeholder="client@email.com" style={{ ...s.input, marginBottom: 12 }} />
+            <label style={s.label}>TEMPORARY PASSWORD</label>
+            <input type="text" value={newClient.password} onChange={e => setNewClient(p => ({ ...p, password: e.target.value }))}
+              placeholder="e.g. KarlitoStrength2025" style={{ ...s.input, marginBottom: 8 }} />
+            <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 16, lineHeight: 1.5 }}>
+              ℹ️ Share these credentials with your client. They can change password in their profile.
+            </div>
+            {createClientError && (
+              <div style={{ fontSize: 12, color: "var(--red)", background: "rgba(196,30,30,0.1)", padding: "8px 12px", borderRadius: 6, marginBottom: 12 }}>
+                ⚠ {createClientError}
+              </div>
+            )}
+            <button onClick={createAthlete}
+              disabled={creatingClient || !newClient.name || !newClient.email || !newClient.password}
+              style={{ ...s.btn, opacity: (creatingClient || !newClient.name || !newClient.email || !newClient.password) ? 0.5 : 1, marginBottom: 10 }}>
+              {creatingClient ? "CREATING..." : "CREATE CLIENT →"}
+            </button>
+            <button onClick={() => { setShowCreateClient(false); setCreateClientError(""); }}
+              style={{ ...s.btnGhost, fontSize: 13 }}>CANCEL</button>
           </div>
         </div>
       )}

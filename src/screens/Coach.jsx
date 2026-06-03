@@ -503,6 +503,75 @@ export function CoachScreen() {
             </div>
           )}
 
+          {/* INTAKE */}
+          {(selectedClientData.date_of_birth || selectedClientData.training_goal || selectedClientData.injuries || selectedClientData.phone) && (
+            <div style={{ ...s.card, marginBottom: 12, borderColor: "rgba(201,168,76,0.2)" }}>
+              <div style={{ fontSize: 10, color: "var(--gold)", letterSpacing: "0.2em", marginBottom: 12, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>📝 INTAKE FORM</div>
+
+              {selectedClientData.date_of_birth && (() => {
+                const dob = new Date(selectedClientData.date_of_birth);
+                const today = new Date();
+                const age = today.getFullYear() - dob.getFullYear() - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+                const nextBday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+                if (nextBday < today) nextBday.setFullYear(today.getFullYear() + 1);
+                const daysUntil = Math.ceil((nextBday - today) / 86400000);
+                const isSoon = daysUntil <= 7;
+                return (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 2 }}>DATE OF BIRTH</div>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>
+                        {dob.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} · {age} yrs
+                      </div>
+                    </div>
+                    {isSoon && (
+                      <div style={{ background: "rgba(201,168,76,0.15)", color: "var(--gold)", fontSize: 11, padding: "4px 10px", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                        🎂 {daysUntil === 0 ? "TODAY!" : `${daysUntil}d`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  ["PHONE", selectedClientData.phone],
+                  ["GENDER", selectedClientData.gender],
+                  ["SESSIONS/WK", selectedClientData.sessions_per_week ? `${selectedClientData.sessions_per_week}× per week` : null],
+                  ["EQUIPMENT", selectedClientData.equipment],
+                ].filter(([,v]) => v).map(([label, val]) => (
+                  <div key={label} style={{ background: "var(--bg3)", borderRadius: 6, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: 13, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedClientData.training_goal && (
+                <div style={{ marginTop: 10, background: "var(--bg3)", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>GOAL</div>
+                  <div style={{ fontSize: 13, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                    {{"get_stronger":"Get stronger (barbell)","kettlebells":"Learn kettlebells","lose_weight":"Lose weight & build muscle","compete":"Compete in KB sport","general_fitness":"General fitness","rehab":"Injury rehab"}[selectedClientData.training_goal] || selectedClientData.training_goal}
+                  </div>
+                </div>
+              )}
+              {selectedClientData.training_history && (
+                <div style={{ marginTop: 8, background: "var(--bg3)", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "var(--gray2)", letterSpacing: "0.1em", marginBottom: 3 }}>TRAINING HISTORY</div>
+                  <div style={{ fontSize: 13, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>
+                    {{"never":"Never trained","beginner":"Less than 1 year","intermediate":"1–3 years","advanced":"3+ years (advanced)"}[selectedClientData.training_history] || selectedClientData.training_history}
+                  </div>
+                </div>
+              )}
+              {selectedClientData.injuries && (
+                <div style={{ marginTop: 8, background: "rgba(196,30,30,0.06)", border: "1px solid rgba(196,30,30,0.2)", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: "var(--red)", letterSpacing: "0.1em", marginBottom: 3 }}>⚠ INJURIES / LIMITATIONS</div>
+                  <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>{selectedClientData.injuries}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Program actions */}
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button onClick={() => setBuildMode(true)} style={{ ...s.btn, flex: 1, fontSize: 12, padding: "10px" }}>+ PROGRAMME DAY</button>

@@ -22,7 +22,7 @@ export function SplashScreen({ onDone }) {
         position: "absolute", inset: 0,
         backgroundImage: "url('/karlito.jpg')",
         backgroundSize: "cover",
-        backgroundPosition: "center 35%",
+        backgroundPosition: "center 65%",
         filter: "grayscale(100%) contrast(1.15)",
         opacity: phase === "in" ? 0 : 1,
         transition: "opacity 0.8s ease",

@@ -1,24 +1,31 @@
-{
-  "name": "Karlito Strength",
-  "short_name": "Karlito",
-  "description": "Strength training coaching app",
-  "start_url": "/",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#080808",
-  "theme_color": "#080808",
-  "icons": [
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
-}
+const CACHE = "karlito-v1";
+const ASSETS = [
+  "/",
+  "/index.html",
+];
+
+self.addEventListener("install", e => {
+  e.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", e => {
+  // Network first — always fresh data from Supabase
+  if (e.request.url.includes("supabase.co")) return;
+
+  e.respondWith(
+    fetch(e.request)
+      .catch(() => caches.match(e.request))
+  );
+});

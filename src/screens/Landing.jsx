@@ -157,7 +157,7 @@ export function LandingScreen({ onSignUp }) {
             <img
               src="/karlito.jpg"
               alt="Karol competing in kettlebell sport"
-              style={{ width: "100%", maxHeight: 480, objectFit: "cover", objectPosition: "center 20%", display: "block", filter: "brightness(0.88) contrast(1.05)" }}
+              style={{ width: "100%", maxHeight: 600, objectFit: "contain", objectPosition: "center center", display: "block", filter: "brightness(0.88) contrast(1.05)", background: "#07090c" }}
             />
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 16px", background: "linear-gradient(0deg, rgba(7,9,12,0.9) 0%, transparent 100%)" }}>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: "0.2em", color: "var(--gold)", opacity: 0.8 }}>COMPETING AT NATIONAL LEVEL · KETTLEBELL SPORT</div>

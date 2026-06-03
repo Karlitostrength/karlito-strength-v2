@@ -287,6 +287,22 @@ function IntakeForm({ authUser }) {
 
 export function ProfileScreen({ user, authUser }) {
   const [profileTab, setProfileTab] = useState("profile");
+  const [intakeCompleted, setIntakeCompleted] = useState(true); // assume done, check on load
+
+  useEffect(() => {
+    const checkIntake = async () => {
+      try {
+        const { data } = await supabase.from("profiles")
+          .select("intake_completed")
+          .eq("id", authUser.id).single();
+        if (data && !data.intake_completed) {
+          setIntakeCompleted(false);
+          setProfileTab("intake"); // auto-switch to intake tab
+        }
+      } catch (e) {}
+    };
+    checkIntake();
+  }, [authUser]);
   const [goals, setGoals] = useState({ main_goal: "", competition_date: "", notes: "" });
   const [savingGoals, setSavingGoals] = useState(false);
   const [goalsSaved, setGoalsSaved] = useState(false);

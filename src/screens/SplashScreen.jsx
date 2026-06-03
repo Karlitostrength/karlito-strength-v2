@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export function SplashScreen({ onDone }) {
-  const [phase, setPhase] = useState("in"); // in | hold | out
+  const [phase, setPhase] = useState("in");
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("out"), 2400);
@@ -17,23 +17,21 @@ export function SplashScreen({ onDone }) {
       opacity: phase === "out" ? 0 : 1,
       transition: phase === "out" ? "opacity 0.6s ease" : "none",
     }}>
-
       {/* PHOTO — full bleed, B&W */}
       <div style={{
         position: "absolute", inset: 0,
-        backgroundImage: "url('/hero.jpg')",
+        backgroundImage: "url('/karlito.jpg')",
         backgroundSize: "cover",
-        backgroundPosition: "center 20%",
+        backgroundPosition: "center 15%",
         filter: "grayscale(100%) contrast(1.15)",
         opacity: phase === "in" ? 0 : 1,
         transition: "opacity 0.8s ease",
-        animation: phase === "in" ? "none" : "none",
       }} />
 
       {/* dark gradient overlay */}
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(180deg, rgba(7,9,12,0.3) 0%, rgba(7,9,12,0.1) 40%, rgba(7,9,12,0.7) 80%, rgba(7,9,12,0.95) 100%)",
+        background: "linear-gradient(180deg, rgba(7,9,12,0.2) 0%, rgba(7,9,12,0.05) 40%, rgba(7,9,12,0.75) 80%, rgba(7,9,12,0.97) 100%)",
       }} />
 
       {/* gold vertical line left */}
@@ -63,26 +61,23 @@ export function SplashScreen({ onDone }) {
           KARLITO <span style={{ color: "#c9a84c" }}>STRENGTH</span>
         </div>
         <div style={{
-          fontFamily: "'Cinzel', serif",
-          fontSize: 9, letterSpacing: "0.4em",
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 10, letterSpacing: "0.35em",
           color: "rgba(201,168,76,0.6)",
           textTransform: "uppercase",
         }}>
-          Ferrum · Sanguis · Gloria
+          Move · Lift · Last
         </div>
       </div>
 
-      {/* PHOTO fade-in trigger */}
       <PhotoReveal phase={phase} setPhase={setPhase} />
-
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Cinzel+Decorative:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Cinzel+Decorative:wght@700&family=Barlow+Condensed:wght@600&display=swap');
       `}</style>
     </div>
   );
 }
 
-// triggers photo fade-in after mount
 function PhotoReveal({ phase, setPhase }) {
   useEffect(() => {
     const t = setTimeout(() => setPhase("hold"), 50);

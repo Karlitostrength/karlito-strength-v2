@@ -20,7 +20,7 @@ export function SplashScreen({ onDone }) {
       {/* PHOTO — full bleed, B&W */}
       <div style={{
         position: "absolute", inset: 0,
-        backgroundImage: "url('/karlito%201.jpg')",
+        backgroundImage: "url('/karlito%20(1).jpg')",
         backgroundSize: "contain",
         backgroundPosition: "center center",
         backgroundRepeat: "no-repeat",

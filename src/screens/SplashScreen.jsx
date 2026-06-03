@@ -20,9 +20,10 @@ export function SplashScreen({ onDone }) {
       {/* PHOTO — full bleed, B&W */}
       <div style={{
         position: "absolute", inset: 0,
-        backgroundImage: "url('/karlito.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center 45%",
+        backgroundImage: "url('/karlito%201.jpg')",
+        backgroundSize: "contain",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
         filter: "grayscale(100%) contrast(1.15)",
         opacity: phase === "in" ? 0 : 1,
         transition: "opacity 0.8s ease",

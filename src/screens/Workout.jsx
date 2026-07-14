@@ -261,6 +261,12 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
   const [editResult, setEditResult]       = useState("");
   const [editIdx, setEditIdx]             = useState(null);
   const [savingEdit, setSavingEdit]       = useState(false);
+  const [showQuickLog, setShowQuickLog]   = useState(false);
+  const [qlTitle, setQlTitle]             = useState("");
+  const [qlExercises, setQlExercises]     = useState([{ name: "", sets: "", reps: "", weight: "", notes: "" }]);
+  const [qlComment, setQlComment]         = useState("");
+  const [qlSaving, setQlSaving]           = useState(false);
+  const [qlSaved, setQlSaved]             = useState(false);
 
   const load = async () => {
     if (!authUser) { setLoading(false); return; }
@@ -294,6 +300,37 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
     setSavingEdit(false);
   };
 
+  const saveQuickLog = async () => {
+    if (!qlTitle.trim()) return;
+    setQlSaving(true);
+    const exercises = qlExercises
+      .filter(e => e.name.trim())
+      .map(e => ({
+        name: e.name,
+        result: [e.sets && e.reps ? `${e.sets}×${e.reps}` : "", e.weight ? `@ ${e.weight}kg` : "", e.notes].filter(Boolean).join(" "),
+        done: true,
+      }));
+    try {
+      const { data: { user: au } } = await supabase.auth.getUser();
+      if (au) {
+        await supabase.from("workouts").insert({
+          user_id: au.id,
+          week: 0,
+          day: "Q",
+          workout_title: qlTitle,
+          exercises,
+          comment: qlComment,
+        });
+        setQlSaved(true);
+        setQlTitle("");
+        setQlExercises([{ name: "", sets: "", reps: "", weight: "", notes: "" }]);
+        setQlComment("");
+        setTimeout(() => { setQlSaved(false); setShowQuickLog(false); load(); }, 1500);
+      }
+    } catch (e) { console.log("QuickLog save error:", e); }
+    setQlSaving(false);
+  };
+
   if (loading) return (
     <div style={s.screen}>
       <div style={{ textAlign: "center", padding: 60, color: "var(--gray)", fontSize: 13, letterSpacing: "0.1em" }}>LOADING...</div>
@@ -324,7 +361,83 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
         <div style={{ ...s.card, textAlign: "center", padding: 40, borderColor: "var(--border)" }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 8 }}>AWAITING YOUR PROGRAMME</div>
-          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6 }}>Your coach will assign your programme soon. Message them if you have questions.</div>
+          <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, marginBottom: 20 }}>Your coach will assign your programme soon. Message them if you have questions.</div>
+          <button onClick={() => setShowQuickLog(true)} style={{ ...s.btn, fontSize: 13 }}>+ LOG A SESSION →</button>
+        </div>
+      )}
+
+      {allDays.length > 0 && (
+        <div style={{ marginBottom: 16, textAlign: "right" }}>
+          <button onClick={() => setShowQuickLog(true)}
+            style={{ ...s.btnGhost, width: "auto", padding: "8px 16px", fontSize: 12 }}>
+            + QUICK LOG
+          </button>
+        </div>
+      )}
+
+      {showQuickLog && (
+        <div style={{ ...s.card, marginBottom: 16, borderColor: "var(--red-dim)" }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, color: "var(--accent)", marginBottom: 16 }}>
+            📝 LOG SESSION
+          </div>
+
+          <label style={s.label}>SESSION TITLE</label>
+          <input value={qlTitle} onChange={e => setQlTitle(e.target.value)}
+            placeholder="e.g. Upper Body, Kettlebell, Legs..."
+            style={{ ...s.input, marginBottom: 16 }} />
+
+          <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 10 }}>EXERCISES</div>
+
+          {qlExercises.map((ex, i) => (
+            <div key={i} style={{ background: "var(--bg3)", borderRadius: 8, padding: 12, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                <input value={ex.name} onChange={e => { const a=[...qlExercises]; a[i].name=e.target.value; setQlExercises(a); }}
+                  placeholder="Exercise name..."
+                  style={{ ...s.input, flex: 1, marginBottom: 0, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }} />
+                {qlExercises.length > 1 && (
+                  <div onClick={() => setQlExercises(qlExercises.filter((_,j) => j !== i))}
+                    style={{ color: "var(--gray2)", fontSize: 18, cursor: "pointer", padding: "0 4px", flexShrink: 0 }}>✕</div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[["Sets","sets"],["Reps","reps"],["kg","weight"]].map(([lbl, key]) => (
+                  <div key={key} style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, color: "var(--gray2)", marginBottom: 3 }}>{lbl}</div>
+                    <input type="number" value={ex[key]}
+                      onChange={e => { const a=[...qlExercises]; a[i][key]=e.target.value; setQlExercises(a); }}
+                      placeholder="—" style={{ ...s.input, padding: "8px 6px", textAlign: "center" }} />
+                  </div>
+                ))}
+              </div>
+              <input value={ex.notes} onChange={e => { const a=[...qlExercises]; a[i].notes=e.target.value; setQlExercises(a); }}
+                placeholder="Notes... e.g. RPE 8, paused, per side"
+                style={{ ...s.input, marginTop: 8, fontSize: 12 }} />
+            </div>
+          ))}
+
+          <button onClick={() => setQlExercises([...qlExercises, { name: "", sets: "", reps: "", weight: "", notes: "" }])}
+            style={{ ...s.btnGhost, fontSize: 12, marginBottom: 16 }}>+ ADD EXERCISE</button>
+
+          <label style={s.label}>SESSION COMMENT (optional)</label>
+          <textarea value={qlComment} onChange={e => setQlComment(e.target.value)}
+            placeholder="How did it feel? Any notes for your coach..."
+            rows={3} style={{ ...s.input, resize: "none", lineHeight: 1.5, marginBottom: 16 }} />
+
+          {qlSaved ? (
+            <div style={{ ...s.card, textAlign: "center", padding: 20, borderColor: "var(--red)" }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>🔥</div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900 }}>SESSION SAVED!</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={saveQuickLog} disabled={qlSaving || !qlTitle.trim()}
+                style={{ ...s.btn, opacity: (qlSaving || !qlTitle.trim()) ? 0.5 : 1 }}>
+                {qlSaving ? "SAVING..." : "💾 SAVE SESSION →"}
+              </button>
+              <button onClick={() => { setShowQuickLog(false); setQlTitle(""); setQlExercises([{ name: "", sets: "", reps: "", weight: "", notes: "" }]); setQlComment(""); }}
+                style={s.btnGhost}>CANCEL</button>
+            </div>
+          )}
         </div>
       )}
 

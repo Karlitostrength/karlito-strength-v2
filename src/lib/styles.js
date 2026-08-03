@@ -28,7 +28,30 @@ style.textContent = `
     --rune: #4a7fa5;
   }
 
-  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  /* ── LIGHT THEME ── */
+  :root[data-theme="light"] {
+    --bg: #f5f3ee;
+    --bg2: #ffffff;
+    --bg3: #ece9e2;
+    --bg4: #e0ddd4;
+    --border: #d8d4ca;
+    --red: #c41e1e;
+    --red-dim: #e8a0a0;
+    --red-glow: rgba(196,30,30,0.10);
+    --gold: #a8862c;
+    --gold-dim: rgba(168,134,44,0.20);
+    --gold-glow: rgba(168,134,44,0.25);
+    --steel: #3a6a8f;
+    --steel-dim: rgba(58,106,143,0.12);
+    --white: #1a1a1a;
+    --text: #1a1a1a;
+    --gray: #5a5a5a;
+    --gray2: #8a8a8a;
+    --accent: #a8862c;
+    --rune: #3a6a8f;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
 
   .condensed { font-family: 'Barlow Condensed', sans-serif; }
   .cinzel { font-family: 'DM Sans', sans-serif; font-weight: 700; }
@@ -79,12 +102,25 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// ─── THEME HELPERS ──────────────────────────────────────────────────────────
+
+export const getTheme = () => {
+  try { return localStorage.getItem("ks_theme") || "dark"; } catch { return "dark"; }
+};
+
+export const applyTheme = (theme) => {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  try { localStorage.setItem("ks_theme", theme); } catch {}
+};
+
+// Apply saved theme immediately on load
+applyTheme(getTheme());
+
 // ─── ENGINE ───────────────────────────────────────────────────────────────────
-
-// DOM SIŁY — 8-week phases
-
-// ───────────────────────────────────────────────────────────────────────────
-
 
 export const s = {
   app: { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", maxWidth: 480, margin: "0 auto", padding: "0 0 80px 0", position: "relative" },
@@ -100,12 +136,12 @@ export const s = {
   btn: { background: "var(--red)", color: "#fff", border: "none", borderRadius: 8, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
   btnGold: { background: "var(--gold)", color: "#111", border: "none", borderRadius: 8, padding: "14px 24px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "opacity 0.2s" },
   btnGhost: { background: "transparent", color: "var(--gray)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 20px", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", width: "100%", transition: "border-color 0.2s" },
-  input: { background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 14px", color: "var(--white)", fontSize: 15, width: "100%", fontFamily: "'DM Sans', sans-serif", outline: "none", lineHeight: 1.4 },
+  input: { background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 14px", color: "var(--text)", fontSize: 15, width: "100%", fontFamily: "'DM Sans', sans-serif", outline: "none", lineHeight: 1.4 },
   label: { fontSize: 11, color: "var(--gray)", marginBottom: 6, letterSpacing: "0.1em", display: "block", textTransform: "uppercase", fontWeight: 600 },
   pill: (active, color = "var(--gold)") => ({ display: "inline-block", padding: "7px 14px", borderRadius: 6, border: `1px solid ${active ? color : "var(--border)"}`, background: active ? `rgba(201,168,76,0.15)` : "var(--bg3)", color: active ? color : "var(--gray)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: "0.08em", cursor: "pointer", transition: "all 0.2s" }),
   navBar: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "var(--bg2)", borderTop: "1px solid var(--border)", display: "flex", padding: "8px 0 14px" },
   navItem: (active) => ({ flex: 1, textAlign: "center", padding: "6px 2px", cursor: "pointer", opacity: active ? 1 : 0.35, transition: "opacity 0.2s" }),
-  navLabel: { fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 3, color: "var(--white)" },
+  navLabel: { fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 3, color: "var(--text)" },
   exerciseRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "14px 0", borderBottom: "1px solid var(--border)" },
   badge: (color) => ({ background: color || "var(--red)", padding: "2px 8px", borderRadius: 4, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" }),
   phaseBar: (color) => ({ height: 2, background: `linear-gradient(90deg, ${color}, transparent)`, borderRadius: 2, marginBottom: 20 }),

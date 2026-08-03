@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { s, getTheme, applyTheme } from "../lib/styles";
+import { s } from "../lib/styles";
 import { registerPushSubscription, unregisterPushSubscription } from "../lib/push";
 import { getDomSilyLevel } from "../constants/levels";
 import { Row } from "../components/SmallComponents";
@@ -287,13 +287,7 @@ function IntakeForm({ authUser }) {
 
 export function ProfileScreen({ user, authUser }) {
   const [profileTab, setProfileTab] = useState("profile");
-  const [theme, setTheme] = useState(getTheme());
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    applyTheme(next);
-  };
   const [intakeCompleted, setIntakeCompleted] = useState(true); // assume done, check on load
 
   useEffect(() => {
@@ -497,21 +491,6 @@ export function ProfileScreen({ user, authUser }) {
                 style={{ ...s.btn, opacity: savingGoals ? 0.6 : 1 }}>
                 {goalsSaved ? "✓ SAVED" : savingGoals ? "SAVING..." : "SAVE GOALS"}
               </button>
-            </div>
-          </div>
-
-          <div style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700 }}>
-                {theme === "dark" ? "🌙 DARK MODE" : "☀️ LIGHT MODE"}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--gray)", marginTop: 2 }}>Tap to switch appearance</div>
-            </div>
-            <div onClick={toggleTheme}
-              style={{ width: 52, height: 28, borderRadius: 14, background: theme === "dark" ? "var(--bg3)" : "var(--gold)", position: "relative", cursor: "pointer", transition: "background 0.3s", flexShrink: 0 }}>
-              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: theme === "dark" ? 3 : 27, transition: "left 0.3s", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
-                {theme === "dark" ? "🌙" : "☀️"}
-              </div>
             </div>
           </div>
 

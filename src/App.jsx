@@ -2,7 +2,7 @@ import { SplashScreen } from "./screens/SplashScreen";
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { sendPushToUser, sendEmailNotification } from "./lib/push";
-import { s } from "./lib/styles";
+import { s, getTheme, applyTheme } from "./lib/styles";
 import { PHASES } from "./constants/phases";
 import { getPhase } from "./engine/workout";
 import { LandingScreen } from "./screens/Landing";
@@ -42,6 +42,12 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isCoach, setIsCoach] = useState(false);
   const [hasCoach, setHasCoach] = useState(false);
+  const [theme, setThemeState] = useState(getTheme());
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setThemeState(next);
+    applyTheme(next);
+  };
   const [week, setWeek] = useState(1);
   const [tab, setTab] = useState("dashboard");
   const [activeDay, setActiveDay] = useState(null);
@@ -208,9 +214,16 @@ export default function App() {
             <div style={s.logo}>KARLITO <span style={s.logoRed}>STRENGTH</span></div>
             <div style={s.tagline}>FERRUM · SANGUIS · GLORIA</div>
           </div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)", textAlign: "right", letterSpacing: "0.1em" }}>
-            <div style={{ color: "var(--gold)", fontSize: 10 }}>WK {week}</div>
-            {!hasCoach && <div>{PHASES[getPhase(week)].name}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div onClick={toggleTheme}
+              style={{ fontSize: 20, cursor: "pointer", lineHeight: 1, userSelect: "none" }}
+              title="Switch theme">
+              {theme === "dark" ? "☀️" : "🌙"}
+            </div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: "var(--gray2)", textAlign: "right", letterSpacing: "0.1em" }}>
+              <div style={{ color: "var(--gold)", fontSize: 10 }}>WK {week}</div>
+              {!hasCoach && <div>{PHASES[getPhase(week)].name}</div>}
+            </div>
           </div>
         </div>
       </div>

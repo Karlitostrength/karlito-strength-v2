@@ -584,12 +584,12 @@ export function CoachScreen() {
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>FROM WEEK</div>
-                  <input type="number" min={1} max={12} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
+                  <input type="number" min={1} max={52} value={copyWeekFrom} onChange={e => setCopyWeekFrom(+e.target.value)} style={s.input} />
                 </div>
                 <div style={{ fontSize: 18, color: "var(--gray2)", paddingTop: 16 }}>→</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: "var(--gray2)", marginBottom: 4 }}>TO WEEK</div>
-                  <input type="number" min={1} max={12} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
+                  <input type="number" min={1} max={52} value={copyWeekTo} onChange={e => setCopyWeekTo(+e.target.value)} style={s.input} />
                 </div>
               </div>
               <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 10 }}>
@@ -724,7 +724,7 @@ export function CoachScreen() {
             {editingDay ? "✏️ EDIT PROGRAMME DAY" : "BUILD PROGRAMME DAY"}
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="12" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
+            <div style={{ flex: 1 }}><label style={s.label}>WEEK</label><input type="number" min="1" max="52" value={buildWeek} onChange={e => setBuildWeek(+e.target.value)} style={s.input} /></div>
             <div style={{ flex: 1 }}><label style={s.label}>DAY</label><select value={buildDay} onChange={e => setBuildDay(e.target.value)} style={s.input}>{["A","B","C","D"].map(d => <option key={d} value={d}>{d}</option>)}</select></div>
           </div>
           <label style={s.label}>TITLE</label>
@@ -996,7 +996,7 @@ export function CoachScreen() {
               <button onClick={() => { setTplMode("list"); setSelectedTpl(null); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 16 }}>← BACK</button>
               <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "var(--accent)" }}>ASSIGN: {selectedTpl.name.toUpperCase()}</div>
               <label style={s.label}>START WEEK</label>
-              <input type="number" min="1" max="12" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
+              <input type="number" min="1" max="52" value={tplWeekStart} onChange={e => setTplWeekStart(+e.target.value)} style={{ ...s.input, marginBottom: 16 }} />
               <div style={{ fontSize: 11, color: "var(--gray2)", marginBottom: 16 }}>ℹ️ Existing sessions for this week will be overwritten.</div>
               <label style={s.label}>SELECT ATHLETES</label>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>

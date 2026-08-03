@@ -762,9 +762,10 @@ export function CoachScreen() {
                   </div>
                 ))}
               </div>
-              <input value={ex.notes} onChange={e => { const a=[...buildExercises]; a[i].notes=e.target.value; setBuildExercises(a); }}
-                placeholder="Notes... e.g. per side, paused, RPE 8"
-                style={{ ...s.input, marginTop: 6, fontSize: 12 }} />
+              <textarea value={ex.notes} onChange={e => { const a=[...buildExercises]; a[i].notes=e.target.value; setBuildExercises(a); }}
+                placeholder="Notes... e.g. ladder 1-2-3-4-5 × 3, per side, start conservative"
+                rows={4}
+                style={{ ...s.input, marginTop: 6, fontSize: 12, resize: "vertical", lineHeight: 1.5, minHeight: 80 }} />
             </div>
           ))}
           <button onClick={() => setBuildExercises([...buildExercises,{name:"",sets:3,reps:8,weight:0,notes:""}])}

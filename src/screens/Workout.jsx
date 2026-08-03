@@ -175,7 +175,7 @@ export function WorkoutScreen({ user, week, dayKey, authUser, onComplete }) {
                     {ex.sets} × {ex.unit === "sec" ? `${ex.reps}sec` : ex.unit === "m" ? `${ex.reps}m` : ex.reps}
                     {ex.rpe ? ` · RPE ${ex.rpe}` : ex.weight ? ` @ ${ex.weight}kg` : ""}
                   </div>
-                  {ex.notes ? <div style={{ fontSize: 11, color: "var(--gray2)", marginTop: 2, fontStyle: "italic" }}>{ex.notes}</div> : null}
+                  {ex.notes ? <div style={{ fontSize: 12, color: "var(--gray)", marginTop: 6, lineHeight: 1.6, whiteSpace: "pre-wrap", background: "var(--bg3)", borderRadius: 6, padding: "8px 10px", borderLeft: "2px solid var(--gold-dim)" }}>{ex.notes}</div> : null}
                 </div>
                 <div onClick={() => setExResults(p => ({ ...p, [ei]: { ...res, done: !res.done } }))}
                   style={{ width: 32, height: 32, borderRadius: 6, background: res.done ? "var(--red)" : "var(--bg3)",

@@ -29,9 +29,9 @@ const NAV_ATHLETE = [
 // ── COACH nav: HOME | LIBRARY | CHAT | COACH | ME
 const NAV_COACH = [
   { id: "dashboard", icon: "⚡", label: "HOME" },
-  { id: "library",   icon: "📚", label: "LIBRARY" },
-  { id: "chat",      icon: "💬", label: "CHAT" },
+  { id: "train",     icon: "🏋️", label: "TRAIN" },
   { id: "coach",     icon: "🎯", label: "COACH" },
+  { id: "chat",      icon: "💬", label: "CHAT" },
   { id: "profile",   icon: "👤", label: "ME" },
 ];
 
@@ -193,7 +193,7 @@ export default function App() {
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   return (
-    <div style={{ ...s.app, background: `linear-gradient(rgba(6,8,10,0.92) 0%, rgba(6,8,10,0.88) 50%, rgba(6,8,10,0.95) 100%), url('https://drive.google.com/uc?export=view&id=1U8QROGZWsy5_BxVcrUFs98HIYt1yud7-') center 20% / cover fixed` }}>
+    <div style={s.app}>
 
       {showPwaBanner && (
         <div style={{ position: "fixed", bottom: 70, left: 12, right: 12, zIndex: 9999, background: "#1a1a1a", border: "1px solid var(--accent)", borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.7)" }}>

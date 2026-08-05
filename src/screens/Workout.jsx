@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { PHASES, getPhase } from "../engine/workout";
 import { EMOMTimer } from "../components/SmallComponents";
 import { s } from "../lib/styles";
+import { GarminImport } from "./GarminImport";
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
@@ -262,6 +263,7 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
   const [editIdx, setEditIdx]             = useState(null);
   const [savingEdit, setSavingEdit]       = useState(false);
   const [showQuickLog, setShowQuickLog]   = useState(false);
+  const [showGarmin, setShowGarmin]       = useState(false);
   const [qlTitle, setQlTitle]             = useState("");
   const [qlExercises, setQlExercises]     = useState([{ name: "", sets: "", reps: "", weight: "", notes: "" }]);
   const [qlComment, setQlComment]         = useState("");
@@ -362,16 +364,27 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
           <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
           <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, marginBottom: 8 }}>AWAITING YOUR PROGRAMME</div>
           <div style={{ fontSize: 13, color: "var(--gray)", lineHeight: 1.6, marginBottom: 20 }}>Your coach will assign your programme soon. Message them if you have questions.</div>
-          <button onClick={() => setShowQuickLog(true)} style={{ ...s.btn, fontSize: 13 }}>+ LOG A SESSION →</button>
+          <button onClick={() => setShowQuickLog(true)} style={{ ...s.btn, fontSize: 13, marginBottom: 8 }}>+ LOG A SESSION →</button>
+          <button onClick={() => setShowGarmin(v => !v)} style={{ ...s.btnGhost, fontSize: 13 }}>⌚ IMPORT FROM GARMIN</button>
         </div>
       )}
 
       {allDays.length > 0 && (
-        <div style={{ marginBottom: 16, textAlign: "right" }}>
+        <div style={{ marginBottom: 16, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={() => setShowGarmin(v => !v)}
+            style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12 }}>
+            ⌚ GARMIN
+          </button>
           <button onClick={() => setShowQuickLog(true)}
             style={{ ...s.btnGhost, width: "auto", padding: "8px 16px", fontSize: 12 }}>
             + QUICK LOG
           </button>
+        </div>
+      )}
+
+      {showGarmin && (
+        <div style={{ marginBottom: 16 }}>
+          <GarminImport authUser={authUser} onImported={() => { setShowGarmin(false); load(); }} />
         </div>
       )}
 

@@ -302,6 +302,15 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
     setSavingEdit(false);
   };
 
+  const deleteSession = async (logId) => {
+    if (!confirm("Delete this session permanently? This cannot be undone.")) return;
+    try {
+      await supabase.from("workouts").delete().eq("id", logId);
+      setCompletedLogs(prev => prev.filter(l => l.id !== logId));
+      setExpandedLog(null);
+    } catch (e) { console.log("Delete error:", e); }
+  };
+
   const saveQuickLog = async () => {
     if (!qlTitle.trim()) return;
     setQlSaving(true);
@@ -616,6 +625,10 @@ export function ScheduleScreen({ authUser, week, setWeek, onStartWorkout }) {
                         {log.coach_comment}
                       </div>
                     )}
+                    <div onClick={() => deleteSession(log.id)}
+                      style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: "var(--red)", cursor: "pointer", padding: "8px", border: "1px solid var(--red-dim)", borderRadius: 6, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.1em" }}>
+                      🗑 DELETE SESSION
+                    </div>
                   </div>
                 )}
               </div>

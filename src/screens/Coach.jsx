@@ -366,6 +366,44 @@ export function CoachScreen() {
   // ── DERIVED DATA ───────────────────────────────────────────────────────────
 
   const selectedClientData = clients.find(c => c.id === selectedClient);
+
+  // ── WhatsApp export ──
+  const dayColEmoji = { A: "🔵", B: "🟠", C: "🔴", D: "🟣" };
+
+  const formatDay = (day) => {
+    const dayExs = exercises
+      .filter(e => e.athlete_id === selectedClient && e.week === day.week && e.day === day.day)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    let txt = `${dayColEmoji[day.day] || "⚪"} *DAY ${day.day} — ${day.title}*\n`;
+    if (day.notes) txt += `_${day.notes}_\n`;
+    dayExs.forEach(ex => {
+      txt += `• ${ex.name} — ${ex.sets}×${ex.reps}${ex.weight ? ` @ ${ex.weight}kg` : ""}`;
+      if (ex.notes) txt += `\n   ↳ ${ex.notes}`;
+      txt += "\n";
+    });
+    return txt;
+  };
+
+  const exportDayToWhatsApp = (day) => {
+    const clientName = selectedClientData?.name || "Athlete";
+    let msg = `🏋️ *KARLITO STRENGTH*\n${clientName} · Week ${day.week}\n\n`;
+    msg += formatDay(day);
+    msg += `\n_Ferrum · Sanguis · Gloria_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  const exportWeekToWhatsApp = (week) => {
+    const clientName = selectedClientData?.name || "Athlete";
+    const weekDays = programDays
+      .filter(d => d.athlete_id === selectedClient && d.week === week)
+      .sort((a, b) => a.day < b.day ? -1 : 1);
+    if (weekDays.length === 0) return;
+    let msg = `🏋️ *KARLITO STRENGTH*\n${clientName} · Week ${week}\n\n`;
+    weekDays.forEach(day => { msg += formatDay(day) + "\n"; });
+    msg += `_Ferrum · Sanguis · Gloria_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
   const athletes = clients.filter(c => c.role === "athlete");
   const now = new Date();
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1); startOfWeek.setHours(0,0,0,0);
@@ -605,7 +643,20 @@ export function CoachScreen() {
           {/* Programme overview */}
           {programDays.filter(d => d.athlete_id === selectedClient).length > 0 && (
             <div style={{ ...s.card, marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em", marginBottom: 8 }}>PROGRAMME</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.15em" }}>PROGRAMME</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[...new Set(programDays.filter(d => d.athlete_id === selectedClient).map(d => d.week))]
+                    .sort((a, b) => a - b)
+                    .map(wk => (
+                      <div key={wk} onClick={() => exportWeekToWhatsApp(wk)}
+                        style={{ fontSize: 11, color: "#25D366", cursor: "pointer", border: "1px solid rgba(37,211,102,0.4)", borderRadius: 5, padding: "4px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 4 }}
+                        title={`Send Week ${wk} to WhatsApp`}>
+                        📱 WK {wk}
+                      </div>
+                    ))}
+                </div>
+              </div>
               {programDays
                 .filter(d => d.athlete_id === selectedClient)
                 .sort((a, b) => a.week !== b.week ? a.week - b.week : a.day < b.day ? -1 : 1)
@@ -628,6 +679,8 @@ export function CoachScreen() {
                             setEditingDay({ dayId: day.id });
                             setBuildMode(true);
                           }} style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer", padding: "4px 8px", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>EDIT</div>
+                          <div onClick={() => exportDayToWhatsApp(day)}
+                            style={{ fontSize: 14, cursor: "pointer", padding: "4px 6px" }} title="Send this day to WhatsApp">📱</div>
                           <div onClick={() => deleteProgramDay(day.id, day.week, day.day)}
                             style={{ color: "var(--red-dim)", fontSize: 16, cursor: "pointer", padding: "4px 8px" }}>✕</div>
                         </div>

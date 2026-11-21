@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { sendPushToUser } from "../lib/push";
 import { s } from "../lib/styles";
 import { RanksCoachView } from "../components/RankComponents";
+import { CoachPackages } from "./CoachPackages";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export function CoachScreen() {
@@ -435,13 +436,16 @@ export function CoachScreen() {
   return (
     <div style={s.screen}>
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[["dashboard","📊"],["sessions","📋"],["templates","📁"],["diet","🥗"],["ranks","🏆"]].map(([v, icon]) => (
+        {[["dashboard","📊"],["payments","💷"],["sessions","📋"],["templates","📁"],["diet","🥗"],["ranks","🏆"]].map(([v, icon]) => (
           <div key={v} onClick={() => { setView(v); setSelectedClient(null); setBuildMode(false); setEditingDay(null); }}
             style={{ ...s.pill(view === v && !selectedClient), padding: "8px 0", flex: 1, textAlign: "center", fontSize: 18 }}>
             {icon}
           </div>
         ))}
       </div>
+
+      {/* ── PAYMENTS & PACKAGES ── */}
+      {view === "payments" && !selectedClient && <CoachPackages />}
 
       {/* ── DASHBOARD ── */}
       {view === "dashboard" && !selectedClient && (

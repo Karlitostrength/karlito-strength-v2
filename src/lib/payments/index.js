@@ -14,14 +14,14 @@ export const PROVIDER = "manual";
 
 // Result: { kind: "bank_transfer", reference, price, ... }
 //    or (Phase 2) { kind: "redirect", url }
-export async function startPortalCheckout({ token, clientName, pkg, termsAccepted }) {
+export async function startPortalCheckout({ token, clientName, pkg, payForPartner, termsAccepted }) {
   if (!termsAccepted) throw new Error("Zaakceptuj zasady");
-  return providers[PROVIDER].checkoutFromPortal({ token, clientName, pkg });
+  return providers[PROVIDER].checkoutFromPortal({ token, clientName, pkg, payForPartner });
 }
 
-export async function startPublicCheckout({ name, email, phone, pkg, termsAccepted }) {
+export async function startPublicCheckout({ name, email, phone, pkg, partner, payForPartner, partnerEmail, termsAccepted }) {
   if (!termsAccepted) throw new Error("Zaakceptuj zasady");
-  return providers[PROVIDER].checkoutPublic({ name, email, phone, pkg });
+  return providers[PROVIDER].checkoutPublic({ name, email, phone, pkg, partner, payForPartner, partnerEmail });
 }
 
 export const COACH_METHODS = manual.METHODS;

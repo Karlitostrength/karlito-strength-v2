@@ -39,6 +39,7 @@ const TXT = {
       "Level 3 Personal Trainer",
       "StrongFirst kettlebell certification",
       "Master of Sport World Class — IKMF kettlebell pentathlon",
+      "Top Team Kettlebell Polska",
       "5+ years coaching clients in South West London",
     ],
     phTag: "My philosophy",
@@ -56,6 +57,7 @@ const TXT = {
     moreReviews: "MORE REVIEWS",
     lessReviews: "SHOW FEWER",
     nextPrices: "SEE PRICES & PACKAGES →",
+    nextContact: "BOOK A FREE CONSULTATION →",
 
     // PRICES
     svTag: "Training & Prices",
@@ -146,6 +148,7 @@ const TXT = {
       "Trener personalny Level 3",
       "Certyfikacja kettlebell StrongFirst",
       "Mistrz Sportu Klasy Światowej — pięciobój kettlebell IKMF",
+      "Top Team Kettlebell Polska",
       "5+ lat trenowania klientów w południowo-zachodnim Londynie",
     ],
     phTag: "Moja filozofia",
@@ -163,6 +166,7 @@ const TXT = {
     moreReviews: "WIĘCEJ OPINII",
     lessReviews: "POKAŻ MNIEJ",
     nextPrices: "ZOBACZ CENY I PAKIETY →",
+    nextContact: "UMÓW DARMOWĄ KONSULTACJĘ →",
 
     svTag: "Treningi i ceny",
     svTitle: ["WYBIERZ, JAK", "TRENUJESZ."],
@@ -377,6 +381,22 @@ export function LandingScreen({ onSignUp }) {
   );
 
   // ---------- pages ----------
+  const pricesSection = (top) => (
+    <section className="section" style={{ paddingTop: top }}>
+      {heading(t.svTag, t.svTitle)}
+      <p style={{ fontSize: 14, color: "var(--gray)", marginBottom: 28, lineHeight: 1.75, maxWidth: 520 }}>{t.svNote}</p>
+      {card(t.solo, solo, true, { href: "/buy" }, solo.map((p) => priceRow(p)))}
+      {card(t.duo, duo, false, waProps(t.waDuo), duo.map((p) => priceRow(p, true)))}
+      {online && card(t.online, null, false, { href: "/buy" }, (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontFamily: BC, fontSize: 40, fontWeight: 900, color: "var(--gold)" }}>{gbp(online.price)}</span>
+          <span style={{ fontSize: 14, color: "var(--gray)" }}>{t.perMonth}</span>
+        </div>
+      ))}
+      <p style={{ fontSize: 12, color: "var(--gray2)", lineHeight: 1.7, marginTop: 4 }}>{t.terms(cancelHours)}</p>
+    </section>
+  );
+
   const Home = (
     <>
       <section className="section" style={{ paddingTop: 124 }}>
@@ -438,7 +458,9 @@ export function LandingScreen({ onSignUp }) {
         </section>
       )}
 
-      <section className="band">
+      <div className="band" id="home-prices">{pricesSection(84)}</div>
+
+      <section>
         <div className="section">
           {heading(t.teTag, t.teTitle)}
           {(allReviews ? TESTIMONIALS : TESTIMONIALS.slice(0, 3)).map((tm) => (
@@ -454,26 +476,12 @@ export function LandingScreen({ onSignUp }) {
       </section>
 
       <section className="section" style={{ textAlign: "center" }}>
-        <button className="btn-primary" onClick={() => go("prices")}>{t.nextPrices}</button>
+        <button className="btn-primary" onClick={() => go("contact")}>{t.nextContact}</button>
       </section>
     </>
   );
 
-  const Prices = (
-    <section className="section" style={{ paddingTop: 120 }}>
-      {heading(t.svTag, t.svTitle)}
-      <p style={{ fontSize: 14, color: "var(--gray)", marginBottom: 28, lineHeight: 1.75, maxWidth: 520 }}>{t.svNote}</p>
-      {card(t.solo, solo, true, { href: "/buy" }, solo.map((p) => priceRow(p)))}
-      {card(t.duo, duo, false, waProps(t.waDuo), duo.map((p) => priceRow(p, true)))}
-      {online && card(t.online, null, false, { href: "/buy" }, (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontFamily: BC, fontSize: 40, fontWeight: 900, color: "var(--gold)" }}>{gbp(online.price)}</span>
-          <span style={{ fontSize: 14, color: "var(--gray)" }}>{t.perMonth}</span>
-        </div>
-      ))}
-      <p style={{ fontSize: 12, color: "var(--gray2)", lineHeight: 1.7, marginTop: 4 }}>{t.terms(cancelHours)}</p>
-    </section>
-  );
+  const Prices = pricesSection(120);
 
   const App = (
     <section className="section" style={{ paddingTop: 120 }}>

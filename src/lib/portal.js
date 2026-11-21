@@ -24,8 +24,10 @@ export async function portalCancel(token, sessionAt) {
   return unwrap(await supabase.rpc("ks_portal_cancel", { p_token: token, p_session_at: sessionAt }));
 }
 
-export async function portalOrder(token, packageId) {
-  return unwrap(await supabase.rpc("ks_portal_order", { p_token: token, p_package: packageId, p_accept_terms: true }));
+export async function portalOrder(token, packageId, payForPartner = false) {
+  return unwrap(await supabase.rpc("ks_portal_order", {
+    p_token: token, p_package: packageId, p_accept_terms: true, p_pay_for_partner: !!payForPartner,
+  }));
 }
 
 export async function portalInvoice(token, invoiceId) {
@@ -36,9 +38,12 @@ export async function getPublicPrices() {
   return unwrap(await supabase.rpc("ks_public_prices"));
 }
 
-export async function publicOrder({ name, email, phone, packageId }) {
+export async function publicOrder({ name, email, phone, packageId, partner, payForPartner, partnerEmail }) {
   return unwrap(await supabase.rpc("ks_public_order", {
     p_name: name, p_email: email, p_phone: phone || "", p_package: packageId, p_accept_terms: true,
+    p_partner: partner || null,
+    p_pay_for_partner: !!payForPartner,
+    p_partner_email: partnerEmail || null,
   }));
 }
 
@@ -119,5 +124,7 @@ export function friendlyError(e) {
   if (m.includes("czekające na płatność")) return "You already have orders waiting for payment. Please pay those first or message Karol.";
   if (m.includes("Podaj imię")) return "Please enter your name and a valid email address.";
   if (m.includes("Zaakceptuj")) return "Please accept the terms first.";
+  if (m.includes("imię partnera")) return "Please enter your training partner's name.";
+  if (m.includes("email partnera")) return "Please enter your partner's email (different from yours).";
   return "Something went wrong. Please try again or message Karol.";
 }

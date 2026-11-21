@@ -91,6 +91,47 @@ export function TermsList({ pkg, cancelHours }) {
   );
 }
 
+// ---------- duo: "who are you paying for?" ----------
+export function WhoPays({ payBoth, onChange, ownPrice, partnerPrice, partnerName }) {
+  const partner = partnerName || "my partner";
+  const opt = (active, title, price, note, onClick) => (
+    <div onClick={onClick} style={{ flex: 1, minWidth: 140, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+      background: active ? "var(--gold-dim)" : "var(--bg3)", border: `2px solid ${active ? "var(--gold)" : "var(--border)"}` }}>
+      <div style={{ fontFamily: cond, fontSize: 16, letterSpacing: "0.04em", marginBottom: 2 }}>{active ? "● " : "○ "}{title}</div>
+      <div style={{ fontFamily: cond, fontSize: 24, fontWeight: 900, color: "var(--gold)" }}>{gbp(price)}</div>
+      <div style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.4 }}>{note}</div>
+    </div>
+  );
+  return (
+    <div style={{ marginTop: 8, marginBottom: 12 }}>
+      <div style={{ ...s.sectionLabel, marginBottom: 8 }}>WHO ARE YOU PAYING FOR?</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {opt(!payBoth, "Just me", ownPrice, `${partnerName || "Your partner"} pays separately`, () => onChange(false))}
+        {opt(payBoth, `Me + ${partner}`, Number(ownPrice) + Number(partnerPrice || 0), "2 packages · 1 payment · 1 invoice for you", () => onChange(true))}
+      </div>
+    </div>
+  );
+}
+
+export function SplitSummary({ ownPrice, partnerPrice, partnerName, pkgName }) {
+  const row = { display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14 };
+  return (
+    <div style={{ padding: 14, background: "var(--bg3)", borderRadius: 10, border: "1px solid var(--border)", margin: "10px 0" }}>
+      <div style={{ ...s.sectionLabel, marginBottom: 6 }}>YOUR ORDER — 2 PACKAGES</div>
+      <div style={row}><span>You — {pkgName}</span><span>{gbp(ownPrice)}</span></div>
+      <div style={{ ...row, borderBottom: "1px solid var(--border)" }}><span>{partnerName} — {pkgName}</span><span>{gbp(partnerPrice)}</span></div>
+      <div style={{ ...row, fontFamily: cond, fontSize: 20, fontWeight: 900 }}>
+        <span>TOTAL TO PAY</span><span style={{ color: "var(--gold)" }}>{gbp(Number(ownPrice) + Number(partnerPrice))}</span>
+      </div>
+      <ul style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, paddingLeft: 18, margin: "6px 0 0" }}>
+        <li>One bank transfer, one invoice in your name.</li>
+        <li>You each get your own package and balance — if one of you cancels, the other's sessions aren't affected.</li>
+        <li>{partnerName} gets their own page to see their sessions.</li>
+      </ul>
+    </div>
+  );
+}
+
 export function PriceOption({ p, selected, onClick }) {
   const ph = !p.is_subscription ? perHour(p.price, p.sessions) : null;
   const isOverride = p.standard_price !== undefined && Number(p.standard_price) !== Number(p.price);
@@ -288,12 +329,26 @@ export function ClientPortal({ token, standalone = false }) {
 
       {/* ===== ORDERS WAITING FOR PAYMENT ===== */}
       {otherPending.map((p) => (
-        <div key={p.id} style={{ ...s.card, borderColor: "var(--gold)" }}>
-          <div style={s.sectionLabel}>WAITING FOR PAYMENT</div>
-          <div style={{ fontFamily: cond, fontSize: 18 }}>{p.name}</div>
-          <BankBox bank={bank} reference={p.reference} price={p.price}
-            dueText={`Ordered ${dateShort(p.purchased_at)}. Your package starts when Karol confirms the payment.`} />
-        </div>
+        p.in_group && !p.group_lead ? (
+          <div key={p.id} style={{ ...s.card, borderColor: "var(--gold)" }}>
+            <div style={s.sectionLabel}>YOUR NEXT PACKAGE</div>
+            <div style={{ fontFamily: cond, fontSize: 18 }}>{p.name}</div>
+            <div style={{ fontSize: 14, color: "var(--gray)", marginTop: 6, lineHeight: 1.5 }}>
+              <b style={{ color: "var(--text)" }}>{p.group_other}</b> is paying for this package. It starts as soon as Karol confirms the payment — nothing for you to do.
+            </div>
+          </div>
+        ) : (
+          <div key={p.id} style={{ ...s.card, borderColor: "var(--gold)" }}>
+            <div style={s.sectionLabel}>WAITING FOR PAYMENT</div>
+            <div style={{ fontFamily: cond, fontSize: 18 }}>
+              {p.name}{p.in_group ? ` × 2 — for you and ${p.group_other}` : ""}
+            </div>
+            <BankBox bank={bank} reference={p.reference} price={p.in_group ? p.group_total : p.price}
+              dueText={p.in_group
+                ? `One payment for both packages. They start when Karol confirms the payment.`
+                : `Ordered ${dateShort(p.purchased_at)}. Your package starts when Karol confirms the payment.`} />
+          </div>
+        )
       ))}
 
       {/* ===== NEXT SESSIONS ===== */}
@@ -361,12 +416,17 @@ function BuyFromPortal({ token, data, bank, cancelHours, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [result, setResult] = useState(null);
+  const [payBoth, setPayBoth] = useState(false);
   const options = data.prices || [];
+  const partnerName = data.client?.partner_name || null;
+  const canPayBoth = !!partnerName && selected?.kind === "duo";
+  const total = selected ? Number(selected.price) + (canPayBoth && payBoth ? Number(selected.partner_price || 0) : 0) : 0;
 
   const go = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await startPortalCheckout({ token, clientName: data.client?.name, pkg: selected, termsAccepted: accepted });
+      const r = await startPortalCheckout({ token, clientName: data.client?.name, pkg: selected,
+        payForPartner: canPayBoth && payBoth, termsAccepted: accepted });
       if (r.kind === "redirect" && r.url) { window.location.href = r.url; return; }
       setResult(r);
     } catch (e) { setErr(friendlyError(e)); }
@@ -377,7 +437,14 @@ function BuyFromPortal({ token, data, bank, cancelHours, onDone }) {
     return (
       <div style={s.card}>
         <div style={{ fontFamily: cond, fontSize: 20, color: "var(--gold)", marginBottom: 4 }}>Order received ✓</div>
-        <div style={{ fontSize: 14, color: "var(--gray)" }}>{result.name}. Your package starts as soon as Karol confirms the payment.</div>
+        <div style={{ fontSize: 14, color: "var(--gray)" }}>
+          {result.partnerName
+            ? `${result.name} for you and ${result.partnerName}. Both packages start as soon as Karol confirms the payment.`
+            : `${result.name}. Your package starts as soon as Karol confirms the payment.`}
+        </div>
+        {result.partnerName && (
+          <SplitSummary ownPrice={result.ownPrice} partnerPrice={result.partnerPrice} partnerName={result.partnerName} pkgName={result.name} />
+        )}
         <BankBox bank={bank} reference={result.reference} price={result.price} />
         <button onClick={onDone} style={{ ...s.btnGhost, marginTop: 12 }}>DONE</button>
       </div>
@@ -392,6 +459,13 @@ function BuyFromPortal({ token, data, bank, cancelHours, onDone }) {
         <PriceOption key={p.package_id} p={p} selected={selected?.package_id === p.package_id}
           onClick={() => { setSelected(p); setAccepted(false); }} />
       ))}
+      {canPayBoth && (
+        <WhoPays payBoth={payBoth} onChange={setPayBoth} ownPrice={selected.price}
+          partnerPrice={selected.partner_price} partnerName={partnerName} />
+      )}
+      {canPayBoth && payBoth && (
+        <SplitSummary ownPrice={selected.price} partnerPrice={selected.partner_price} partnerName={partnerName} pkgName={selected.name} />
+      )}
       {selected && (
         <div style={{ marginTop: 8 }}>
           <div style={{ ...s.sectionLabel, marginBottom: 8 }}>TERMS</div>
@@ -402,7 +476,7 @@ function BuyFromPortal({ token, data, bank, cancelHours, onDone }) {
           </label>
           {err && <Notice tone="error">{err}</Notice>}
           <button onClick={go} disabled={!accepted || busy} style={{ ...s.btnGold, opacity: accepted && !busy ? 1 : 0.4 }}>
-            {busy ? "..." : `ORDER · ${gbp(selected.price)}`}
+            {busy ? "..." : `ORDER · ${gbp(total)}`}
           </button>
         </div>
       )}
@@ -420,8 +494,12 @@ function History({ token, data }) {
       {paid.map((p) => (
         <div key={p.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-            <span>{p.name}</span>
-            <span style={{ fontFamily: cond, fontSize: 17 }}>{Number(p.price) > 0 ? gbp(p.price) : "—"}</span>
+            <span>{p.name}{p.in_group && p.group_lead ? ` × 2 (you + ${p.group_other})` : ""}</span>
+            <span style={{ fontFamily: cond, fontSize: 17 }}>
+              {p.in_group && !p.group_lead ? `paid by ${p.group_other}`
+                : p.in_group ? gbp(p.group_total)
+                : Number(p.price) > 0 ? gbp(p.price) : "—"}
+            </span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--gray2)", marginTop: 2 }}>
             <span>

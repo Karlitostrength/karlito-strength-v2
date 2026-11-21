@@ -1,30 +1,27 @@
 // ============================================================
-// KARLITO STRENGTH — ADAPTER PŁATNOŚCI
-// Reszta apki woła TYLKO te funkcje. Nie wie, czy pod spodem jest
-// gotówka, przelew czy Revolut.
+// KARLITO STRENGTH — PAYMENT ADAPTER (single entry point)
+// Screens only call these functions. They don't know whether it's
+// a bank transfer or Revolut underneath.
 //
-// Faza 1: dostępny tylko adapter "manual" (cash / transfer — dodaje coach).
-// Faza 2: dodajemy ./revolut.js + /api/create-order + /api/revolut-webhook
-//         i przełączamy CLIENT_CHECKOUT_PROVIDER na "revolut". Nic więcej.
+// Phase 1: "manual" (bank transfer / cash, Karol confirms).
+// Phase 2: add ./revolut.js + /api/create-order + /api/revolut-webhook,
+//          then switch PROVIDER to "revolut". Nothing else changes.
 // ============================================================
 import * as manual from "./manual";
 
 const providers = { manual };
+export const PROVIDER = "manual";
 
-// Jak klient płaci sam w apce. Faza 1 = "manual" (instrukcja + powiadomienie coacha).
-export const CLIENT_CHECKOUT_PROVIDER = "manual";
-
-// Klient klika "Kup pakiet" → zaakceptował zasady (checkbox).
-// Zwraca { kind: "manual", ... } albo w Fazie 2 { kind: "redirect", url }.
-export async function startClientCheckout({ client, pkg, price, termsAccepted }) {
-  if (!termsAccepted) throw new Error("Zaakceptuj zasady ważności pakietu");
-  const provider = providers[CLIENT_CHECKOUT_PROVIDER];
-  return provider.startClientCheckout({ client, pkg, price });
+// Result: { kind: "bank_transfer", reference, price, ... }
+//    or (Phase 2) { kind: "redirect", url }
+export async function startPortalCheckout({ token, clientName, pkg, termsAccepted }) {
+  if (!termsAccepted) throw new Error("Zaakceptuj zasady");
+  return providers[PROVIDER].checkoutFromPortal({ token, clientName, pkg });
 }
 
-// Coach dodaje wpłatę ręcznie (gotówka / przelew).
-export async function recordCoachPayment({ clientId, packageId, method, purchasedAt, price, note }) {
-  return manual.recordPayment({ clientId, packageId, method, purchasedAt, price, note });
+export async function startPublicCheckout({ name, email, phone, pkg, termsAccepted }) {
+  if (!termsAccepted) throw new Error("Zaakceptuj zasady");
+  return providers[PROVIDER].checkoutPublic({ name, email, phone, pkg });
 }
 
 export const COACH_METHODS = manual.METHODS;

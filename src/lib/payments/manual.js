@@ -19,16 +19,19 @@ function notifyCoach(title, message) {
 }
 
 // Existing client, from their personal page
-export async function checkoutFromPortal({ token, clientName, pkg }) {
-  const r = await portalOrder(token, pkg.package_id);
-  notifyCoach("💷 New order", `${clientName || "Client"}: ${r.name} — £${r.price} (ref ${r.reference})`);
-  return { kind: "bank_transfer", reference: r.reference, price: r.price, name: r.name };
+export async function checkoutFromPortal({ token, clientName, pkg, payForPartner }) {
+  const r = await portalOrder(token, pkg.package_id, payForPartner);
+  const both = r.partner_name ? ` (paying for ${r.partner_name} too)` : "";
+  notifyCoach("💷 New order", `${clientName || "Client"}${both}: ${r.name} — £${r.price} (ref ${r.reference})`);
+  return { kind: "bank_transfer", reference: r.reference, price: r.price, name: r.name,
+           ownPrice: r.own_price, partnerPrice: r.partner_price, partnerName: r.partner_name || null };
 }
 
 // New client, from the public /buy page
-export async function checkoutPublic({ name, email, phone, pkg }) {
-  const r = await publicOrder({ name, email, phone, packageId: pkg.package_id });
-  notifyCoach("🆕 New client order", `${name}: ${r.name} — £${r.price} (ref ${r.reference})`);
+export async function checkoutPublic({ name, email, phone, pkg, partner, payForPartner, partnerEmail }) {
+  const r = await publicOrder({ name, email, phone, packageId: pkg.package_id, partner, payForPartner, partnerEmail });
+  const who = partner ? (payForPartner ? ` (paying for ${partner} too)` : ` (duo with ${partner})`) : "";
+  notifyCoach("🆕 New client order", `${name}${who}: ${r.name} — £${r.price} (ref ${r.reference})`);
   return {
     kind: "bank_transfer",
     reference: r.reference,
@@ -36,6 +39,7 @@ export async function checkoutPublic({ name, email, phone, pkg }) {
     name: r.name,
     accessToken: r.access_token || null,
     existingClient: !!r.existing_client,
+    ownPrice: r.own_price, partnerPrice: r.partner_price, partnerName: r.partner_name || null,
     bank: {
       account_name: r.bank_account_name,
       sort_code: r.bank_sort_code,

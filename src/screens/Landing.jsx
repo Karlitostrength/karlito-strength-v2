@@ -77,7 +77,7 @@ const TXT = {
     duo: {
       title: "Duo — Train With a Partner",
       sub: "Train with your partner or a friend in the same private studio. Same attention, lower price. Prices are per person.",
-      cta: "ASK ABOUT DUO →",
+      cta: "BUY A DUO PACKAGE →",
     },
     online: {
       title: "Online Coaching",
@@ -185,7 +185,7 @@ const TXT = {
     duo: {
       title: "Duo — trening we dwoje",
       sub: "Trenuj z partnerem lub znajomym w tym samym prywatnym studiu. Ta sama uwaga, niższa cena. Ceny za osobę.",
-      cta: "ZAPYTAJ O DUO →",
+      cta: "KUP PAKIET DUO →",
     },
     online: {
       title: "Trening online",
@@ -385,9 +385,9 @@ export function LandingScreen({ onSignUp }) {
     <section className="section" style={{ paddingTop: top }}>
       {heading(t.svTag, t.svTitle)}
       <p style={{ fontSize: 14, color: "var(--gray)", marginBottom: 28, lineHeight: 1.75, maxWidth: 520 }}>{t.svNote}</p>
-      {card(t.solo, solo, true, { href: "/buy" }, solo.map((p) => priceRow(p)))}
-      {card(t.duo, duo, false, waProps(t.waDuo), duo.map((p) => priceRow(p, true)))}
-      {online && card(t.online, null, false, { href: "/buy" }, (
+      {card(t.solo, solo, true, { href: "/buy?kind=solo" }, solo.map((p) => priceRow(p)))}
+      {card(t.duo, duo, false, { href: "/buy?kind=duo" }, duo.map((p) => priceRow(p, true)))}
+      {online && card(t.online, null, false, { href: "/buy?kind=online" }, (
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
           <span style={{ fontFamily: BC, fontSize: 40, fontWeight: 900, color: "var(--gold)" }}>{gbp(online.price)}</span>
           <span style={{ fontSize: 14, color: "var(--gray)" }}>{t.perMonth}</span>

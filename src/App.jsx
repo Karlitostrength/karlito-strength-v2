@@ -16,6 +16,8 @@ import { ChatScreen } from "./screens/Chat";
 import { HistoryScreen } from "./screens/History";
 import { LibraryScreen } from "./screens/Library";
 import { NutritionScreen } from "./screens/Nutrition";
+import { ClientPortalRoute, InAppClientPortal } from "./screens/ClientPortal";
+import { PublicBuyScreen } from "./screens/PublicBuy";
 
 // ── ATHLETE nav: HOME | TRAIN | NUTRITION | CHAT | ME
 const NAV_ATHLETE = [
@@ -35,7 +37,15 @@ const NAV_COACH = [
   { id: "profile",   icon: "👤", label: "ME" },
 ];
 
+// ── Public pages (no login): personal client page + buy page
 export default function App() {
+  const path = window.location.pathname;
+  if (path.startsWith("/k/")) return <ClientPortalRoute />;
+  if (path === "/buy" || path === "/buy/") return <PublicBuyScreen />;
+  return <MainApp />;
+}
+
+function MainApp() {
   const [splashDone, setSplashDone] = useState(false);
   const [inviteCode, setInviteCode] = useState(null);
   const [authUser, setAuthUser] = useState(undefined);
@@ -230,6 +240,7 @@ export default function App() {
 
       <div className="fade-in" key={tab + activeDay}>
         {/* SHARED SCREENS */}
+        {tab === "dashboard" && !isCoach && <InAppClientPortal />}
         {tab === "dashboard" && <DashboardScreen user={user} week={week} setWeek={setWeek} onStartWorkout={handleStartWorkout} hasCoach={hasCoach} />}
         {tab === "chat"      && <ChatScreen authUser={authUser} isCoach={isCoach} />}
         {tab === "profile"   && <ProfileScreen user={user} authUser={authUser} />}

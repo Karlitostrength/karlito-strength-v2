@@ -125,7 +125,8 @@ export function SplitSummary({ ownPrice, partnerPrice, partnerName, pkgName }) {
       </div>
       <ul style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.6, paddingLeft: 18, margin: "6px 0 0" }}>
         <li>One bank transfer, one invoice in your name.</li>
-        <li>You each get your own package and balance — if one of you cancels, the other's sessions aren't affected.</li>
+        <li>Duo sessions are for the two of you together. If one of you can't make it, cancel at least 12 hours before and we move the session for both.</li>
+        <li>Later cancellations or no-shows: the session goes ahead for whoever comes and counts for both of you.</li>
         <li>{partnerName} gets their own page to see their sessions.</li>
       </ul>
     </div>

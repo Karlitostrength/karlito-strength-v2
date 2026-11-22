@@ -53,6 +53,7 @@ export function CoachScreen() {
   const [createClientError, setCreateClientError] = useState("");
   const [clientChartEx, setClientChartEx]   = useState("");
   const [clientFilter, setClientFilter] = useState("all"); // all | active | inactive
+  const [showArchived, setShowArchived] = useState(false);
 
   // ── DATA ──────────────────────────────────────────────────────────────────
 
@@ -405,7 +406,14 @@ export function CoachScreen() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
-  const athletes = clients.filter(c => c.role === "athlete");
+  const athletes = clients.filter(c => c.role === "athlete" && !c.archived);
+  const archivedAthletes = clients.filter(c => c.role === "athlete" && c.archived);
+  const setArchived = async (id, archived) => {
+    const { error } = await supabase.rpc("ks_set_athlete_archived", { p_profile: id, p_archived: archived });
+    if (error) { alert("Could not update: " + error.message); return; }
+    setClients(prev => prev.map(c => c.id === id ? { ...c, archived } : c));
+    if (archived) { setSelectedClient(null); setView("dashboard"); }
+  };
   const now = new Date();
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1); startOfWeek.setHours(0,0,0,0);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -493,13 +501,33 @@ export function CoachScreen() {
               </div>
             );
           })}
+
+          {archivedAthletes.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <div onClick={() => setShowArchived(v => !v)}
+                style={{ fontSize: 11, color: "var(--gray2)", letterSpacing: "0.12em", cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", marginBottom: 8 }}>
+                {showArchived ? "▾" : "▸"} ARCHIVED ({archivedAthletes.length})
+              </div>
+              {showArchived && archivedAthletes.map(a => (
+                <div key={a.id} style={{ ...s.card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", marginBottom: 6, opacity: 0.6 }}>
+                  <div style={{ fontSize: 14 }}>{a.name || a.email || "Athlete"}</div>
+                  <button onClick={() => setArchived(a.id, false)}
+                    style={{ ...s.btnGhost, width: "auto", padding: "6px 12px", fontSize: 11 }}>RESTORE</button>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
       {/* ── CLIENT PROFILE ── */}
       {selectedClient && selectedClientData && view === "profile" && !buildMode && (
         <>
-          <button onClick={() => { setSelectedClient(null); setView("dashboard"); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, marginBottom: 14 }}>← BACK</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <button onClick={() => { setSelectedClient(null); setView("dashboard"); }} style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12 }}>← BACK</button>
+            <button onClick={() => { if (window.confirm("Hide this athlete from your list? Nothing is deleted — you can restore them under ARCHIVED.")) setArchived(selectedClient, true); }}
+              style={{ ...s.btnGhost, width: "auto", padding: "8px 14px", fontSize: 12, color: "var(--gray2)" }}>ARCHIVE</button>
+          </div>
 
           <div style={{ ...s.card, borderColor: "var(--red-dim)", marginBottom: 12 }}>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{selectedClientData.name || "Athlete"}</div>

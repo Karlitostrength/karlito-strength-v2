@@ -73,10 +73,23 @@ export async function getPendingOrders() {
     .select("*, clients(id, full_name, phone, email), packages(name, code)")
     .eq("status", "pending").order("created_at", { ascending: true }));
 }
+// Faktura mailem od razu po zaksięgowaniu płatności (api/daily.js, tryb "invoices").
+// Nie blokuje panelu — jeśli się nie uda, poranny automat wyśle ją jutro.
+export async function sendInvoiceEmails() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
+    await fetch("/api/daily?mode=invoices", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  } catch (e) { console.log("invoice email (non-critical):", e); }
+}
+
 export async function confirmPayment(purchaseId, method = "transfer", paidAt) {
-  return unwrap(await supabase.rpc("ks_confirm_payment", {
+  const res = unwrap(await supabase.rpc("ks_confirm_payment", {
     p_purchase: purchaseId, p_method: method, p_paid_at: paidAt || new Date().toISOString(),
   }));
+  sendInvoiceEmails();
+  return res;
 }
 export async function rejectOrder(purchaseId) {
   return unwrap(await supabase.rpc("ks_reject_order", { p_purchase: purchaseId }));
@@ -193,11 +206,13 @@ export async function deleteSession(ledgerId) {
 
 // ---------- purchases ----------
 export async function addManualPurchase({ clientId, packageId, method, purchasedAt, price }) {
-  return unwrap(await supabase.rpc("ks_add_purchase", {
+  const res = unwrap(await supabase.rpc("ks_add_purchase", {
     p_client: clientId, p_package: packageId, p_method: method,
     p_purchased_at: purchasedAt || new Date().toISOString(),
     p_price: price === "" || price === undefined || price === null ? null : Number(price), p_note: null,
   }));
+  sendInvoiceEmails();
+  return res;
 }
 export async function freezePurchase(purchaseId, days) {
   return unwrap(await supabase.rpc("ks_freeze_purchase", { p_purchase: purchaseId, p_days: Number(days) }));

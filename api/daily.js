@@ -68,6 +68,12 @@ ${row("Account no.", s.bank_account_no)}${row("Reference", j.reference)}</table>
 }
 
 const what = (j) => j.period_start ? `${j.package} — ${monthYear(j.period_start)}` : j.package;
+const CASH_LINE = `<p>Prefer cash? Just bring it to your next session.</p>`;
+// Płatność za styczeń wychodzi 28 grudnia → życzenia noworoczne + mocny start roku
+const isJanuary = (j) => j.period_start && new Date(j.period_start).getUTCMonth() === 0;
+const festive = (j) => isJanuary(j)
+  ? `<p>Happy New Year! 🎉 Thank you for training with me this year — let's make ${new Date(j.period_start).getUTCFullYear()} your strongest yet.</p>`
+  : "";
 
 // ---------- treść maili ----------
 function buildEmail(j, s) {
@@ -75,10 +81,12 @@ function buildEmail(j, s) {
   switch (j.kind) {
     case "order":
       return {
-        subject: `Payment details — ${what(j)} (${j.reference})`,
-        html: layout("Your order is ready", `${hi}
+        subject: isJanuary(j) ? `Happy New Year + your ${what(j)}` : `Payment details — ${what(j)} (${j.reference})`,
+        html: layout(isJanuary(j) ? "Happy New Year! 🎉" : "Your order is ready", `${hi}
+${festive(j)}
 <p>Here are the payment details for <b>${esc(what(j))}</b>${j.for_also ? ` for you and <b>${esc(j.for_also)}</b>` : ""}.</p>
 ${bankBox(s, j)}
+${CASH_LINE}
 <p>Your sessions are activated as soon as the payment arrives — you'll get the invoice by email.</p>`,
           { label: "VIEW MY PAGE", url: portal(j) }),
       };
@@ -87,7 +95,8 @@ ${bankBox(s, j)}
         subject: `Reminder: payment for ${what(j)} (${j.reference})`,
         html: layout("Friendly reminder", `${hi}
 <p>I haven't received the payment for <b>${esc(what(j))}</b> yet. If you've already sent it — thank you, ignore this email.</p>
-${bankBox(s, j)}`, { label: "VIEW MY PAGE", url: portal(j) }),
+${bankBox(s, j)}
+${CASH_LINE}`, { label: "VIEW MY PAGE", url: portal(j) }),
       };
     case "invoice": {
       const url = `${portal(j)}/invoice/${j.invoice_id}`;
